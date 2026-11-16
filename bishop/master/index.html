@@ -104,7 +104,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch an astronaut.
+        Click anywhere on the canvas to launch astronauts.
     </div>
 
     <script>
@@ -117,6 +117,7 @@
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;          // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
+        const MAX_ASTRONAUTS = 50;         // Cap simultaneous astronauts for performance
 
         // STATE VARIABLES
         let astronauts = [];
@@ -141,7 +142,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch astronaut at click position
+        // Canvas Click Handler: Launch an additional astronaut at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -156,8 +157,13 @@
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single astronaut on screen
-            astronauts = [{
+            // Remove oldest astronaut if cap is reached
+            if (astronauts.length >= MAX_ASTRONAUTS) {
+                astronauts.shift();
+            }
+
+            // Append new astronaut so multiple remain active simultaneously
+            astronauts.push({
                 x: x,
                 y: y,
                 vx: vx,
@@ -166,7 +172,7 @@
                 angle: 0,
                 angularVelocity: 0.03, // Gentle zero-gravity tumble
                 trail: [] // Stores history of past {x, y} coordinates
-            }];
+            });
         }
 
         function resetSimulation() {
@@ -335,7 +341,7 @@
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            // 2. Draw Astronaut & Trail
+            // 2. Draw Astronauts & Trails
             for (const a of astronauts) {
                 // Draw path line
                 if (a.trail.length > 1) {
