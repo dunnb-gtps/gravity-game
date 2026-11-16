@@ -104,7 +104,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball.
+        Click anywhere on the canvas to launch an astronaut.
     </div>
 
     <script>
@@ -115,11 +115,11 @@
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;         // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
 
         // STATE VARIABLES
-        let balls = [];
+        let astronauts = [];
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -141,57 +141,59 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch ball at click position
+        // Canvas Click Handler: Directly launch astronaut at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchBall(clickX, clickY);
+            launchAstronaut(clickX, clickY);
         });
 
-        function launchBall(x, y) {
+        function launchAstronaut(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
-            balls = [{
+            // Overwrite existing array to strictly maintain a single astronaut on screen
+            astronauts = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4,
+                radius: 12,
+                angle: 0,
+                angularVelocity: 0.03, // Gentle zero-gravity tumble
                 trail: [] // Stores history of past {x, y} coordinates
             }];
         }
 
         function resetSimulation() {
-            balls = [];
+            astronauts = [];
         }
 
         function updatePhysics() {
-            for (let i = balls.length - 1; i >= 0; i--) {
-                const b = balls[i];
+            for (let i = astronauts.length - 1; i >= 0; i--) {
+                const a = astronauts[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove astronaut if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
-                    b.y < -margin || b.y > canvas.height + margin) {
-                    balls.splice(i, 1);
+                if (a.x < -margin || a.x > canvas.width + margin || 
+                    a.y < -margin || a.y > canvas.height + margin) {
+                    astronauts.splice(i, 1);
                     continue;
                 }
 
                 // Distance vector to central gravity node
-                const dx = centralNode.x - b.x;
-                const dy = centralNode.y - b.y;
+                const dx = centralNode.x - a.x;
+                const dy = centralNode.y - a.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
-                if (dist < centralNode.radius + b.radius) {
-                    balls.splice(i, 1);
+                // Absorption check: astronaut collides with central mass
+                if (dist < centralNode.radius + a.radius) {
+                    astronauts.splice(i, 1);
                     continue;
                 }
 
@@ -202,18 +204,118 @@
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
 
-                // Update velocity and position
-                b.vx += ax;
-                b.vy += ay;
-                b.x += b.vx;
-                b.y += b.vy;
+                // Update velocity, position, and rotation
+                a.vx += ax;
+                a.vy += ay;
+                a.x += a.vx;
+                a.y += a.vy;
+                a.angle += a.angularVelocity;
 
                 // Record position history for line trail
-                b.trail.push({ x: b.x, y: b.y });
-                if (b.trail.length > TRAIL_LENGTH) {
-                    b.trail.shift();
+                a.trail.push({ x: a.x, y: a.y });
+                if (a.trail.length > TRAIL_LENGTH) {
+                    a.trail.shift();
                 }
             }
+        }
+
+        function drawRoundedRect(x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function drawAstronaut(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 1. Life-Support Backpack (PLSS)
+            ctx.fillStyle = '#cccccc';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            drawRoundedRect(-8, -6, 5, 11, 1.5);
+            ctx.fill();
+            ctx.stroke();
+
+            // 2. Legs (floating zero-G pose)
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3.5;
+            // Left/back leg
+            ctx.beginPath();
+            ctx.moveTo(-2, 5);
+            ctx.lineTo(-4, 11);
+            ctx.lineTo(-2, 14);
+            ctx.stroke();
+            // Right/front leg
+            ctx.beginPath();
+            ctx.moveTo(2, 5);
+            ctx.lineTo(4, 10);
+            ctx.lineTo(6, 13);
+            ctx.stroke();
+
+            // 3. Arms (floating outward)
+            ctx.lineWidth = 3;
+            // Left/back arm
+            ctx.beginPath();
+            ctx.moveTo(-4, -3);
+            ctx.lineTo(-9, 1);
+            ctx.stroke();
+            // Right/front arm
+            ctx.beginPath();
+            ctx.moveTo(4, -3);
+            ctx.lineTo(9, -6);
+            ctx.stroke();
+
+            // 4. Torso (spacesuit body)
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            drawRoundedRect(-5, -5, 10, 11, 2.5);
+            ctx.fill();
+            ctx.stroke();
+
+            // Chest control module
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(-2, -2, 5, 4);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-1, -1, 1.2, 1.2);
+            ctx.fillRect(1, -1, 1.2, 1.2);
+
+            // 5. Helmet
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(0, -10, 6.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Visor
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.ellipse(1.5, -10, 4.2, 3.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Visor reflection glint
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(2.2, -10.8, 2, -Math.PI * 0.7, -Math.PI * 0.15);
+            ctx.stroke();
+
+            ctx.restore();
         }
 
         function draw() {
@@ -233,25 +335,22 @@
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            // 2. Draw Ball & Trail
-            for (const b of balls) {
+            // 2. Draw Astronaut & Trail
+            for (const a of astronauts) {
                 // Draw path line
-                if (b.trail.length > 1) {
+                if (a.trail.length > 1) {
                     ctx.beginPath();
-                    ctx.moveTo(b.trail[0].x, b.trail[0].y);
-                    for (let t = 1; t < b.trail.length; t++) {
-                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                    ctx.moveTo(a.trail[0].x, a.trail[0].y);
+                    for (let t = 1; t < a.trail.length; t++) {
+                        ctx.lineTo(a.trail[t].x, a.trail[t].y);
                     }
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 1.2;
                     ctx.stroke();
                 }
 
-                // Draw ball object
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
+                // Draw astronaut figure
+                drawAstronaut(a.x, a.y, a.angle);
             }
         }
 
