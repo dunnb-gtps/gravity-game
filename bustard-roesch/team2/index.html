@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Simulation - Jungle Edition</title>
     <style>
         * {
             box-sizing: border-box;
@@ -14,8 +14,8 @@
         }
 
         body {
-            background-color: #000000;
-            color: #ffffff;
+            background-color: #07140e;
+            color: #e8f5ee;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -34,7 +34,7 @@
             max-width: 1100px;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #ffffff;
+            border-bottom: 1px solid #35684e;
         }
 
         h1 {
@@ -42,12 +42,15 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             font-weight: bold;
+            color: #d8f3dc;
+            text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
         }
 
         .btn-reset {
-            background: transparent;
-            color: #ffffff;
-            border: 1px solid #ffffff;
+            background: rgba(13, 38, 27, 0.75);
+            color: #d8f3dc;
+            border: 1px solid #52b788;
+            border-radius: 4px;
             padding: 6px 16px;
             font-size: 14px;
             font-weight: bold;
@@ -58,8 +61,12 @@
         }
 
         .btn-reset:hover {
-            background: #ffffff;
-            color: #000000;
+            background: #52b788;
+            color: #07140e;
+        }
+
+        .btn-reset:active {
+            transform: scale(0.97);
         }
 
         /* Main Canvas Container */
@@ -71,11 +78,15 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
         }
 
         canvas {
-            background-color: #000000;
-            border: 1px solid #ffffff;
+            background-color: #081c15;
+            border: 1px solid #35684e;
+            border-radius: 6px;
             display: block;
             cursor: crosshair;
             width: 100%;
@@ -85,8 +96,9 @@
         .instructions {
             margin-top: 8px;
             font-size: 11px;
-            color: #888888;
+            color: #8cb89f;
             text-align: center;
+            letter-spacing: 0.4px;
         }
     </style>
 </head>
@@ -111,15 +123,21 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // SIMULATION CONSTANTS
+        // Offscreen canvas to cache the detailed procedural jungle scene for smooth 60fps rendering
+        const bgCanvas = document.createElement('canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        // SIMULATION CONSTANTS (Preserved exactly from baseline)
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;         // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
 
         // STATE VARIABLES
         let balls = [];
+        let fireflies = [];
+        let animTime = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -128,14 +146,457 @@
             radius: 12
         };
 
+        // Deterministic PRNG (Mulberry32) so jungle foliage stays consistent across resizes
+        function createSeededRandom(seed) {
+            return function() {
+                let t = seed += 0x6D2B79F5;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        // Initialize drifting jungle fireflies / forest dust motes
+        function initFireflies(width, height) {
+            const rand = createSeededRandom(90210);
+            const count = 34;
+            fireflies = [];
+
+            for (let i = 0; i < count; i++) {
+                fireflies.push({
+                    x: rand() * width,
+                    y: rand() * height,
+                    baseX: rand() * width,
+                    baseY: rand() * height,
+                    radius: 1.1 + rand() * 1.6,
+                    speedX: (rand() - 0.5) * 0.28,
+                    speedY: -0.08 - rand() * 0.22,
+                    phase: rand() * Math.PI * 2,
+                    pulseSpeed: 0.02 + rand() * 0.03,
+                    swayAmp: 12 + rand() * 24,
+                    swayFreq: 0.006 + rand() * 0.01,
+                    isWarmGold: rand() > 0.35
+                });
+            }
+        }
+
+        // Helper: Draw a curved tropical palm frond with radiating leaflets
+        function drawPalmFrond(targetCtx, startX, startY, ctrlX, ctrlY, endX, endY, leafletCount, maxLen, color, highlightColor) {
+            targetCtx.save();
+
+            // Central rachis stem
+            targetCtx.beginPath();
+            targetCtx.moveTo(startX, startY);
+            targetCtx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+            targetCtx.strokeStyle = highlightColor || color;
+            targetCtx.lineWidth = 2.2;
+            targetCtx.stroke();
+
+            // Leaflets along quadratic Bezier curve
+            for (let i = 1; i < leafletCount; i++) {
+                const t = i / leafletCount;
+                const invT = 1 - t;
+
+                // Point on curve
+                const px = invT * invT * startX + 2 * invT * t * ctrlX + t * t * endX;
+                const py = invT * invT * startY + 2 * invT * t * ctrlY + t * t * endY;
+
+                // Tangent vector
+                const tx = 2 * invT * (ctrlX - startX) + 2 * t * (endX - ctrlX);
+                const ty = 2 * invT * (ctrlY - startY) + 2 * t * (endY - ctrlY);
+                const angle = Math.atan2(ty, tx);
+
+                // Taper leaflet length toward tip and base
+                const profile = Math.sin(t * Math.PI);
+                const len = maxLen * (0.25 + 0.85 * profile);
+
+                for (const side of [-1, 1]) {
+                    const leafAngle = angle + side * (1.05 - t * 0.25);
+                    const tipX = px + Math.cos(leafAngle) * len;
+                    const tipY = py + Math.sin(leafAngle) * len + len * 0.18; // Slight gravity droop
+                    const midX = (px + tipX) * 0.5 + Math.cos(leafAngle - side * 0.4) * (len * 0.14);
+                    const midY = (py + tipY) * 0.5 + Math.sin(leafAngle - side * 0.4) * (len * 0.14);
+
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(px, py);
+                    targetCtx.quadraticCurveTo(midX, midY, tipX, tipY);
+                    targetCtx.quadraticCurveTo(
+                        (px + tipX) * 0.5 - Math.cos(leafAngle - side * 0.4) * (len * 0.08),
+                        (py + tipY) * 0.5 - Math.sin(leafAngle - side * 0.4) * (len * 0.08),
+                        px,
+                        py
+                    );
+                    targetCtx.fillStyle = color;
+                    targetCtx.fill();
+                }
+            }
+
+            targetCtx.restore();
+        }
+
+        // Helper: Draw a broad tropical Monstera leaf with natural splits
+        function drawMonsteraLeaf(targetCtx, baseX, baseY, angle, size, fillColor, veinColor) {
+            targetCtx.save();
+            targetCtx.translate(baseX, baseY);
+            targetCtx.rotate(angle);
+
+            // Leaf stem
+            targetCtx.beginPath();
+            targetCtx.moveTo(0, 0);
+            targetCtx.quadraticCurveTo(size * 0.05, -size * 0.25, 0, -size * 0.45);
+            targetCtx.strokeStyle = veinColor;
+            targetCtx.lineWidth = Math.max(2, size * 0.03);
+            targetCtx.stroke();
+
+            // Heart-shaped outer silhouette with scalloped fenestration notches
+            targetCtx.translate(0, -size * 0.42);
+            targetCtx.beginPath();
+            targetCtx.moveTo(0, 0);
+
+            // Left lobe curving up to tip
+            targetCtx.bezierCurveTo(-size * 0.45, size * 0.15, -size * 0.62, -size * 0.32, -size * 0.48, -size * 0.52);
+            // Notch 1
+            targetCtx.lineTo(-size * 0.22, -size * 0.46);
+            targetCtx.lineTo(-size * 0.44, -size * 0.60);
+            // Notch 2
+            targetCtx.bezierCurveTo(-size * 0.40, -size * 0.76, -size * 0.34, -size * 0.84, -size * 0.18, -size * 0.78);
+            targetCtx.lineTo(-size * 0.30, -size * 0.90);
+            // Tip
+            targetCtx.quadraticCurveTo(-size * 0.14, -size * 1.12, 0, -size * 1.22);
+            // Right side mirror with notches
+            targetCtx.quadraticCurveTo(size * 0.14, -size * 1.12, size * 0.30, -size * 0.90);
+            targetCtx.lineTo(size * 0.18, -size * 0.78);
+            targetCtx.bezierCurveTo(size * 0.34, -size * 0.84, size * 0.40, -size * 0.76, size * 0.44, -size * 0.60);
+            targetCtx.lineTo(size * 0.22, -size * 0.46);
+            targetCtx.lineTo(size * 0.48, -size * 0.52);
+            targetCtx.bezierCurveTo(size * 0.62, -size * 0.32, size * 0.45, size * 0.15, 0, 0);
+
+            targetCtx.fillStyle = fillColor;
+            targetCtx.fill();
+
+            // Central midrib vein
+            targetCtx.beginPath();
+            targetCtx.moveTo(0, -size * 0.04);
+            targetCtx.lineTo(0, -size * 1.12);
+            targetCtx.strokeStyle = veinColor;
+            targetCtx.lineWidth = 1.4;
+            targetCtx.stroke();
+
+            targetCtx.restore();
+        }
+
+        // Helper: Draw a hanging liana vine with pairs of tropical leaves
+        function drawHangingVine(targetCtx, anchorX, length, sway, leafDensity, vineColor, leafColor, leafHighlight) {
+            targetCtx.save();
+
+            const cp1X = anchorX + sway;
+            const cp1Y = length * 0.35;
+            const cp2X = anchorX - sway * 0.8;
+            const cp2Y = length * 0.72;
+            const endX = anchorX + sway * 0.4;
+            const endY = length;
+
+            // Main vine tendril
+            targetCtx.beginPath();
+            targetCtx.moveTo(anchorX, -5);
+            targetCtx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+            targetCtx.strokeStyle = vineColor;
+            targetCtx.lineWidth = 2;
+            targetCtx.stroke();
+
+            // Leaves along the cubic Bezier vine
+            for (let i = 1; i <= leafDensity; i++) {
+                const t = i / (leafDensity + 0.5);
+                const u = 1 - t;
+
+                const vx = u * u * u * anchorX +
+                           3 * u * u * t * cp1X +
+                           3 * u * t * t * cp2X +
+                           t * t * t * endX;
+                const vy = u * u * u * (-5) +
+                           3 * u * u * t * cp1Y +
+                           3 * u * t * t * cp2Y +
+                           t * t * t * endY;
+
+                const side = (i % 2 === 0) ? 1 : -1;
+                const leafLen = 13 + Math.sin(t * Math.PI) * 9;
+                const leafWid = leafLen * 0.45;
+                const leafAngle = side * (0.55 + (i % 3) * 0.15);
+
+                targetCtx.save();
+                targetCtx.translate(vx, vy);
+                targetCtx.rotate(leafAngle);
+
+                targetCtx.beginPath();
+                targetCtx.moveTo(0, 0);
+                targetCtx.quadraticCurveTo(side * leafWid, leafLen * 0.45, 0, leafLen);
+                targetCtx.quadraticCurveTo(-side * leafWid, leafLen * 0.45, 0, 0);
+                targetCtx.fillStyle = (i % 3 === 0) ? leafHighlight : leafColor;
+                targetCtx.fill();
+
+                targetCtx.restore();
+            }
+
+            targetCtx.restore();
+        }
+
+        // Helper: Draw a framing jungle tree trunk with bark texture & buttress roots
+        function drawFramingTrunk(targetCtx, isLeft, w, h, rand) {
+            targetCtx.save();
+            const trunkWidth = Math.max(36, w * 0.055);
+            const baseX = isLeft ? 0 : w;
+            const dir = isLeft ? 1 : -1;
+
+            // Main trunk silhouette with gentle organic curve
+            targetCtx.beginPath();
+            targetCtx.moveTo(baseX, 0);
+            targetCtx.lineTo(baseX + dir * trunkWidth * 1.15, 0);
+            targetCtx.bezierCurveTo(
+                baseX + dir * trunkWidth * 0.85, h * 0.35,
+                baseX + dir * trunkWidth * 1.05, h * 0.68,
+                baseX + dir * trunkWidth * 1.9, h
+            );
+            targetCtx.lineTo(baseX, h);
+            targetCtx.closePath();
+
+            const trunkGrad = targetCtx.createLinearGradient(
+                baseX, 0,
+                baseX + dir * trunkWidth * 1.8, 0
+            );
+            trunkGrad.addColorStop(0, '#040e0a');
+            trunkGrad.addColorStop(0.65, '#081b14');
+            trunkGrad.addColorStop(1, '#123326');
+            targetCtx.fillStyle = trunkGrad;
+            targetCtx.fill();
+
+            // Subtle vertical bark ridges & moss patches
+            targetCtx.strokeStyle = 'rgba(45, 106, 79, 0.25)';
+            targetCtx.lineWidth = 1.5;
+            for (let b = 0; b < 6; b++) {
+                const offset = (0.2 + b * 0.13) * trunkWidth;
+                targetCtx.beginPath();
+                targetCtx.moveTo(baseX + dir * offset, 0);
+                targetCtx.bezierCurveTo(
+                    baseX + dir * (offset - 4 + rand() * 8), h * 0.35,
+                    baseX + dir * (offset + 5), h * 0.72,
+                    baseX + dir * (offset * 1.45), h
+                );
+                targetCtx.stroke();
+            }
+
+            targetCtx.restore();
+        }
+
+        // Render the complete multi-layered procedural jungle background to bgCanvas
+        function renderJungleBackground() {
+            const w = bgCanvas.width;
+            const h = bgCanvas.height;
+            if (w <= 0 || h <= 0) return;
+
+            const rand = createSeededRandom(42719);
+            bgCtx.clearRect(0, 0, w, h);
+
+            // 1. Deep Misty Rainforest Canopy Gradient Backdrop
+            const skyGrad = bgCtx.createLinearGradient(0, 0, 0, h);
+            skyGrad.addColorStop(0.0, '#061711');
+            skyGrad.addColorStop(0.28, '#0d2b20');
+            skyGrad.addColorStop(0.58, '#163d2e');
+            skyGrad.addColorStop(0.85, '#0c261c');
+            skyGrad.addColorStop(1.0, '#05120d');
+            bgCtx.fillStyle = skyGrad;
+            bgCtx.fillRect(0, 0, w, h);
+
+            // Subtle radial canopy clearing glow near upper-center (kept soft so white ball pops)
+            const canopyGlow = bgCtx.createRadialGradient(
+                w * 0.48, h * 0.22, w * 0.02,
+                w * 0.48, h * 0.35, w * 0.55
+            );
+            canopyGlow.addColorStop(0, 'rgba(82, 183, 136, 0.16)');
+            canopyGlow.addColorStop(0.5, 'rgba(45, 106, 79, 0.08)');
+            canopyGlow.addColorStop(1, 'rgba(8, 28, 21, 0)');
+            bgCtx.fillStyle = canopyGlow;
+            bgCtx.fillRect(0, 0, w, h);
+
+            // 2. Distant Misty Jungle Tree Trunks & Layered Canopy Silhouettes
+            bgCtx.save();
+            const distantTrunkCount = 11;
+            for (let i = 0; i < distantTrunkCount; i++) {
+                const tx = (w / (distantTrunkCount - 1)) * i + (rand() - 0.5) * 35;
+                const tw = 12 + rand() * 22;
+                bgCtx.fillStyle = i % 2 === 0
+                    ? 'rgba(10, 34, 25, 0.48)'
+                    : 'rgba(17, 50, 37, 0.35)';
+                bgCtx.fillRect(tx - tw * 0.5, 0, tw, h);
+            }
+
+            // Distant rolling canopy foliage mounds
+            bgCtx.fillStyle = 'rgba(11, 37, 27, 0.65)';
+            bgCtx.beginPath();
+            bgCtx.moveTo(0, h);
+            for (let x = 0; x <= w + 60; x += 45) {
+                const moundY = h * 0.76 - Math.sin(x * 0.008) * 28 - rand() * 24;
+                bgCtx.lineTo(x, moundY);
+            }
+            bgCtx.lineTo(w, h);
+            bgCtx.closePath();
+            bgCtx.fill();
+            bgCtx.restore();
+
+            // 3. Diagonal Shafts of Filtered Rainforest Sunlight (God Rays)
+            bgCtx.save();
+            const rays = [
+                { topX: w * 0.22, topW: w * 0.07, botX: w * 0.44, botW: w * 0.16, alpha: 0.045 },
+                { topX: w * 0.42, topW: w * 0.09, botX: w * 0.68, botW: w * 0.20, alpha: 0.055 },
+                { topX: w * 0.63, topW: w * 0.05, botX: w * 0.86, botW: w * 0.13, alpha: 0.035 }
+            ];
+            for (const ray of rays) {
+                const rayGrad = bgCtx.createLinearGradient(ray.topX, 0, ray.botX, h * 0.85);
+                rayGrad.addColorStop(0, `rgba(183, 228, 199, ${ray.alpha * 1.4})`);
+                rayGrad.addColorStop(0.55, `rgba(149, 213, 178, ${ray.alpha})`);
+                rayGrad.addColorStop(1, 'rgba(149, 213, 178, 0)');
+
+                bgCtx.beginPath();
+                bgCtx.moveTo(ray.topX - ray.topW * 0.5, 0);
+                bgCtx.lineTo(ray.topX + ray.topW * 0.5, 0);
+                bgCtx.lineTo(ray.botX + ray.botW * 0.5, h);
+                bgCtx.lineTo(ray.botX - ray.botW * 0.5, h);
+                bgCtx.closePath();
+                bgCtx.fillStyle = rayGrad;
+                bgCtx.fill();
+            }
+            bgCtx.restore();
+
+            // Subtle mid-level atmospheric mist band
+            const mistGrad = bgCtx.createLinearGradient(0, h * 0.45, 0, h * 0.92);
+            mistGrad.addColorStop(0, 'rgba(116, 198, 157, 0)');
+            mistGrad.addColorStop(0.55, 'rgba(116, 198, 157, 0.055)');
+            mistGrad.addColorStop(1, 'rgba(8, 28, 21, 0.25)');
+            bgCtx.fillStyle = mistGrad;
+            bgCtx.fillRect(0, h * 0.45, w, h * 0.47);
+
+            // 4. Mid-ground Palm Fronds & Broad Monstera Leaves in Corners
+            // Upper-left & upper-right canopy palm fronds
+            drawPalmFrond(
+                bgCtx,
+                -10, h * 0.14,
+                w * 0.11, h * 0.06,
+                w * 0.23, h * 0.18,
+                16, 44,
+                '#143b2c', '#245c45'
+            );
+            drawPalmFrond(
+                bgCtx,
+                w + 10, h * 0.12,
+                w * 0.88, h * 0.05,
+                w * 0.76, h * 0.17,
+                16, 44,
+                '#143b2c', '#245c45'
+            );
+
+            // Lower-left & lower-right Monstera leaves
+            const leafScale = Math.min(w, h) * 0.23;
+            drawMonsteraLeaf(bgCtx, w * 0.07, h + 10, 0.42, leafScale * 1.1, '#123829', '#256149');
+            drawMonsteraLeaf(bgCtx, w * 0.16, h + 14, 0.78, leafScale * 0.85, '#1b4d39', '#327a5d');
+            drawMonsteraLeaf(bgCtx, w * 0.93, h + 10, -0.45, leafScale * 1.12, '#123829', '#256149');
+            drawMonsteraLeaf(bgCtx, w * 0.84, h + 14, -0.82, leafScale * 0.88, '#1b4d39', '#327a5d');
+
+            // 5. Left & Right Framing Jungle Tree Trunks
+            drawFramingTrunk(bgCtx, true, w, h, rand);
+            drawFramingTrunk(bgCtx, false, w, h, rand);
+
+            // 6. Upper Canopy Foliage Border & Hanging Liana Vines
+            // Dense dark emerald canopy clusters along the very top edge
+            bgCtx.save();
+            const clusterStep = 44;
+            for (let cx = -20; cx <= w + 40; cx += clusterStep) {
+                const rad = 34 + rand() * 24;
+                const cy = -8 + rand() * 16;
+                bgCtx.beginPath();
+                bgCtx.arc(cx, cy, rad, 0, Math.PI * 2);
+                bgCtx.fillStyle = rand() > 0.45 ? '#071b13' : '#0d2b1f';
+                bgCtx.fill();
+            }
+            bgCtx.restore();
+
+            // Hanging vines (shorter in the middle so central orbital space remains clear)
+            const vineCount = Math.max(9, Math.floor(w / 85));
+            for (let v = 0; v < vineCount; v++) {
+                const normX = (v + 0.5) / vineCount;
+                const vx = normX * w + (rand() - 0.5) * 18;
+                // Keep middle vines shorter than outer edge vines
+                const edgeFactor = Math.abs(normX - 0.5) * 2; // 0 at center, 1 at edges
+                const maxVineLen = h * (0.11 + edgeFactor * 0.24);
+                const vineLen = maxVineLen * (0.65 + rand() * 0.45);
+                const sway = (rand() - 0.5) * 34;
+                const leaves = Math.max(4, Math.floor(vineLen / 18));
+
+                drawHangingVine(
+                    bgCtx,
+                    vx,
+                    vineLen,
+                    sway,
+                    leaves,
+                    '#174231',
+                    '#1e543f',
+                    '#2f7a5c'
+                );
+            }
+
+            // 7. Lush Forest Floor Ferns & Undergrowth along the Bottom Edge
+            const fernCount = Math.max(12, Math.floor(w / 68));
+            for (let f = 0; f < fernCount; f++) {
+                const fx = (f / (fernCount - 1)) * w + (rand() - 0.5) * 22;
+                const lean = (rand() - 0.5) * 1.1;
+                const fernH = 38 + rand() * 44;
+                const endX = fx + Math.sin(lean) * fernH * 1.15;
+                const endY = h - Math.cos(lean) * fernH;
+                const ctrlX = fx + Math.sin(lean) * fernH * 0.45;
+                const ctrlY = h - fernH * 0.65;
+
+                drawPalmFrond(
+                    bgCtx,
+                    fx, h + 4,
+                    ctrlX, ctrlY,
+                    endX, endY,
+                    11, 20 + rand() * 10,
+                    f % 2 === 0 ? '#0b261c' : '#143d2d',
+                    '#245c45'
+                );
+            }
+
+            // Subtle dark floor vignette for depth and clean framing
+            const floorVignette = bgCtx.createLinearGradient(0, h - 42, 0, h);
+            floorVignette.addColorStop(0, 'rgba(4, 14, 10, 0)');
+            floorVignette.addColorStop(1, 'rgba(4, 14, 10, 0.82)');
+            bgCtx.fillStyle = floorVignette;
+            bgCtx.fillRect(0, h - 42, w, 42);
+
+            // Subtle shaded radial focus in the center so the white trail & ball have crisp contrast
+            const centerContrast = bgCtx.createRadialGradient(
+                w * 0.5, h * 0.5, Math.min(w, h) * 0.05,
+                w * 0.5, h * 0.5, Math.min(w, h) * 0.44
+            );
+            centerContrast.addColorStop(0, 'rgba(5, 18, 13, 0.34)');
+            centerContrast.addColorStop(1, 'rgba(5, 18, 13, 0)');
+            bgCtx.fillStyle = centerContrast;
+            bgCtx.fillRect(0, 0, w, h);
+        }
+
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
+
+            bgCanvas.width = canvas.width;
+            bgCanvas.height = canvas.height;
+
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            // Re-render cached jungle backdrop and re-seed fireflies to fit new bounds
+            renderJungleBackground();
+            initFireflies(canvas.width, canvas.height);
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -171,13 +632,31 @@
             balls = [];
         }
 
+        function updateFireflies() {
+            animTime += 1;
+            for (const f of fireflies) {
+                f.baseY += f.speedY;
+                f.baseX += f.speedX;
+                f.x = f.baseX + Math.sin(animTime * f.swayFreq + f.phase) * f.swayAmp;
+                f.y = f.baseY;
+
+                // Wrap gently around edges
+                if (f.y < -10) {
+                    f.baseY = canvas.height + 10;
+                    f.baseX = Math.random() * canvas.width;
+                }
+                if (f.baseX < -20) f.baseX = canvas.width + 20;
+                if (f.baseX > canvas.width + 20) f.baseX = -20;
+            }
+        }
+
         function updatePhysics() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
                 // Remove ball if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
+                if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
                     balls.splice(i, 1);
                     continue;
@@ -216,12 +695,49 @@
             }
         }
 
-        function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function drawFireflies() {
+            for (const f of fireflies) {
+                const pulse = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(animTime * f.pulseSpeed + f.phase));
+                const glowRadius = f.radius * 4.5;
 
-            // 1. Draw Central Mass Node
+                const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowRadius);
+                if (f.isWarmGold) {
+                    grad.addColorStop(0, `rgba(255, 238, 136, ${pulse})`);
+                    grad.addColorStop(0.45, `rgba(217, 237, 146, ${pulse * 0.45})`);
+                    grad.addColorStop(1, 'rgba(217, 237, 146, 0)');
+                } else {
+                    grad.addColorStop(0, `rgba(183, 228, 199, ${pulse})`);
+                    grad.addColorStop(0.45, `rgba(116, 198, 157, ${pulse * 0.4})`);
+                    grad.addColorStop(1, 'rgba(116, 198, 157, 0)');
+                }
+
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, glowRadius, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+            }
+        }
+
+        function draw() {
+            // 0. Draw cached procedural jungle background
+            ctx.drawImage(bgCanvas, 0, 0);
+
+            // Subtle drifting jungle fireflies
+            drawFireflies();
+
+            // 1. Draw Central Mass Node (crisp luminous appearance + center mark)
+            const nodeAura = ctx.createRadialGradient(
+                centralNode.x, centralNode.y, centralNode.radius * 0.8,
+                centralNode.x, centralNode.y, centralNode.radius * 2.6
+            );
+            nodeAura.addColorStop(0, 'rgba(216, 243, 220, 0.38)');
+            nodeAura.addColorStop(0.6, 'rgba(116, 198, 157, 0.14)');
+            nodeAura.addColorStop(1, 'rgba(116, 198, 157, 0)');
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, centralNode.radius * 2.6, 0, Math.PI * 2);
+            ctx.fillStyle = nodeAura;
+            ctx.fill();
+
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
@@ -230,7 +746,7 @@
             // Center mark on node
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = '#061711';
             ctx.fill();
 
             // 2. Draw Ball & Trail
@@ -243,9 +759,15 @@
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
                     ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
+                    ctx.lineWidth = 1.35;
                     ctx.stroke();
                 }
+
+                // Subtle soft halo around ball for high contrast against foliage
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius * 2.2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(216, 243, 220, 0.25)';
+                ctx.fill();
 
                 // Draw ball object
                 ctx.beginPath();
@@ -256,12 +778,14 @@
         }
 
         function animate() {
+            updateFireflies();
             updatePhysics();
             draw();
             requestAnimationFrame(animate);
         }
 
         window.onload = function() {
+            resizeCanvas();
             animate();
         };
     </script>
