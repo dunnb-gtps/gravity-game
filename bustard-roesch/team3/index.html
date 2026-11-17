@@ -14,8 +14,8 @@
         }
 
         body {
-            background-color: #000000;
-            color: #ffffff;
+            background: radial-gradient(ellipse at top, #091024 0%, #02040a 70%, #010206 100%);
+            color: #e6eefc;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -34,7 +34,7 @@
             max-width: 1100px;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #ffffff;
+            border-bottom: 1px solid rgba(148, 184, 255, 0.35);
         }
 
         h1 {
@@ -42,24 +42,29 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             font-weight: bold;
+            color: #f0f6ff;
+            text-shadow: 0 0 12px rgba(125, 211, 252, 0.35);
         }
 
         .btn-reset {
-            background: transparent;
-            color: #ffffff;
-            border: 1px solid #ffffff;
+            background: rgba(10, 18, 38, 0.65);
+            color: #e6eefc;
+            border: 1px solid rgba(148, 184, 255, 0.55);
             padding: 6px 16px;
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 1px;
+            border-radius: 4px;
             transition: all 0.15s ease-in-out;
         }
 
         .btn-reset:hover {
-            background: #ffffff;
-            color: #000000;
+            background: #e6eefc;
+            color: #02040a;
+            border-color: #ffffff;
+            box-shadow: 0 0 14px rgba(148, 184, 255, 0.5);
         }
 
         /* Main Canvas Container */
@@ -74,8 +79,10 @@
         }
 
         canvas {
-            background-color: #000000;
-            border: 1px solid #ffffff;
+            background-color: #02040a;
+            border: 1px solid rgba(148, 184, 255, 0.4);
+            box-shadow: 0 0 30px rgba(8, 16, 40, 0.85), inset 0 0 24px rgba(15, 28, 64, 0.4);
+            border-radius: 4px;
             display: block;
             cursor: crosshair;
             width: 100%;
@@ -85,8 +92,9 @@
         .instructions {
             margin-top: 8px;
             font-size: 11px;
-            color: #888888;
+            color: #7c8fb5;
             text-align: center;
+            letter-spacing: 0.4px;
         }
     </style>
 </head>
@@ -111,15 +119,34 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // SIMULATION CONSTANTS
+        // Offscreen canvas for static deep-space backdrop (nebulae, dust band, distant planet)
+        const bgCanvas = document.createElement('canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        // SIMULATION CONSTANTS (Preserved 100% from baseline)
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
+        // SPACE THEME CONSTANTS
+        const STAR_COUNT = 200;
+        const STAR_PALETTE = [
+            '#ffffff', // Pure white
+            '#ffffff',
+            '#dbeafe', // Pale blue-white
+            '#bfdbfe', // Cool blue-white
+            '#fef3c7', // Warm pale gold
+            '#fde68a'  // Soft amber starlight
+        ];
+
         // STATE VARIABLES
         let balls = [];
+        let stars = [];
+        let shootingStars = [];
+        let nextShootingStarTimer = 180;
+        let animationTime = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -127,6 +154,194 @@
             y: 0,
             radius: 12
         };
+
+        /**
+         * Initializes procedural twinkling stars across multiple depth layers
+         * adapted to the current canvas dimensions.
+         */
+        function initStarfield(width, height) {
+            stars = [];
+            for (let i = 0; i < STAR_COUNT; i++) {
+                // Depth layer: 0 = distant faint, 1 = mid, 2 = bright foreground
+                const layerRoll = Math.random();
+                const layer = layerRoll < 0.55 ? 0 : (layerRoll < 0.88 ? 1 : 2);
+
+                let radius, baseAlpha;
+                if (layer === 0) {
+                    radius = 0.6 + Math.random() * 0.45;
+                    baseAlpha = 0.28 + Math.random() * 0.32;
+                } else if (layer === 1) {
+                    radius = 1.05 + Math.random() * 0.55;
+                    baseAlpha = 0.48 + Math.random() * 0.35;
+                } else {
+                    radius = 1.6 + Math.random() * 0.6;
+                    baseAlpha = 0.72 + Math.random() * 0.28;
+                }
+
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    radius: radius,
+                    color: STAR_PALETTE[Math.floor(Math.random() * STAR_PALETTE.length)],
+                    baseAlpha: baseAlpha,
+                    phase: Math.random() * Math.PI * 2,
+                    twinkleSpeed: 0.015 + Math.random() * 0.035,
+                    hasGlint: layer === 2 && radius >= 1.78
+                });
+            }
+        }
+
+        /**
+         * Pre-renders the deep-space gradient, multi-layered nebulae, cosmic dust band,
+         * and a distant ringed planet onto an offscreen canvas for smooth 60fps rendering.
+         */
+        function renderStaticSpaceBackdrop(width, height) {
+            bgCanvas.width = width;
+            bgCanvas.height = height;
+
+            if (width <= 0 || height <= 0) return;
+
+            // 1. Deep Cosmic Gradient (#02040a -> #080d1e -> #03050c)
+            const baseGrad = bgCtx.createLinearGradient(0, 0, width, height);
+            baseGrad.addColorStop(0, '#02040a');
+            baseGrad.addColorStop(0.5, '#080d1e');
+            baseGrad.addColorStop(1, '#03050c');
+            bgCtx.fillStyle = baseGrad;
+            bgCtx.fillRect(0, 0, width, height);
+
+            // Subtle deep atmospheric vignette/core depth
+            const centerDepth = bgCtx.createRadialGradient(
+                width * 0.5, height * 0.5, width * 0.05,
+                width * 0.5, height * 0.5, Math.max(width, height) * 0.75
+            );
+            centerDepth.addColorStop(0, 'rgba(14, 24, 52, 0.28)');
+            centerDepth.addColorStop(1, 'rgba(1, 2, 6, 0.45)');
+            bgCtx.fillStyle = centerDepth;
+            bgCtx.fillRect(0, 0, width, height);
+
+            // 2. Layered Soft Radial Nebula Clouds (Indigo, Cosmic Blue, Violet, Teal wisps)
+            bgCtx.save();
+            bgCtx.globalCompositeOperation = 'screen';
+
+            const nebulae = [
+                { x: width * 0.22, y: height * 0.30, r: Math.max(width, height) * 0.42, inner: 'rgba(49, 46, 129, 0.13)', mid: 'rgba(30, 27, 75, 0.05)' },
+                { x: width * 0.78, y: height * 0.68, r: Math.max(width, height) * 0.46, inner: 'rgba(29, 78, 216, 0.11)', mid: 'rgba(23, 37, 84, 0.04)' },
+                { x: width * 0.68, y: height * 0.24, r: Math.max(width, height) * 0.34, inner: 'rgba(91, 33, 182, 0.08)', mid: 'rgba(59, 7, 100, 0.03)' },
+                { x: width * 0.34, y: height * 0.76, r: Math.max(width, height) * 0.36, inner: 'rgba(15, 118, 110, 0.075)', mid: 'rgba(17, 94, 89, 0.025)' },
+                { x: width * 0.52, y: height * 0.48, r: Math.max(width, height) * 0.30, inner: 'rgba(37, 99, 235, 0.06)', mid: 'rgba(15, 23, 42, 0.01)' }
+            ];
+
+            for (const neb of nebulae) {
+                const grad = bgCtx.createRadialGradient(neb.x, neb.y, 0, neb.x, neb.y, neb.r);
+                grad.addColorStop(0, neb.inner);
+                grad.addColorStop(0.55, neb.mid);
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                bgCtx.fillStyle = grad;
+                bgCtx.fillRect(0, 0, width, height);
+            }
+
+            // 3. Subtle Cosmic Dust Band (faint diagonal galactic plane)
+            bgCtx.save();
+            bgCtx.translate(width * 0.5, height * 0.5);
+            bgCtx.rotate(-0.42);
+            const bandHeight = Math.min(width, height) * 0.26;
+            const bandLength = Math.hypot(width, height) * 1.1;
+            const dustGrad = bgCtx.createLinearGradient(0, -bandHeight, 0, bandHeight);
+            dustGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            dustGrad.addColorStop(0.35, 'rgba(99, 130, 195, 0.035)');
+            dustGrad.addColorStop(0.5, 'rgba(147, 197, 253, 0.055)');
+            dustGrad.addColorStop(0.65, 'rgba(99, 130, 195, 0.035)');
+            dustGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            bgCtx.fillStyle = dustGrad;
+            bgCtx.fillRect(-bandLength * 0.5, -bandHeight, bandLength, bandHeight * 2);
+
+            // Micro-stardust specks concentrated softly along the galactic band
+            for (let i = 0; i < 260; i++) {
+                const dx = (Math.random() - 0.5) * bandLength;
+                // Gaussian-like spread around band center
+                const spread = (Math.random() + Math.random() - 1) * bandHeight * 0.75;
+                const speckAlpha = 0.06 + Math.random() * 0.14;
+                bgCtx.fillStyle = `rgba(195, 218, 255, ${speckAlpha})`;
+                bgCtx.fillRect(dx, spread, 0.8, 0.8);
+            }
+            bgCtx.restore();
+            bgCtx.restore();
+
+            // 4. Subtle Distant Ringed Planet in upper-left background
+            drawDistantRingedPlanet(bgCtx, width, height);
+        }
+
+        /**
+         * Renders a faint, atmospheric ringed gas giant in the far distance
+         * so it adds depth without competing with the foreground orbital simulation.
+         */
+        function drawDistantRingedPlanet(targetCtx, width, height) {
+            const planetX = width * 0.16;
+            const planetY = height * 0.21;
+            const planetRadius = Math.max(15, Math.min(width, height) * 0.036);
+            const ringTilt = -0.36;
+
+            targetCtx.save();
+            targetCtx.translate(planetX, planetY);
+            targetCtx.globalAlpha = 0.34;
+
+            // Subtle planetary atmospheric halo
+            const halo = targetCtx.createRadialGradient(0, 0, planetRadius * 0.8, 0, 0, planetRadius * 2.4);
+            halo.addColorStop(0, 'rgba(125, 165, 235, 0.18)');
+            halo.addColorStop(1, 'rgba(125, 165, 235, 0)');
+            targetCtx.fillStyle = halo;
+            targetCtx.beginPath();
+            targetCtx.arc(0, 0, planetRadius * 2.4, 0, Math.PI * 2);
+            targetCtx.fill();
+
+            // Back half of rings (behind planet)
+            targetCtx.save();
+            targetCtx.rotate(ringTilt);
+            targetCtx.strokeStyle = 'rgba(165, 195, 240, 0.32)';
+            targetCtx.lineWidth = planetRadius * 0.14;
+            targetCtx.beginPath();
+            targetCtx.ellipse(0, 0, planetRadius * 2.25, planetRadius * 0.55, 0, Math.PI, Math.PI * 2);
+            targetCtx.stroke();
+
+            targetCtx.strokeStyle = 'rgba(120, 155, 215, 0.22)';
+            targetCtx.lineWidth = planetRadius * 0.07;
+            targetCtx.beginPath();
+            targetCtx.ellipse(0, 0, planetRadius * 2.55, planetRadius * 0.63, 0, Math.PI, Math.PI * 2);
+            targetCtx.stroke();
+            targetCtx.restore();
+
+            // Planet sphere with directional lighting (lit toward center of canvas)
+            const bodyGrad = targetCtx.createRadialGradient(
+                planetRadius * 0.38, planetRadius * 0.32, planetRadius * 0.1,
+                0, 0, planetRadius
+            );
+            bodyGrad.addColorStop(0, '#7c9bd1');
+            bodyGrad.addColorStop(0.55, '#2b3d63');
+            bodyGrad.addColorStop(1, '#090e1c');
+
+            targetCtx.fillStyle = bodyGrad;
+            targetCtx.beginPath();
+            targetCtx.arc(0, 0, planetRadius, 0, Math.PI * 2);
+            targetCtx.fill();
+
+            // Front half of rings (crossing in front of planet)
+            targetCtx.save();
+            targetCtx.rotate(ringTilt);
+            targetCtx.strokeStyle = 'rgba(175, 205, 248, 0.38)';
+            targetCtx.lineWidth = planetRadius * 0.14;
+            targetCtx.beginPath();
+            targetCtx.ellipse(0, 0, planetRadius * 2.25, planetRadius * 0.55, 0, 0, Math.PI);
+            targetCtx.stroke();
+
+            targetCtx.strokeStyle = 'rgba(125, 160, 220, 0.25)';
+            targetCtx.lineWidth = planetRadius * 0.07;
+            targetCtx.beginPath();
+            targetCtx.ellipse(0, 0, planetRadius * 2.55, planetRadius * 0.63, 0, 0, Math.PI);
+            targetCtx.stroke();
+            targetCtx.restore();
+
+            targetCtx.restore();
+        }
 
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -136,6 +351,10 @@
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            // Rebuild space backdrop and adapt starfield to new dimensions
+            renderStaticSpaceBackdrop(canvas.width, canvas.height);
+            initStarfield(canvas.width, canvas.height);
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -169,6 +388,42 @@
 
         function resetSimulation() {
             balls = [];
+        }
+
+        function updateBackgroundEffects() {
+            animationTime += 1;
+
+            // Periodic subtle shooting star spawn
+            nextShootingStarTimer--;
+            if (nextShootingStarTimer <= 0 && canvas.width > 0 && canvas.height > 0) {
+                const startX = Math.random() * canvas.width * 0.85;
+                const startY = Math.random() * canvas.height * 0.45;
+                const angle = (20 + Math.random() * 25) * (Math.PI / 180);
+                const speed = 7 + Math.random() * 5;
+
+                shootingStars.push({
+                    x: startX,
+                    y: startY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    length: 45 + Math.random() * 45,
+                    life: 0,
+                    maxLife: 36 + Math.floor(Math.random() * 20)
+                });
+
+                nextShootingStarTimer = 260 + Math.floor(Math.random() * 320);
+            }
+
+            // Update active shooting stars
+            for (let i = shootingStars.length - 1; i >= 0; i--) {
+                const s = shootingStars[i];
+                s.x += s.vx;
+                s.y += s.vy;
+                s.life++;
+                if (s.life >= s.maxLife) {
+                    shootingStars.splice(i, 1);
+                }
+            }
         }
 
         function updatePhysics() {
@@ -216,52 +471,150 @@
             }
         }
 
-        function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function drawSpaceEnvironment() {
+            // Blit pre-rendered deep space, nebulae, dust band, and distant planet
+            ctx.drawImage(bgCanvas, 0, 0);
 
-            // 1. Draw Central Mass Node
+            // Render twinkling starfield
+            for (const star of stars) {
+                const twinkle = 0.65 + 0.35 * Math.sin(animationTime * star.twinkleSpeed + star.phase);
+                const alpha = star.baseAlpha * twinkle;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = star.color;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Subtle 4-point diffraction sparkle glint on brightest stars
+                if (star.hasGlint && twinkle > 0.78) {
+                    const glintSize = star.radius * 3.2 * twinkle;
+                    ctx.strokeStyle = star.color;
+                    ctx.lineWidth = 0.65;
+                    ctx.globalAlpha = alpha * 0.55;
+                    ctx.beginPath();
+                    ctx.moveTo(star.x - glintSize, star.y);
+                    ctx.lineTo(star.x + glintSize, star.y);
+                    ctx.moveTo(star.x, star.y - glintSize);
+                    ctx.lineTo(star.x, star.y + glintSize);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // Render occasional subtle shooting stars
+            for (const s of shootingStars) {
+                const progress = s.life / s.maxLife;
+                const fade = Math.sin(progress * Math.PI);
+                const speed = Math.hypot(s.vx, s.vy);
+                const tailX = s.x - (s.vx / speed) * s.length;
+                const tailY = s.y - (s.vy / speed) * s.length;
+
+                const grad = ctx.createLinearGradient(s.x, s.y, tailX, tailY);
+                grad.addColorStop(0, `rgba(224, 242, 254, ${0.55 * fade})`);
+                grad.addColorStop(0.35, `rgba(147, 197, 253, ${0.22 * fade})`);
+                grad.addColorStop(1, 'rgba(147, 197, 253, 0)');
+
+                ctx.save();
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 1.4;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(s.x, s.y);
+                ctx.lineTo(tailX, tailY);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function draw() {
+            // 0. Draw Deep Space Background, Nebulae, Stars & Shooting Stars
+            drawSpaceEnvironment();
+
+            // 1. Draw Central Mass Node with Celestial Corona Aura
+            const pulse = 1 + 0.06 * Math.sin(animationTime * 0.04);
+            const coronaRadius = centralNode.radius * 3.6 * pulse;
+            const coronaGrad = ctx.createRadialGradient(
+                centralNode.x, centralNode.y, centralNode.radius * 0.8,
+                centralNode.x, centralNode.y, coronaRadius
+            );
+            coronaGrad.addColorStop(0, 'rgba(224, 242, 254, 0.36)');
+            coronaGrad.addColorStop(0.4, 'rgba(96, 165, 250, 0.14)');
+            coronaGrad.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, coronaRadius, 0, Math.PI * 2);
+            ctx.fillStyle = coronaGrad;
+            ctx.fill();
+
+            // Subtle outer gravitational ring hint
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, centralNode.radius * 2.1, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(147, 197, 253, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Exact 12px Central Mass Core
+            ctx.save();
+            ctx.shadowColor = 'rgba(186, 230, 253, 0.75)';
+            ctx.shadowBlur = 14;
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
+            ctx.restore();
 
             // Center mark on node
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = '#02040a';
             ctx.fill();
 
-            // 2. Draw Ball & Trail
+            // 2. Draw Ball & Luminous Trajectory Trail
             for (const b of balls) {
-                // Draw path line
                 if (b.trail.length > 1) {
+                    // Outer soft cyan luminous glow along trajectory
+                    ctx.save();
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+                    ctx.lineWidth = 3.2;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
                     ctx.stroke();
+
+                    // Crisp high-contrast inner trajectory path
+                    ctx.strokeStyle = '#f0f9ff';
+                    ctx.lineWidth = 1.25;
+                    ctx.stroke();
+                    ctx.restore();
                 }
 
-                // Draw ball object
+                // Draw ball object with subtle celestial glow
+                ctx.save();
+                ctx.shadowColor = '#7dd3fc';
+                ctx.shadowBlur = 10;
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
+                ctx.restore();
             }
         }
 
         function animate() {
+            updateBackgroundEffects();
             updatePhysics();
             draw();
             requestAnimationFrame(animate);
         }
 
         window.onload = function() {
+            resizeCanvas();
             animate();
         };
     </script>
