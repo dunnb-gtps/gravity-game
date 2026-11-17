@@ -115,8 +115,9 @@
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;         // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
+        const BALL_RADIUS = 4;             // Ball radius in pixels
 
         // STATE VARIABLES
         let balls = [];
@@ -156,13 +157,17 @@
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
+            // Clamp initial spawn inside the box boundaries
+            const startX = Math.max(BALL_RADIUS, Math.min(canvas.width - BALL_RADIUS, x));
+            const startY = Math.max(BALL_RADIUS, Math.min(canvas.height - BALL_RADIUS, y));
+
             // Overwrite existing array to strictly maintain a single ball on screen
             balls = [{
-                x: x,
-                y: y,
+                x: startX,
+                y: startY,
                 vx: vx,
                 vy: vy,
-                radius: 4,
+                radius: BALL_RADIUS,
                 trail: [] // Stores history of past {x, y} coordinates
             }];
         }
@@ -174,14 +179,6 @@
         function updatePhysics() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
-
-                // Remove ball if it travels too far off-screen (prevents memory leak)
-                const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
-                    b.y < -margin || b.y > canvas.height + margin) {
-                    balls.splice(i, 1);
-                    continue;
-                }
 
                 // Distance vector to central gravity node
                 const dx = centralNode.x - b.x;
@@ -207,6 +204,24 @@
                 b.vy += ay;
                 b.x += b.vx;
                 b.y += b.vy;
+
+                // Bounce off the left and right walls of the box
+                if (b.x - b.radius < 0) {
+                    b.x = b.radius;
+                    b.vx = -b.vx;
+                } else if (b.x + b.radius > canvas.width) {
+                    b.x = canvas.width - b.radius;
+                    b.vx = -b.vx;
+                }
+
+                // Bounce off the top and bottom walls of the box
+                if (b.y - b.radius < 0) {
+                    b.y = b.radius;
+                    b.vy = -b.vy;
+                } else if (b.y + b.radius > canvas.height) {
+                    b.y = canvas.height - b.radius;
+                    b.vy = -b.vy;
+                }
 
                 // Record position history for line trail
                 b.trail.push({ x: b.x, y: b.y });
