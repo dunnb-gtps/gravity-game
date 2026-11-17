@@ -3,29 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Hello Kitty & Cinnamoroll Gravity Simulation</title>
+    <!-- Friendly Rounded Kawaii Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
             box-sizing: border-box;
             user-select: none;
+            -webkit-user-select: none;
             margin: 0;
             padding: 0;
-            font-family: 'Courier New', Courier, monospace, sans-serif;
+            font-family: 'Fredoka', 'Nunito', 'Quicksand', sans-serif;
         }
 
         body {
-            background-color: #000000;
-            color: #ffffff;
+            /* Soft cotton-candy pink to Cinnamoroll baby-blue pastel gradient */
+            background: linear-gradient(135deg, #ffe6f0 0%, #fff6fa 48%, #dff3ff 100%);
+            color: #5c2d46;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
             height: 100vh;
             overflow: hidden;
-            padding: 16px;
+            padding: 14px 16px;
         }
 
-        /* Top Header Bar */
+        /* Top Header Bar - Kawaii Cloud & Ribbon Card */
         #header {
             display: flex;
             justify-content: space-between;
@@ -33,33 +39,91 @@
             width: 100%;
             max-width: 1100px;
             margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #ffffff;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 2.5px solid #ffb3cf;
+            border-radius: 999px;
+            box-shadow: 0 6px 18px rgba(255, 118, 168, 0.16), 0 2px 6px rgba(90, 169, 230, 0.12);
+        }
+
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ffe0ec, #dff3ff);
+            border: 2px solid #ff8ab4;
+            flex-shrink: 0;
         }
 
         h1 {
-            font-size: 18px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            font-weight: bold;
+            font-size: 19px;
+            letter-spacing: 1px;
+            font-weight: 700;
+            color: #d93870;
+            text-shadow: 0 1px 0 #ffffff;
         }
 
+        .subtitle-tag {
+            display: inline-block;
+            font-family: 'Nunito', sans-serif;
+            font-size: 11px;
+            font-weight: 800;
+            color: #3d8ac7;
+            background: #e3f4ff;
+            border: 1.5px solid #9dd4fa;
+            padding: 2px 10px;
+            border-radius: 999px;
+            letter-spacing: 0.4px;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 15px;
+            }
+            .subtitle-tag {
+                display: none;
+            }
+            #header {
+                padding: 8px 14px;
+            }
+        }
+
+        /* Cute Strawberry-Pink Pill Reset Button */
         .btn-reset {
-            background: transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(180deg, #ff7aa8 0%, #ff5c93 100%);
             color: #ffffff;
-            border: 1px solid #ffffff;
-            padding: 6px 16px;
+            border: 2px solid #ffffff;
+            outline: 2px solid #ff7aa8;
+            border-radius: 999px;
+            padding: 7px 18px;
             font-size: 14px;
-            font-weight: bold;
+            font-weight: 700;
             cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.15s ease-in-out;
+            letter-spacing: 0.8px;
+            box-shadow: 0 4px 10px rgba(255, 92, 147, 0.32);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
         }
 
         .btn-reset:hover {
-            background: #ffffff;
-            color: #000000;
+            background: linear-gradient(180deg, #ff6399 0%, #eb467f 100%);
+            transform: translateY(-1px) scale(1.03);
+            box-shadow: 0 6px 14px rgba(255, 92, 147, 0.42);
+        }
+
+        .btn-reset:active {
+            transform: translateY(1px) scale(0.98);
         }
 
         /* Main Canvas Container */
@@ -71,22 +135,34 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            border-radius: 28px;
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 12px 32px rgba(255, 118, 168, 0.2), 0 4px 14px rgba(90, 169, 230, 0.18);
+            overflow: hidden;
+            background: #e6f5ff;
         }
 
         canvas {
-            background-color: #000000;
-            border: 1px solid #ffffff;
             display: block;
             cursor: crosshair;
             width: 100%;
             height: 100%;
+            border-radius: 24px;
         }
 
+        /* Instructions Pill */
         .instructions {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #888888;
+            margin-top: 10px;
+            padding: 5px 16px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            color: #6b3b54;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1.5px solid #ffd1e3;
+            border-radius: 999px;
             text-align: center;
+            box-shadow: 0 2px 8px rgba(255, 138, 180, 0.12);
         }
     </style>
 </head>
@@ -94,8 +170,25 @@
 
     <!-- Header Section -->
     <div id="header">
-        <h1>Gravity Simulation</h1>
-        <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        <div class="title-group">
+            <!-- Cute Hello Kitty Bow SVG Badge -->
+            <div class="header-badge" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+                    <path d="M12.5 16C9.5 11.5 4.5 11 4.5 16C4.5 21 9.5 20.5 12.5 16Z" fill="#ff477e" stroke="#591936" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M19.5 16C22.5 11.5 27.5 11 27.5 16C27.5 21 22.5 20.5 19.5 16Z" fill="#ff477e" stroke="#591936" stroke-width="2" stroke-linejoin="round"/>
+                    <circle cx="16" cy="16" r="3.6" fill="#ff7aa8" stroke="#591936" stroke-width="2"/>
+                </svg>
+            </div>
+            <h1>Gravity Simulation</h1>
+            <span class="subtitle-tag">Hello Kitty &amp; Cinnamoroll</span>
+        </div>
+        <button class="btn-reset" onclick="resetSimulation()">
+            <!-- Mini Star Sparkle Icon -->
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z"/>
+            </svg>
+            Reset
+        </button>
     </div>
 
     <!-- Canvas Container -->
@@ -111,15 +204,20 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // SIMULATION CONSTANTS
+        // =========================================================================
+        // SIMULATION CONSTANTS (Preserved verbatim from baseline)
+        // =========================================================================
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;         // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
 
+        // =========================================================================
         // STATE VARIABLES
+        // =========================================================================
         let balls = [];
+        let animTime = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -128,14 +226,52 @@
             radius: 12
         };
 
+        // Decorative Background Clouds & Sparkles
+        let clouds = [];
+        let sparkles = [];
+
+        /**
+         * Initializes fluffy kawaii clouds and floating pastel stars/hearts
+         * scaled cleanly to the current canvas dimensions.
+         */
+        function initDecorations() {
+            const w = Math.max(canvas.width, 320);
+            const h = Math.max(canvas.height, 320);
+
+            clouds = [
+                { x: w * 0.14, y: h * 0.16, scale: 0.95, speed: 0.18 },
+                { x: w * 0.44, y: h * 0.11, scale: 0.78, speed: 0.13 },
+                { x: w * 0.62, y: h * 0.25, scale: 0.65, speed: 0.21 },
+                { x: w * 0.34, y: h * 0.84, scale: 0.88, speed: 0.15 },
+                { x: w * 0.82, y: h * 0.78, scale: 1.05, speed: 0.16 }
+            ];
+
+            sparkles = [
+                { x: w * 0.08, y: h * 0.32, size: 7, type: 'star', color: '#ffd966', phase: 0.2 },
+                { x: w * 0.25, y: h * 0.22, size: 6, type: 'heart', color: '#ff9ec2', phase: 1.1 },
+                { x: w * 0.36, y: h * 0.36, size: 5, type: 'sparkle', color: '#8acbf7', phase: 2.0 },
+                { x: w * 0.64, y: h * 0.14, size: 7, type: 'star', color: '#ffd966', phase: 2.7 },
+                { x: w * 0.71, y: h * 0.42, size: 6, type: 'heart', color: '#ff9ec2', phase: 0.8 },
+                { x: w * 0.91, y: h * 0.52, size: 7, type: 'sparkle', color: '#8acbf7', phase: 1.9 },
+                { x: w * 0.28, y: h * 0.68, size: 6, type: 'sparkle', color: '#ff9ec2', phase: 3.1 },
+                { x: w * 0.68, y: h * 0.88, size: 7, type: 'star', color: '#ffd966', phase: 1.5 },
+                { x: w * 0.92, y: h * 0.88, size: 6, type: 'heart', color: '#ff9ec2', phase: 2.4 }
+            ];
+        }
+
+        /**
+         * Resizes canvas to fit container and recenters the central gravity node.
+         */
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
+
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            initDecorations();
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -150,6 +286,9 @@
             launchBall(clickX, clickY);
         });
 
+        /**
+         * Launches a single ball at (x, y) using the exact baseline physics parameters.
+         */
         function launchBall(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
@@ -167,17 +306,23 @@
             }];
         }
 
+        /**
+         * Clears active balls from the simulation.
+         */
         function resetSimulation() {
             balls = [];
         }
 
+        /**
+         * Updates orbital physics (inverse square law gravity, absorption, and trail history).
+         */
         function updatePhysics() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
                 // Remove ball if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
+                if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
                     balls.splice(i, 1);
                     continue;
@@ -216,40 +361,524 @@
             }
         }
 
-        function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
+        // =========================================================================
+        // KAWAII BACKGROUND & CHARACTER VECTOR DRAWING HELPERS
+        // =========================================================================
+
+        /**
+         * Draws the pastel baby-blue to blush-pink sky gradient with subtle polka dots.
+         */
+        function drawPastelSky() {
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            skyGrad.addColorStop(0, '#d7f0ff');    // Cinnamoroll baby-blue top
+            skyGrad.addColorStop(0.52, '#f7f9ff'); // Soft airy cloud-white mid
+            skyGrad.addColorStop(1, '#ffe0ed');    // Hello Kitty blush-pink bottom
+
+            ctx.fillStyle = skyGrad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Central Mass Node
+            // Subtle pastel polka-dot pattern
+            const spacing = 48;
+            ctx.save();
+            for (let row = 0; row * spacing < canvas.height + spacing; row++) {
+                const offsetX = (row % 2) * (spacing / 2);
+                for (let col = 0; col * spacing < canvas.width + spacing; col++) {
+                    const px = col * spacing + offsetX;
+                    const py = row * spacing;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+                    ctx.fillStyle = (row + col) % 2 === 0
+                        ? 'rgba(255, 255, 255, 0.65)'
+                        : 'rgba(255, 173, 206, 0.22)';
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        /**
+         * Draws a fluffy white kawaii cloud with a soft sky-blue outline.
+         */
+        function drawFluffyCloud(x, y, scale) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scale, scale);
+
+            ctx.beginPath();
+            ctx.moveTo(-44, 16);
+            ctx.bezierCurveTo(-58, 16, -62, -2, -46, -8);
+            ctx.bezierCurveTo(-46, -26, -22, -32, -12, -18);
+            ctx.bezierCurveTo(-2, -34, 24, -30, 28, -12);
+            ctx.bezierCurveTo(46, -14, 56, 2, 44, 16);
+            ctx.closePath();
+
+            // Soft white fill with gentle blue bottom tint
+            const cloudGrad = ctx.createLinearGradient(0, -28, 0, 18);
+            cloudGrad.addColorStop(0, 'rgba(255, 255, 255, 0.96)');
+            cloudGrad.addColorStop(1, 'rgba(232, 246, 255, 0.92)');
+            ctx.fillStyle = cloudGrad;
+            ctx.fill();
+
+            // Crisp soft sky-blue outline
+            ctx.lineWidth = 2.2;
+            ctx.strokeStyle = '#97cef5';
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        /**
+         * Draws twinkling stars, tiny pastel hearts, and 4-point sparkles.
+         */
+        function drawSparkleItem(item, time) {
+            const pulse = 0.78 + 0.22 * Math.sin(time * 0.003 + item.phase);
+            ctx.save();
+            ctx.translate(item.x, item.y);
+            ctx.scale(pulse, pulse);
+            ctx.globalAlpha = 0.75;
+            ctx.fillStyle = item.color;
+
+            const s = item.size;
+            if (item.type === 'sparkle') {
+                // 4-point diamond sparkle
+                ctx.beginPath();
+                ctx.moveTo(0, -s * 1.4);
+                ctx.quadraticCurveTo(0, 0, s * 1.4, 0);
+                ctx.quadraticCurveTo(0, 0, 0, s * 1.4);
+                ctx.quadraticCurveTo(0, 0, -s * 1.4, 0);
+                ctx.quadraticCurveTo(0, 0, 0, -s * 1.4);
+                ctx.fill();
+            } else if (item.type === 'heart') {
+                // Cute mini pastel heart
+                ctx.beginPath();
+                ctx.moveTo(0, s * 0.6);
+                ctx.bezierCurveTo(-s * 1.2, -s * 0.4, -s * 0.6, -s * 1.3, 0, -s * 0.5);
+                ctx.bezierCurveTo(s * 0.6, -s * 1.3, s * 1.2, -s * 0.4, 0, s * 0.6);
+                ctx.fill();
+            } else {
+                // Rounded 5-point pastel star
+                ctx.beginPath();
+                for (let i = 0; i < 10; i++) {
+                    const r = i % 2 === 0 ? s * 1.25 : s * 0.55;
+                    const a = (i * Math.PI) / 5 - Math.PI / 2;
+                    if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+                    else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        /**
+         * Draws Hello Kitty in the lower-left corner with soft pastel harmony
+         * so trajectory lines remain super crisp and legible over her.
+         */
+        function drawHelloKitty() {
+            const scale = Math.max(0.58, Math.min(0.95, canvas.width / 980));
+            const baseX = 108 * scale;
+            const baseY = canvas.height - 76 * scale;
+            const outlineColor = '#5e374b';
+
+            ctx.save();
+            ctx.translate(baseX, baseY);
+            ctx.scale(scale, scale);
+            ctx.globalAlpha = 0.88; // Soft harmony so orbit paths remain super clear
+
+            // 1. Blue Overalls & Yellow Shirt Peek (Bottom torso)
+            // Yellow puff sleeves
+            ctx.fillStyle = '#ffe375';
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.4;
+
+            // Left sleeve & little white paw
+            ctx.beginPath();
+            ctx.ellipse(-40, 44, 15, 13, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-50, 52, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Right sleeve & little white paw waving
+            ctx.fillStyle = '#ffe375';
+            ctx.beginPath();
+            ctx.ellipse(40, 40, 15, 13, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(52, 34, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Classic Sky-Blue Overalls Bib
+            ctx.fillStyle = '#6cb8f0';
+            ctx.beginPath();
+            ctx.moveTo(-34, 30);
+            ctx.lineTo(34, 30);
+            ctx.lineTo(38, 78);
+            ctx.lineTo(-38, 78);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Overall straps & yellow buttons
+            ctx.fillStyle = '#58a6e3';
+            ctx.fillRect(-28, 28, 10, 18);
+            ctx.strokeRect(-28, 28, 10, 18);
+            ctx.fillRect(18, 28, 10, 18);
+            ctx.strokeRect(18, 28, 10, 18);
+
+            ctx.fillStyle = '#ffd54f';
+            ctx.beginPath();
+            ctx.arc(-23, 41, 3.8, 0, Math.PI * 2);
+            ctx.arc(23, 41, 3.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 2. Classic White Cat Head with Pointed Ears
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.6;
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            // Start top-center forehead -> right ear -> right cheek -> chin -> left cheek -> left ear
+            ctx.moveTo(-22, -44);
+            // Left ear
+            ctx.quadraticCurveTo(-36, -66, -48, -62);
+            ctx.quadraticCurveTo(-56, -54, -52, -30);
+            // Left cheek & chin
+            ctx.bezierCurveTo(-66, -12, -64, 24, -32, 32);
+            ctx.quadraticCurveTo(0, 36, 32, 32);
+            // Right cheek & right ear
+            ctx.bezierCurveTo(64, 24, 66, -12, 52, -30);
+            ctx.quadraticCurveTo(56, -54, 48, -62);
+            ctx.quadraticCurveTo(36, -66, 22, -44);
+            // Forehead curve
+            ctx.quadraticCurveTo(0, -48, -22, -44);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Facial Features (Oval eyes, yellow nose, 3 whiskers per side)
+            // Left & right oval eyes
+            ctx.fillStyle = '#3b212e';
+            ctx.beginPath();
+            ctx.ellipse(-25, 2, 4.2, 6.2, 0, 0, Math.PI * 2);
+            ctx.ellipse(25, 2, 4.2, 6.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Iconic horizontal yellow oval nose
+            ctx.fillStyle = '#ffd23f';
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(0, 10, 6.2, 4.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Three whiskers on left cheek
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-47, -2); ctx.lineTo(-65, -6);
+            ctx.moveTo(-49, 7);  ctx.lineTo(-68, 7);
+            ctx.moveTo(-46, 16); ctx.lineTo(-64, 20);
+            // Three whiskers on right cheek
+            ctx.moveTo(47, -2);  ctx.lineTo(65, -6);
+            ctx.moveTo(49, 7);   ctx.lineTo(68, 7);
+            ctx.moveTo(46, 16);  ctx.lineTo(64, 20);
+            ctx.stroke();
+
+            // 4. Iconic Red-Pink Bow on Her Right Ear (viewer's upper right)
+            ctx.save();
+            ctx.translate(36, -42);
+            ctx.rotate(0.32);
+            ctx.fillStyle = '#ff477e';
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.4;
+
+            // Left bow loop
+            ctx.beginPath();
+            ctx.ellipse(-13, 0, 12, 10, -0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Right bow loop
+            ctx.beginPath();
+            ctx.ellipse(13, 0, 12, 10, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Inner bow creases
+            ctx.beginPath();
+            ctx.arc(-8, 0, 4.2, -0.7, 0.7);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(8, 0, 4.2, Math.PI - 0.7, Math.PI + 0.7);
+            ctx.stroke();
+
+            // Center bow knot
+            ctx.fillStyle = '#ff6b98';
+            ctx.beginPath();
+            ctx.arc(0, 0, 6.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        /**
+         * Draws Cinnamoroll floating gently in the upper-right sky among clouds,
+         * complete with long floppy ears, sky-blue eyes, rosy cheeks, and curled tail.
+         */
+        function drawCinnamoroll(time) {
+            const scale = Math.max(0.58, Math.min(0.95, canvas.width / 980));
+            const bobOffset = Math.sin(time * 0.0025) * 6;
+            const earWave = Math.sin(time * 0.0032) * 0.08;
+            const baseX = canvas.width - 132 * scale;
+            const baseY = (96 + bobOffset) * scale;
+            const cinnaOutline = '#62a4d6';
+
+            ctx.save();
+            ctx.translate(baseX, baseY);
+            ctx.scale(scale, scale);
+            ctx.globalAlpha = 0.90;
+
+            // Soft cloud cushion puff right beneath Cinnamoroll
+            drawFluffyCloud(6, 44, 0.72);
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 1. Curled Cinnamon-Roll Tail (peeking on right side)
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = cinnaOutline;
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.arc(36, 26, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Cinnamon swirl spiral line inside tail
+            ctx.beginPath();
+            ctx.arc(36, 26, 6.5, 0.2, Math.PI * 1.65);
+            ctx.stroke();
+
+            // 2. Chubby White Puppy Body & Tiny Paws
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(8, 26, 24, 18, -0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Front outstretched stubby paws
+            ctx.beginPath();
+            ctx.ellipse(-14, 24, 9, 6.5, -0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.ellipse(4, 33, 9, 6.5, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Long Floppy Puppy Ears (Left & Right, billowing gently)
+            // Left long floppy ear
+            ctx.save();
+            ctx.translate(-28, -10);
+            ctx.rotate(-0.22 + earWave);
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(0, -6);
+            ctx.bezierCurveTo(-28, -16, -64, -4, -68, 14);
+            ctx.bezierCurveTo(-70, 28, -44, 28, -18, 14);
+            ctx.quadraticCurveTo(-4, 6, 0, -6);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            // Right long floppy ear
+            ctx.save();
+            ctx.translate(28, -12);
+            ctx.rotate(0.25 - earWave);
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(0, -6);
+            ctx.bezierCurveTo(28, -18, 64, -6, 68, 12);
+            ctx.bezierCurveTo(70, 26, 44, 26, 18, 12);
+            ctx.quadraticCurveTo(4, 4, 0, -6);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            // 4. Chubby-Cheeked White Head
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(-22, -24);
+            ctx.quadraticCurveTo(0, -30, 22, -24);
+            ctx.bezierCurveTo(40, -18, 44, 8, 24, 15);
+            ctx.quadraticCurveTo(0, 19, -24, 15);
+            ctx.bezierCurveTo(-44, 8, -40, -18, -22, -24);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 5. Facial Features: Big Sky-Blue Eyes, Rosy Cheeks, Puppy Mouth
+            // Rosy pink oval blush cheeks
+            ctx.fillStyle = 'rgba(255, 148, 184, 0.72)';
+            ctx.beginPath();
+            ctx.ellipse(-22, 4, 7.5, 4.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(22, 4, 7.5, 4.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Big sky-blue oval eyes
+            ctx.fillStyle = '#489ee0';
+            ctx.beginPath();
+            ctx.ellipse(-15, -3, 4.2, 5.8, 0, 0, Math.PI * 2);
+            ctx.ellipse(15, -3, 4.2, 5.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Bright white eye catchlights
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-16.2, -5, 1.6, 0, Math.PI * 2);
+            ctx.arc(13.8, -5, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cute curved puppy "w" mouth
+            ctx.strokeStyle = '#538db8';
+            ctx.lineWidth = 2.1;
+            ctx.beginPath();
+            ctx.arc(-3.5, 3.5, 3.5, 0.15 * Math.PI, 0.95 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(3.5, 3.5, 3.5, 0.05 * Math.PI, 0.85 * Math.PI);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // =========================================================================
+        // MAIN RENDER LOOP
+        // =========================================================================
+
+        function draw() {
+            animTime += 16.67;
+
+            // 1. Pastel Sky Background with Polka Dots
+            drawPastelSky();
+
+            // 2. Drifting Fluffy Clouds
+            for (const c of clouds) {
+                c.x += c.speed;
+                if (c.x - 70 * c.scale > canvas.width) {
+                    c.x = -70 * c.scale;
+                }
+                drawFluffyCloud(c.x, c.y, c.scale);
+            }
+
+            // 3. Twinkling Sparkles, Stars & Mini Hearts
+            for (const sp of sparkles) {
+                drawSparkleItem(sp, animTime);
+            }
+
+            // 4. Theme Characters: Hello Kitty (Lower-Left) & Cinnamoroll (Upper-Right)
+            drawHelloKitty();
+            drawCinnamoroll(animTime);
+
+            // 5. Central Mass Node (radius = 12) - High-Contrast Strawberry & Gold Planet
+            const pulseAura = 18 + Math.sin(animTime * 0.004) * 2.5;
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, pulseAura, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 71, 126, 0.16)';
+            ctx.fill();
+
+            // Main planet sphere (exact radius = 12)
+            const nodeGrad = ctx.createRadialGradient(
+                centralNode.x - 4, centralNode.y - 4, 2,
+                centralNode.x, centralNode.y, centralNode.radius
+            );
+            nodeGrad.addColorStop(0, '#ff9ebb');
+            nodeGrad.addColorStop(0.55, '#ff477e');
+            nodeGrad.addColorStop(1, '#c9184a');
+
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = nodeGrad;
             ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#591936';
+            ctx.stroke();
 
-            // Center mark on node
+            // Center golden 4-point star emblem on node
+            ctx.fillStyle = '#ffe066';
             ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
+            const sr = 5;
+            ctx.moveTo(centralNode.x, centralNode.y - sr);
+            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x + sr, centralNode.y);
+            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x, centralNode.y + sr);
+            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x - sr, centralNode.y);
+            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x, centralNode.y - sr);
             ctx.fill();
 
-            // 2. Draw Ball & Trail
+            // 6. Ball (radius = 4) & High-Contrast Magenta-Pink Orbit Trail
             for (const b of balls) {
-                // Draw path line
                 if (b.trail.length > 1) {
+                    ctx.save();
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    // Soft crisp white under-halo so trail stands out cleanly over characters & clouds
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+                    ctx.lineWidth = 4.2;
                     ctx.stroke();
+
+                    // Rich magenta-pink core orbit trail (#e63973)
+                    ctx.beginPath();
+                    ctx.moveTo(b.trail[0].x, b.trail[0].y);
+                    for (let t = 1; t < b.trail.length; t++) {
+                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                    }
+                    ctx.strokeStyle = '#e63973';
+                    ctx.lineWidth = 2.2;
+                    ctx.stroke();
+
+                    ctx.restore();
                 }
 
-                // Draw ball object
+                // Soft outer white halo around ball
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius + 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                ctx.fill();
+
+                // Ball object (exact radius = 4)
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#e63973';
+                ctx.fill();
+                ctx.lineWidth = 1.3;
+                ctx.strokeStyle = '#591936';
+                ctx.stroke();
+
+                // Tiny glossy candy highlight dot
+                ctx.beginPath();
+                ctx.arc(b.x - 1.2, b.y - 1.2, 1.1, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
             }
@@ -262,6 +891,7 @@
         }
 
         window.onload = function() {
+            resizeCanvas();
             animate();
         };
     </script>
