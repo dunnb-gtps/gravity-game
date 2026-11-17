@@ -163,6 +163,7 @@
                 vx: vx,
                 vy: vy,
                 radius: 4,
+                hue: 0,
                 trail: [] // Stores history of past {x, y} coordinates
             }];
         }
@@ -202,11 +203,12 @@
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
 
-                // Update velocity and position
+                // Update velocity, position, and rainbow hue
                 b.vx += ax;
                 b.vy += ay;
                 b.x += b.vx;
                 b.y += b.vy;
+                b.hue = (b.hue + 6) % 360;
 
                 // Record position history for line trail
                 b.trail.push({ x: b.x, y: b.y });
@@ -247,11 +249,25 @@
                     ctx.stroke();
                 }
 
-                // Draw ball object
+                // Draw ball object with rainbow gradient and cycling hue
+                const rainbowGradient = ctx.createLinearGradient(
+                    b.x - b.radius,
+                    b.y - b.radius,
+                    b.x + b.radius,
+                    b.y + b.radius
+                );
+                rainbowGradient.addColorStop(0, `hsl(${b.hue}, 100%, 60%)`);
+                rainbowGradient.addColorStop(0.5, `hsl(${(b.hue + 60) % 360}, 100%, 55%)`);
+                rainbowGradient.addColorStop(1, `hsl(${(b.hue + 120) % 360}, 100%, 50%)`);
+
+                ctx.save();
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = rainbowGradient;
+                ctx.shadowColor = `hsl(${b.hue}, 100%, 55%)`;
+                ctx.shadowBlur = 8;
                 ctx.fill();
+                ctx.restore();
             }
         }
 
@@ -267,3 +283,4 @@
     </script>
 </body>
 </html>
+```[cite: 1]
