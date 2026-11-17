@@ -14,7 +14,7 @@
         }
 
         body {
-            background-color: #000000;
+            background-color: #0b0e14;
             color: #ffffff;
             display: flex;
             flex-direction: column;
@@ -74,7 +74,7 @@
         }
 
         canvas {
-            background-color: #000000;
+            background-color: #121722;
             border: 1px solid #ffffff;
             display: block;
             cursor: crosshair;
@@ -120,6 +120,7 @@
 
         // STATE VARIABLES
         let balls = [];
+        let bgPattern = null;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -127,6 +128,381 @@
             y: 0,
             radius: 12
         };
+
+        // Build seamless cats-and-dogs background pattern
+        function createCatsAndDogsPattern() {
+            const tile = document.createElement('canvas');
+            const size = 360;
+            tile.width = size;
+            tile.height = size;
+            const pctx = tile.getContext('2d');
+
+            // Deep midnight backdrop so white foreground elements stay sharp
+            pctx.fillStyle = '#121722';
+            pctx.fillRect(0, 0, size, size);
+
+            // Helper: Draw a small paw print
+            function drawPaw(x, y, angle, scale) {
+                pctx.save();
+                pctx.translate(x, y);
+                pctx.rotate(angle);
+                pctx.scale(scale, scale);
+                pctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+
+                // Main pad
+                pctx.beginPath();
+                pctx.ellipse(0, 4, 8, 6, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Four toes
+                const toes = [
+                    { x: -9, y: -4, r: 3.2 },
+                    { x: -3.5, y: -8, r: 3.5 },
+                    { x: 3.5, y: -8, r: 3.5 },
+                    { x: 9, y: -4, r: 3.2 }
+                ];
+                for (const t of toes) {
+                    pctx.beginPath();
+                    pctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+                    pctx.fill();
+                }
+                pctx.restore();
+            }
+
+            // Helper: Draw Ginger Tabby Cat Face
+            function drawGingerCat(x, y) {
+                pctx.save();
+                pctx.translate(x, y);
+                pctx.globalAlpha = 0.82;
+
+                // Pointed ears
+                pctx.fillStyle = '#c97538';
+                pctx.beginPath();
+                pctx.moveTo(-26, -12);
+                pctx.lineTo(-30, -43);
+                pctx.lineTo(-6, -24);
+                pctx.closePath();
+                pctx.fill();
+
+                pctx.beginPath();
+                pctx.moveTo(26, -12);
+                pctx.lineTo(30, -43);
+                pctx.lineTo(6, -24);
+                pctx.closePath();
+                pctx.fill();
+
+                // Pink inner ears
+                pctx.fillStyle = '#c46d7a';
+                pctx.beginPath();
+                pctx.moveTo(-23, -15);
+                pctx.lineTo(-26, -35);
+                pctx.lineTo(-10, -23);
+                pctx.closePath();
+                pctx.fill();
+
+                pctx.beginPath();
+                pctx.moveTo(23, -15);
+                pctx.lineTo(26, -35);
+                pctx.lineTo(10, -23);
+                pctx.closePath();
+                pctx.fill();
+
+                // Head
+                pctx.fillStyle = '#c97538';
+                pctx.beginPath();
+                pctx.ellipse(0, 0, 32, 26, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Tabby forehead stripes
+                pctx.strokeStyle = '#8a4619';
+                pctx.lineWidth = 2.5;
+                pctx.lineCap = 'round';
+                for (const sx of [-7, 0, 7]) {
+                    pctx.beginPath();
+                    pctx.moveTo(sx, -23);
+                    pctx.lineTo(sx, -14);
+                    pctx.stroke();
+                }
+
+                // Eyes
+                pctx.fillStyle = '#181412';
+                pctx.beginPath();
+                pctx.arc(-11, -3, 3.8, 0, Math.PI * 2);
+                pctx.arc(11, -3, 3.8, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.fillStyle = '#ffffff';
+                pctx.beginPath();
+                pctx.arc(-12, -4.2, 1.3, 0, Math.PI * 2);
+                pctx.arc(10, -4.2, 1.3, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Pink triangle nose
+                pctx.fillStyle = '#d97a86';
+                pctx.beginPath();
+                pctx.moveTo(-3.5, 4);
+                pctx.lineTo(3.5, 4);
+                pctx.lineTo(0, 8);
+                pctx.closePath();
+                pctx.fill();
+
+                // Cat mouth ("w")
+                pctx.strokeStyle = '#3b1e0c';
+                pctx.lineWidth = 1.8;
+                pctx.beginPath();
+                pctx.moveTo(-6, 10);
+                pctx.quadraticCurveTo(-3, 13, 0, 8);
+                pctx.quadraticCurveTo(3, 13, 6, 10);
+                pctx.stroke();
+
+                // Whiskers
+                pctx.strokeStyle = 'rgba(255, 245, 235, 0.7)';
+                pctx.lineWidth = 1.3;
+                for (const side of [-1, 1]) {
+                    for (let w = -1; w <= 1; w++) {
+                        pctx.beginPath();
+                        pctx.moveTo(side * 18, 5 + w * 4);
+                        pctx.lineTo(side * 38, 3 + w * 6);
+                        pctx.stroke();
+                    }
+                }
+
+                pctx.restore();
+            }
+
+            // Helper: Draw Golden Floppy-Eared Dog Face
+            function drawGoldenDog(x, y) {
+                pctx.save();
+                pctx.translate(x, y);
+                pctx.globalAlpha = 0.82;
+
+                // Floppy ears
+                pctx.fillStyle = '#8c5830';
+                pctx.beginPath();
+                pctx.ellipse(-30, 5, 10, 23, 0.24, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.beginPath();
+                pctx.ellipse(30, 5, 10, 23, -0.24, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Head
+                pctx.fillStyle = '#cfa063';
+                pctx.beginPath();
+                pctx.ellipse(0, 0, 29, 27, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Cream muzzle
+                pctx.fillStyle = '#e6cfa8';
+                pctx.beginPath();
+                pctx.ellipse(0, 9, 17, 13, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Eyes
+                pctx.fillStyle = '#1c140e';
+                pctx.beginPath();
+                pctx.arc(-11, -6, 3.8, 0, Math.PI * 2);
+                pctx.arc(11, -6, 3.8, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.fillStyle = '#ffffff';
+                pctx.beginPath();
+                pctx.arc(-12, -7.2, 1.3, 0, Math.PI * 2);
+                pctx.arc(10, -7.2, 1.3, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Happy pink tongue
+                pctx.fillStyle = '#d46a7a';
+                pctx.beginPath();
+                pctx.ellipse(0, 17, 5, 6.5, 0, 0, Math.PI);
+                pctx.fill();
+
+                // Dog nose
+                pctx.fillStyle = '#241811';
+                pctx.beginPath();
+                pctx.ellipse(0, 3.5, 6.5, 4.8, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Smile lines
+                pctx.strokeStyle = '#3b2618';
+                pctx.lineWidth = 1.8;
+                pctx.beginPath();
+                pctx.moveTo(0, 8);
+                pctx.lineTo(0, 12);
+                pctx.moveTo(-8, 12);
+                pctx.quadraticCurveTo(0, 16, 8, 12);
+                pctx.stroke();
+
+                pctx.restore();
+            }
+
+            // Helper: Draw Sitting Grey Tuxedo Cat
+            function drawSittingCat(x, y) {
+                pctx.save();
+                pctx.translate(x, y);
+                pctx.globalAlpha = 0.82;
+
+                // Curled tail
+                pctx.strokeStyle = '#636f82';
+                pctx.lineWidth = 7;
+                pctx.lineCap = 'round';
+                pctx.beginPath();
+                pctx.moveTo(14, 34);
+                pctx.bezierCurveTo(42, 34, 44, 6, 28, 2);
+                pctx.stroke();
+
+                // Body
+                pctx.fillStyle = '#636f82';
+                pctx.beginPath();
+                pctx.ellipse(0, 17, 21, 25, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // White chest patch
+                pctx.fillStyle = '#dce2ea';
+                pctx.beginPath();
+                pctx.ellipse(0, 15, 10, 15, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Ears
+                pctx.fillStyle = '#636f82';
+                pctx.beginPath();
+                pctx.moveTo(-20, -18);
+                pctx.lineTo(-22, -40);
+                pctx.lineTo(-5, -26);
+                pctx.closePath();
+                pctx.fill();
+
+                pctx.beginPath();
+                pctx.moveTo(20, -18);
+                pctx.lineTo(22, -40);
+                pctx.lineTo(5, -26);
+                pctx.closePath();
+                pctx.fill();
+
+                // Head
+                pctx.beginPath();
+                pctx.ellipse(0, -13, 23, 19, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Eyes
+                pctx.fillStyle = '#e6c86e';
+                pctx.beginPath();
+                pctx.arc(-8, -14, 3.5, 0, Math.PI * 2);
+                pctx.arc(8, -14, 3.5, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.fillStyle = '#12151c';
+                pctx.beginPath();
+                pctx.ellipse(-8, -14, 1.4, 3, 0, 0, Math.PI * 2);
+                pctx.ellipse(8, -14, 1.4, 3, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Nose & Whiskers
+                pctx.fillStyle = '#d97a86';
+                pctx.beginPath();
+                pctx.arc(0, -8, 2.4, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+                pctx.lineWidth = 1.2;
+                for (const side of [-1, 1]) {
+                    pctx.beginPath();
+                    pctx.moveTo(side * 12, -8);
+                    pctx.lineTo(side * 28, -10);
+                    pctx.moveTo(side * 12, -5);
+                    pctx.lineTo(side * 28, -4);
+                    pctx.stroke();
+                }
+
+                pctx.restore();
+            }
+
+            // Helper: Draw Spotted Beagle Pup
+            function drawSpottedDog(x, y) {
+                pctx.save();
+                pctx.translate(x, y);
+                pctx.globalAlpha = 0.82;
+
+                // Folded ears
+                pctx.fillStyle = '#6e452b';
+                pctx.beginPath();
+                pctx.ellipse(-26, -6, 9, 19, 0.35, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.beginPath();
+                pctx.ellipse(26, -6, 9, 19, -0.35, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Cream head
+                pctx.fillStyle = '#dfd5c5';
+                pctx.beginPath();
+                pctx.ellipse(0, 0, 27, 25, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Brown eye patch
+                pctx.fillStyle = '#7c4d2f';
+                pctx.beginPath();
+                pctx.ellipse(-11, -5, 11, 10, -0.2, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Eyes
+                pctx.fillStyle = '#1a1410';
+                pctx.beginPath();
+                pctx.arc(-11, -5, 3.6, 0, Math.PI * 2);
+                pctx.arc(11, -5, 3.6, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.fillStyle = '#ffffff';
+                pctx.beginPath();
+                pctx.arc(-12, -6.2, 1.2, 0, Math.PI * 2);
+                pctx.arc(10, -6.2, 1.2, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Collar & Gold Tag
+                pctx.strokeStyle = '#b84a4a';
+                pctx.lineWidth = 4.5;
+                pctx.lineCap = 'round';
+                pctx.beginPath();
+                pctx.arc(0, 6, 22, 0.25 * Math.PI, 0.75 * Math.PI);
+                pctx.stroke();
+
+                pctx.fillStyle = '#e0b84c';
+                pctx.beginPath();
+                pctx.arc(0, 30, 4, 0, Math.PI * 2);
+                pctx.fill();
+
+                // Nose & Mouth
+                pctx.fillStyle = '#241811';
+                pctx.beginPath();
+                pctx.ellipse(0, 5, 6, 4.5, 0, 0, Math.PI * 2);
+                pctx.fill();
+
+                pctx.strokeStyle = '#3b2618';
+                pctx.lineWidth = 1.7;
+                pctx.beginPath();
+                pctx.moveTo(0, 9);
+                pctx.lineTo(0, 14);
+                pctx.moveTo(-7, 13);
+                pctx.quadraticCurveTo(0, 17, 7, 13);
+                pctx.stroke();
+
+                pctx.restore();
+            }
+
+            // Populate tile with cats, dogs, and paw prints
+            drawGingerCat(85, 85);
+            drawGoldenDog(265, 95);
+            drawSpottedDog(85, 265);
+            drawSittingCat(265, 265);
+
+            drawPaw(175, 45, -0.3, 0.95);
+            drawPaw(40, 175, 0.4, 0.9);
+            drawPaw(180, 180, -0.2, 1.05);
+            drawPaw(320, 185, 0.35, 0.9);
+            drawPaw(175, 315, 0.25, 0.95);
+
+            return ctx.createPattern(tile, 'repeat');
+        }
 
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -139,6 +515,7 @@
         }
 
         window.addEventListener('resize', resizeCanvas);
+        bgPattern = createCatsAndDogsPattern();
         resizeCanvas();
 
         // Canvas Click Handler: Directly launch ball at click position
@@ -217,9 +594,14 @@
         }
 
         function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
+            // Draw Cats & Dogs Background Pattern
+            ctx.fillStyle = bgPattern || '#121722';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle shadow so white simulation elements stay crisp over the background
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+            ctx.shadowBlur = 5;
 
             // 1. Draw Central Mass Node
             ctx.beginPath();
@@ -243,7 +625,7 @@
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
                     ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
+                    ctx.lineWidth = 1.4;
                     ctx.stroke();
                 }
 
@@ -253,6 +635,8 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
             }
+
+            ctx.restore();
         }
 
         function animate() {
