@@ -111,6 +111,10 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Offscreen cache canvas for the static galaxy nebula & deep starfield
+        const bgCanvas = document.createElement('canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
         // SIMULATION CONSTANTS
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
@@ -120,6 +124,18 @@
 
         // STATE VARIABLES
         let balls = [];
+        let twinklingStars = [];
+
+        // Realistic stellar color tints (pure white, blue-white, pale gold, soft rose)
+        const STAR_COLORS = [
+            { r: 255, g: 255, b: 255 }, // Pure white
+            { r: 255, g: 255, b: 255 }, // Pure white (higher frequency)
+            { r: 196, g: 222, b: 255 }, // Blue-white
+            { r: 168, g: 205, b: 255 }, // Hot blue-white
+            { r: 255, g: 242, b: 204 }, // Pale gold
+            { r: 255, g: 224, b: 166 }, // Warm gold
+            { r: 255, g: 208, b: 220 }  // Soft rose
+        ];
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -127,6 +143,235 @@
             y: 0,
             radius: 12
         };
+
+        /**
+         * Builds the layered deep-space galaxy background onto an offscreen canvas
+         * and populates the animated twinkling star layer for smooth 60fps rendering.
+         */
+        function generateGalaxyBackground() {
+            const w = canvas.width;
+            const h = canvas.height;
+            if (w <= 0 || h <= 0) return;
+
+            bgCanvas.width = w;
+            bgCanvas.height = h;
+
+            const diag = Math.hypot(w, h);
+            const cx = w * 0.5;
+            const cy = h * 0.5;
+
+            // 1. Deep space base gradient (midnight black -> deep indigo -> dark cosmic blue)
+            const baseGrad = bgCtx.createLinearGradient(0, 0, w, h);
+            baseGrad.addColorStop(0.0, '#020208');
+            baseGrad.addColorStop(0.35, '#09071d');
+            baseGrad.addColorStop(0.68, '#050d1f');
+            baseGrad.addColorStop(1.0, '#020208');
+            bgCtx.fillStyle = baseGrad;
+            bgCtx.fillRect(0, 0, w, h);
+
+            // Subtle outer edge vignette to keep deep space corners rich and dark
+            const vignette = bgCtx.createRadialGradient(cx, cy, diag * 0.18, cx, cy, diag * 0.65);
+            vignette.addColorStop(0, 'rgba(9, 7, 29, 0)');
+            vignette.addColorStop(1, 'rgba(2, 2, 8, 0.65)');
+            bgCtx.fillStyle = vignette;
+            bgCtx.fillRect(0, 0, w, h);
+
+            // 2. Tilted Milky Way / Spiral Galaxy Formation
+            bgCtx.save();
+            bgCtx.translate(cx, cy);
+            const galaxyTilt = -0.48; // Tilted diagonally from bottom-left to top-right
+            bgCtx.rotate(galaxyTilt);
+
+            // Broad outer galactic halo (elliptical perspective)
+            bgCtx.save();
+            bgCtx.scale(1, 0.34);
+            const outerHalo = bgCtx.createRadialGradient(0, 0, 10, 0, 0, diag * 0.56);
+            outerHalo.addColorStop(0.0, 'rgba(92, 46, 158, 0.24)');
+            outerHalo.addColorStop(0.35, 'rgba(42, 34, 118, 0.18)');
+            outerHalo.addColorStop(0.7, 'rgba(14, 38, 86, 0.10)');
+            outerHalo.addColorStop(1.0, 'rgba(2, 2, 8, 0)');
+            bgCtx.fillStyle = outerHalo;
+            bgCtx.beginPath();
+            bgCtx.arc(0, 0, diag * 0.56, 0, Math.PI * 2);
+            bgCtx.fill();
+            bgCtx.restore();
+
+            // Additive nebula clouds along spiral arms & galactic disk
+            bgCtx.globalCompositeOperation = 'screen';
+
+            const nebulaClouds = [
+                // Deep violet & cosmic magenta outer/mid arm clouds
+                { x: -diag * 0.26, y: -18, rx: diag * 0.22, ry: diag * 0.08, color: 'rgba(104, 42, 178, 0.15)' },
+                { x:  diag * 0.25, y:  20, rx: diag * 0.23, ry: diag * 0.085, color: 'rgba(112, 45, 185, 0.15)' },
+                { x: -diag * 0.14, y:  24, rx: diag * 0.17, ry: diag * 0.065, color: 'rgba(182, 48, 128, 0.13)' },
+                { x:  diag * 0.15, y: -22, rx: diag * 0.18, ry: diag * 0.068, color: 'rgba(188, 52, 134, 0.13)' },
+                // Teal / cyan ionized star-forming pockets
+                { x: -diag * 0.21, y:  10, rx: diag * 0.14, ry: diag * 0.052, color: 'rgba(26, 152, 188, 0.12)' },
+                { x:  diag * 0.20, y: -12, rx: diag * 0.15, ry: diag * 0.055, color: 'rgba(32, 165, 196, 0.12)' },
+                { x: -diag * 0.07, y: -14, rx: diag * 0.12, ry: diag * 0.048, color: 'rgba(45, 145, 185, 0.10)' },
+                { x:  diag * 0.08, y:  14, rx: diag * 0.12, ry: diag * 0.048, color: 'rgba(45, 145, 185, 0.10)' }
+            ];
+
+            for (const cloud of nebulaClouds) {
+                bgCtx.save();
+                bgCtx.translate(cloud.x, cloud.y);
+                bgCtx.scale(1, cloud.ry / cloud.rx);
+                const g = bgCtx.createRadialGradient(0, 0, 0, 0, 0, cloud.rx);
+                g.addColorStop(0.0, cloud.color);
+                g.addColorStop(0.55, cloud.color.replace(/[\d.]+\)$/, '0.05)'));
+                g.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+                bgCtx.fillStyle = g;
+                bgCtx.beginPath();
+                bgCtx.arc(0, 0, cloud.rx, 0, Math.PI * 2);
+                bgCtx.fill();
+                bgCtx.restore();
+            }
+
+            // Warm golden-amber galactic core glow (balanced so white central node stays crisp)
+            bgCtx.save();
+            bgCtx.scale(1, 0.42);
+            const coreGrad = bgCtx.createRadialGradient(0, 0, 6, 0, 0, diag * 0.20);
+            coreGrad.addColorStop(0.0, 'rgba(255, 206, 128, 0.20)');
+            coreGrad.addColorStop(0.32, 'rgba(235, 142, 74, 0.14)');
+            coreGrad.addColorStop(0.68, 'rgba(155, 62, 128, 0.07)');
+            coreGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+            bgCtx.fillStyle = coreGrad;
+            bgCtx.beginPath();
+            bgCtx.arc(0, 0, diag * 0.20, 0, Math.PI * 2);
+            bgCtx.fill();
+            bgCtx.restore();
+
+            // Unresolved powdery star-dust mist concentrated along spiral arms & galactic plane
+            const dustCount = Math.min(900, Math.floor((w * h) / 750));
+            for (let i = 0; i < dustCount; i++) {
+                // Gaussian-like distribution along the galactic plane
+                const u1 = Math.random() || 0.0001;
+                const u2 = Math.random();
+                const gauss = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+                const alongDisk = (Math.random() - 0.5) * diag * 0.95;
+                const spiralWave = Math.sin((alongDisk / (diag * 0.22)) * Math.PI) * 16;
+                const perpDisk = gauss * (diag * 0.036) + spiralWave;
+
+                const tint = STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)];
+                const alpha = 0.10 + Math.random() * 0.26;
+                const size = 0.45 + Math.random() * 0.85;
+
+                bgCtx.fillStyle = `rgba(${tint.r}, ${tint.g}, ${tint.b}, ${alpha.toFixed(3)})`;
+                bgCtx.beginPath();
+                bgCtx.arc(alongDisk, perpDisk, size, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+
+            // Subtle dark cosmic dust lanes carving depth across the galactic plane
+            bgCtx.globalCompositeOperation = 'source-over';
+            const dustLanes = [
+                { x: -diag * 0.16, y: -4, rx: diag * 0.16, ry: 7, rot: 0.06, alpha: 0.36 },
+                { x:  diag * 0.04, y:  5, rx: diag * 0.15, ry: 6, rot: -0.05, alpha: 0.34 },
+                { x:  diag * 0.20, y: -3, rx: diag * 0.14, ry: 6, rot: 0.04, alpha: 0.32 },
+                { x: -diag * 0.04, y: -7, rx: diag * 0.11, ry: 4.5, rot: -0.03, alpha: 0.28 }
+            ];
+
+            for (const lane of dustLanes) {
+                bgCtx.save();
+                bgCtx.translate(lane.x, lane.y);
+                bgCtx.rotate(lane.rot);
+                bgCtx.scale(1, lane.ry / lane.rx);
+                const dGrad = bgCtx.createRadialGradient(0, 0, 0, 0, 0, lane.rx);
+                dGrad.addColorStop(0.0, `rgba(3, 3, 10, ${lane.alpha})`);
+                dGrad.addColorStop(0.65, `rgba(4, 4, 14, ${lane.alpha * 0.45})`);
+                dGrad.addColorStop(1.0, 'rgba(4, 4, 14, 0)');
+                bgCtx.fillStyle = dGrad;
+                bgCtx.beginPath();
+                bgCtx.arc(0, 0, lane.rx, 0, Math.PI * 2);
+                bgCtx.fill();
+                bgCtx.restore();
+            }
+
+            bgCtx.restore(); // Restore galactic coordinate transform
+
+            // 3. Multi-layered background starfield (baked onto offscreen canvas)
+            const staticStarCount = Math.max(260, Math.min(620, Math.floor((w * h) / 1450)));
+            for (let i = 0; i < staticStarCount; i++) {
+                const sx = Math.random() * w;
+                const sy = Math.random() * h;
+                const radius = 0.4 + Math.pow(Math.random(), 2.4) * 1.35;
+                const alpha = 0.25 + Math.random() * 0.65;
+                const c = STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)];
+
+                bgCtx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha.toFixed(3)})`;
+                bgCtx.beginPath();
+                bgCtx.arc(sx, sy, radius, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+
+            // 4. Populate live twinkling stars & brighter diffraction-spike stars
+            twinklingStars = [];
+            const twinkleCount = Math.max(95, Math.min(165, Math.floor((w * h) / 5200)));
+            const spikeStarCount = Math.max(10, Math.min(18, Math.floor(twinkleCount * 0.11)));
+
+            for (let i = 0; i < twinkleCount; i++) {
+                const isSpikeStar = i < spikeStarCount;
+                const c = STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)];
+
+                twinklingStars.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    radius: isSpikeStar ? (1.4 + Math.random() * 0.8) : (0.75 + Math.random() * 0.95),
+                    baseAlpha: isSpikeStar ? (0.72 + Math.random() * 0.22) : (0.45 + Math.random() * 0.42),
+                    twinkleAmp: isSpikeStar ? 0.22 : (0.20 + Math.random() * 0.25),
+                    speed: 0.0012 + Math.random() * 0.0026,
+                    phase: Math.random() * Math.PI * 2,
+                    color: c,
+                    hasSpikes: isSpikeStar,
+                    spikeLength: isSpikeStar ? (9 + Math.random() * 9) : 0
+                });
+            }
+        }
+
+        /**
+         * Renders the cached galaxy backdrop and real-time twinkling stars onto the main canvas.
+         */
+        function drawGalaxyBackground(time) {
+            ctx.drawImage(bgCanvas, 0, 0);
+
+            for (let i = 0; i < twinklingStars.length; i++) {
+                const s = twinklingStars[i];
+                const wave = Math.sin(time * s.speed + s.phase);
+                const alpha = Math.max(0.12, Math.min(0.95, s.baseAlpha + wave * s.twinkleAmp));
+                const { r, g, b } = s.color;
+
+                if (s.hasSpikes) {
+                    // Soft stellar halo
+                    const haloRadius = s.radius * 4.5;
+                    const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, haloRadius);
+                    halo.addColorStop(0.0, `rgba(${r}, ${g}, ${b}, ${(alpha * 0.55).toFixed(3)})`);
+                    halo.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${(alpha * 0.16).toFixed(3)})`);
+                    halo.addColorStop(1.0, `rgba(${r}, ${g}, ${b}, 0)`);
+                    ctx.fillStyle = halo;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, haloRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Delicate 4-point diffraction spikes
+                    const len = s.spikeLength * (0.9 + wave * 0.12);
+                    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${(alpha * 0.65).toFixed(3)})`;
+                    ctx.lineWidth = 0.85;
+                    ctx.beginPath();
+                    ctx.moveTo(s.x - len, s.y);
+                    ctx.lineTo(s.x + len, s.y);
+                    ctx.moveTo(s.x, s.y - len);
+                    ctx.lineTo(s.x, s.y + len);
+                    ctx.stroke();
+                }
+
+                // Crisp star core
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
 
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -136,6 +381,9 @@
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            // Regenerate cached galaxy and starfield for new dimensions
+            generateGalaxyBackground();
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -216,10 +464,9 @@
             }
         }
 
-        function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function draw(timestamp = performance.now()) {
+            // Render galaxy & twinkling starfield background
+            drawGalaxyBackground(timestamp);
 
             // 1. Draw Central Mass Node
             ctx.beginPath();
@@ -255,14 +502,14 @@
             }
         }
 
-        function animate() {
+        function animate(timestamp) {
             updatePhysics();
-            draw();
+            draw(timestamp);
             requestAnimationFrame(animate);
         }
 
         window.onload = function() {
-            animate();
+            animate(performance.now());
         };
     </script>
 </body>
