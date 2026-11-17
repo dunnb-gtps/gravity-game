@@ -115,8 +115,10 @@
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;         // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
+        const INITIAL_NODE_RADIUS = 12;    // Starting radius of the central absorber
+        const GROWTH_PER_BALL = 4;         // Radius increase each time a ball is eaten
 
         // STATE VARIABLES
         let balls = [];
@@ -125,7 +127,7 @@
         const centralNode = {
             x: 0,
             y: 0,
-            radius: 12
+            radius: INITIAL_NODE_RADIUS
         };
 
         function resizeCanvas() {
@@ -169,6 +171,7 @@
 
         function resetSimulation() {
             balls = [];
+            centralNode.radius = INITIAL_NODE_RADIUS;
         }
 
         function updatePhysics() {
@@ -191,6 +194,7 @@
 
                 // Absorption check: ball collides with central mass
                 if (dist < centralNode.radius + b.radius) {
+                    centralNode.radius += GROWTH_PER_BALL;
                     balls.splice(i, 1);
                     continue;
                 }
