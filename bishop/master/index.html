@@ -371,4 +371,38 @@
 
             // Center mark on node
             ctx.beginPath();
-            ctx.arc(centralNode.
+            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#000000';
+            ctx.fill();
+
+            // 2. Draw Astronauts & Trails
+            for (const a of astronauts) {
+                // Draw path line
+                if (a.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(a.trail[0].x, a.trail[0].y);
+                    for (let t = 1; t < a.trail.length; t++) {
+                        ctx.lineTo(a.trail[t].x, a.trail[t].y);
+                    }
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+
+                // Draw astronaut figure
+                drawAstronaut(a.x, a.y, a.angle);
+            }
+        }
+
+        function animate() {
+            updatePhysics();
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        window.onload = function() {
+            animate();
+        };
+    </script>
+</body>
+</html>
