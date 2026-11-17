@@ -30,6 +30,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
             width: 100%;
             max-width: 1100px;
             margin-bottom: 12px;
@@ -42,6 +44,67 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             font-weight: bold;
+        }
+
+        /* Speed Slider Control */
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #speedSlider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 180px;
+            height: 6px;
+            background: #000000;
+            border: 1px solid #ffffff;
+            outline: none;
+            cursor: pointer;
+        }
+
+        #speedSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #000000;
+            box-shadow: 0 0 0 1px #ffffff;
+            cursor: grab;
+            transition: transform 0.1s ease-in-out;
+        }
+
+        #speedSlider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.15);
+        }
+
+        #speedSlider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #000000;
+            box-shadow: 0 0 0 1px #ffffff;
+            cursor: grab;
+            transition: transform 0.1s ease-in-out;
+        }
+
+        #speedSlider::-moz-range-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.15);
+        }
+
+        #speedValue {
+            min-width: 38px;
+            text-align: right;
         }
 
         .btn-reset {
@@ -95,6 +158,13 @@
     <!-- Header Section -->
     <div id="header">
         <h1>Gravity Simulation</h1>
+
+        <div class="speed-control">
+            <label for="speedSlider">Speed:</label>
+            <input type="range" id="speedSlider" min="0" max="15" step="0.1" value="5">
+            <span id="speedValue">5.0</span>
+        </div>
+
         <button class="btn-reset" onclick="resetSimulation()">Reset</button>
     </div>
 
@@ -104,21 +174,23 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball.
+        Adjust the speed bar above and click anywhere on the canvas to launch a ball.
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
 
         // SIMULATION CONSTANTS
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
-        const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
         // STATE VARIABLES
+        let launchVelocity = parseFloat(speedSlider.value); // Adjustable velocity on click
         let balls = [];
 
         // Central Gravity Node Definition
@@ -127,6 +199,19 @@
             y: 0,
             radius: 12
         };
+
+        function updateSpeedUI() {
+            launchVelocity = parseFloat(speedSlider.value);
+            speedValue.textContent = launchVelocity.toFixed(1);
+
+            const min = parseFloat(speedSlider.min);
+            const max = parseFloat(speedSlider.max);
+            const percent = ((launchVelocity - min) / (max - min)) * 100;
+            speedSlider.style.background = `linear-gradient(to right, #ffffff 0%, #ffffff ${percent}%, #000000 ${percent}%, #000000 100%)`;
+        }
+
+        speedSlider.addEventListener('input', updateSpeedUI);
+        updateSpeedUI();
 
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -153,8 +238,8 @@
         function launchBall(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
-            const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
-            const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
+            const vx = launchVelocity * Math.sin(rad);  // sin(90°) = 1  -> vx = launchVelocity
+            const vy = -launchVelocity * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
             // Overwrite existing array to strictly maintain a single ball on screen
             balls = [{
