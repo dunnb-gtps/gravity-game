@@ -50,6 +50,14 @@
             gap: 16px;
         }
 
+        #ball-counter {
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #38bdf8;
+        }
+
         #eaten-counter {
             font-size: 14px;
             font-weight: bold;
@@ -110,6 +118,7 @@
     <div id="header">
         <h1>Gravity Simulation</h1>
         <div class="header-controls">
+            <span id="ball-counter">BALLS: 0</span>
             <span id="eaten-counter">EATEN: 0</span>
             <button class="btn-reset" onclick="resetSimulation()">Reset</button>
         </div>
@@ -121,13 +130,14 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball. Watch out for the alligator!
+        Click anywhere on the canvas to launch more balls. Watch out for the alligator!
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
         const eatenCounterEl = document.getElementById('eaten-counter');
+        const ballCounterEl = document.getElementById('ball-counter');
 
         // SIMULATION CONSTANTS (Preserved from baseline)
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
@@ -135,6 +145,7 @@
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const INITIAL_BALL_COUNT = 6;     // Number of orbiting balls spawned at start/reset
 
         // ALLIGATOR CONSTANTS
         const GATOR_PATROL_SPEED = 1.2;
@@ -145,14 +156,256 @@
         const GATOR_MOUTH_OFFSET = 28;
         const GATOR_BITE_RADIUS = 19;
         const CENTER_AVOID_RADIUS = 62;
-// ... existing code ... -->
+
+        // BALL COLOR PALETTE
+        const BALL_COLORS = [
+            '#ffffff',
+            '#38bdf8',
+            '#f472b6',
+            '#facc15',
+            '#a78bfa',
+            '#34d399',
+            '#fb923c',
+            '#f87171'
+        ];
+
+        // SIMULATION STATE
+        let balls = [];
+        let particles = [];
+        let launchRipples = [];
+        let eatenCount = 0;
+        let colorIndex = 0;
+        let frameCount = 0;
+
+        const centralNode = {
+            x: 0,
+            y: 0,
+            radius: 14
+        };
+
+        const alligator = {
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            angle: 0,
+            speed: GATOR_PATROL_SPEED,
+            jawOpen: 0,
+            snapTimer: 0,
+            tailPhase: 0,
+            eyeLookAngle: 0,
+            isLunging: false
+        };
+
+        function normalizeAngle(a) {
+            while (a > Math.PI) a -= Math.PI * 2;
+            while (a < -Math.PI) a += Math.PI * 2;
+            return a;
+        }
+
+        function getNextBallColor() {
+            const color = BALL_COLORS[colorIndex % BALL_COLORS.length];
+            colorIndex++;
+            return color;
+        }
+
+        function updateCounters() {
+            ballCounterEl.textContent = `BALLS: ${balls.length}`;
+            eatenCounterEl.textContent = `EATEN: ${eatenCount}`;
+        }
+
+        function createBall(x, y, vx, vy, color = getNextBallColor()) {
+            return {
+                x,
+                y,
+                vx,
+                vy,
+                radius: 5.5,
+                color,
+                trail: [{ x, y }]
+            };
+        }
+
+        function spawnInitialBalls() {
+            balls = [];
+            colorIndex = 0;
+
+            const minDim = Math.min(canvas.width, canvas.height);
+            const maxOrbit = Math.max(130, minDim * 0.36);
+            const minOrbit = Math.max(72, minDim * 0.14);
+
+            for (let i = 0; i < INITIAL_BALL_COUNT; i++) {
+                const t = INITIAL_BALL_COUNT > 1 ? i / (INITIAL_BALL_COUNT - 1) : 0.5;
+                const orbitRadius = minOrbit + t * (maxOrbit - minOrbit);
+                const startAngle = (i * (Math.PI * 2)) / INITIAL_BALL_COUNT + (i % 2 === 0 ? 0.25 : -0.2);
+
+                const x = centralNode.x + Math.cos(startAngle) * orbitRadius;
+                const y = centralNode.y + Math.sin(startAngle) * orbitRadius;
+
+                // Circular orbital speed: v = sqrt(G * r / (r^2 + softening))
+                const circularSpeed = Math.sqrt(
+                    (GRAVITY_CONSTANT * orbitRadius) / (orbitRadius * orbitRadius + SOFTENING_FACTOR)
+                );
+                // Slight eccentricity variation for dynamic orbital paths
+                const speedFactor = i % 2 === 0 ? 1.03 : 0.96;
+                const speed = circularSpeed * speedFactor;
+
+                // Counter-clockwise tangential velocity
+                const vx = -Math.sin(startAngle) * speed;
+                const vy = Math.cos(startAngle) * speed;
+
+                balls.push(createBall(x, y, vx, vy));
+            }
+
+            updateCounters();
+        }
+
+        function spawnBiteParticles(x, y, color) {
+            for (let i = 0; i < 16; i++) {
+                const angle = (Math.PI * 2 * i) / 16 + (Math.random() - 0.5) * 0.4;
+                const speed = 1.5 + Math.random() * 3.5;
+                particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1.0,
+                    decay: 0.03 + Math.random() * 0.025,
+                    size: 2 + Math.random() * 2.5,
+                    color
+                });
+            }
+        }
+
+        function resizeCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const prevCenterX = centralNode.x;
+            const prevCenterY = centralNode.y;
+
+            canvas.width = wrapper.clientWidth;
+            canvas.height = wrapper.clientHeight;
+
+            centralNode.x = canvas.width / 2;
+            centralNode.y = canvas.height / 2;
+
+            if (prevCenterX !== 0 || prevCenterY !== 0) {
+                const dx = centralNode.x - prevCenterX;
+                const dy = centralNode.y - prevCenterY;
+                for (const b of balls) {
+                    b.x += dx;
+                    b.y += dy;
+                    for (const pt of b.trail) {
+                        pt.x += dx;
+                        pt.y += dy;
+                    }
+                }
+                alligator.x += dx;
+                alligator.y += dy;
+            }
+        }
+
+        function resetSimulation() {
+            eatenCount = 0;
+            particles = [];
+            launchRipples = [];
+
+            centralNode.x = canvas.width / 2;
+            centralNode.y = canvas.height / 2;
+
+            // Place alligator on outer patrol ellipse
+            const rx = Math.max(90, canvas.width * 0.36);
+            alligator.x = centralNode.x - rx;
+            alligator.y = centralNode.y;
+            alligator.angle = Math.PI / 2;
+            alligator.speed = GATOR_PATROL_SPEED;
+            alligator.jawOpen = 0;
+            alligator.snapTimer = 0;
+            alligator.isLunging = false;
+
+            spawnInitialBalls();
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clickX = (e.clientX - rect.left) * scaleX;
+            const clickY = (e.clientY - rect.top) * scaleY;
+
+            const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
+            const vx = Math.sin(rad) * LAUNCH_VELOCITY;
+            const vy = -Math.cos(rad) * LAUNCH_VELOCITY;
+
+            const newBall = createBall(clickX, clickY, vx, vy);
+            balls.push(newBall);
+            updateCounters();
+
+            launchRipples.push({
+                x: clickX,
+                y: clickY,
+                radius: 4,
+                alpha: 0.9,
+                color: newBall.color
+            });
+        });
+
+        function updateBalls() {
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                const dx = centralNode.x - ball.x;
+                const dy = centralNode.y - ball.y;
+                const distSq = dx * dx + dy * dy;
+                const dist = Math.sqrt(distSq);
+
+                if (dist > 0.001) {
+                    const force = GRAVITY_CONSTANT / (distSq + SOFTENING_FACTOR);
+                    ball.vx += force * (dx / dist);
+                    ball.vy += force * (dy / dist);
+                }
+
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+
+                ball.trail.push({ x: ball.x, y: ball.y });
+                if (ball.trail.length > TRAIL_LENGTH) {
+                    ball.trail.shift();
+                }
+
+                // Remove ball only if it escapes far outside simulation bounds
+                if (dist > 2500) {
+                    balls.splice(i, 1);
+                    updateCounters();
+                }
+            }
+        }
+
         function updateAlligator() {
-// ... existing code ... -->
+            const mouthX = alligator.x + Math.cos(alligator.angle) * GATOR_MOUTH_OFFSET;
+            const mouthY = alligator.y + Math.sin(alligator.angle) * GATOR_MOUTH_OFFSET;
+
+            // Find the nearest ball to the alligator's mouth
+            let targetBall = null;
+            let distToMouth = Infinity;
+
+            for (const b of balls) {
+                const d = Math.hypot(b.x - mouthX, b.y - mouthY);
+                if (d < distToMouth) {
+                    distToMouth = d;
+                    targetBall = b;
+                }
+            }
+
+            let desiredAngle = alligator.angle;
+            let targetSpeed = GATOR_PATROL_SPEED;
+            let turnRate = 0.045;
+            let targetJawOpen = 0;
+
+            if (targetBall) {
                 // Predictive intercept point blending current position & velocity
                 const leadFrames = Math.min(distToMouth / GATOR_CHASE_SPEED, 32);
-                const blendFactor = Math.min(distToMouth / 130, 1.0); // Aim directly at ball when very close
-                const interceptX = ball.x + ball.vx * leadFrames * 0.72 * blendFactor;
-                const interceptY = ball.y + ball.vy * leadFrames * 0.72 * blendFactor;
+                const blendFactor = Math.min(distToMouth / 130, 1.0);
+                const interceptX = targetBall.x + targetBall.vx * leadFrames * 0.72 * blendFactor;
+                const interceptY = targetBall.y + targetBall.vy * leadFrames * 0.72 * blendFactor;
 
                 desiredAngle = Math.atan2(interceptY - alligator.y, interceptX - alligator.x);
 
@@ -173,8 +426,8 @@
                     targetJawOpen = Math.min(1, Math.pow(proximity, 0.75) * 1.15);
                 }
 
-                // Subtle eye tracking toward the ball in local head space
-                const angleToBall = Math.atan2(ball.y - alligator.y, ball.x - alligator.x);
+                // Subtle eye tracking toward the target ball in local head space
+                const angleToBall = Math.atan2(targetBall.y - alligator.y, targetBall.x - alligator.x);
                 const relEye = normalizeAngle(angleToBall - alligator.angle);
                 alligator.eyeLookAngle = Math.max(-0.45, Math.min(0.45, relEye));
             } else {
@@ -185,7 +438,6 @@
                 const rx = Math.max(90, canvas.width * 0.36);
                 const ry = Math.max(70, canvas.height * 0.34);
 
-                // Advance patrol parametric angle based on current position + lookahead
                 const currentParam = Math.atan2(
                     (alligator.y - centralNode.y) / ry,
                     (alligator.x - centralNode.x) / rx
@@ -197,4 +449,353 @@
                 desiredAngle = Math.atan2(patrolTargetY - alligator.y, patrolTargetX - alligator.x);
                 targetSpeed = GATOR_PATROL_SPEED;
                 turnRate = 0.045;
-// ... existing code ... -->
+            }
+
+            // Steer around the central gravity node
+            const dxCenter = alligator.x - centralNode.x;
+            const dyCenter = alligator.y - centralNode.y;
+            const distCenter = Math.hypot(dxCenter, dyCenter);
+            if (distCenter < CENTER_AVOID_RADIUS + 28 && distCenter > 0.01) {
+                const awayAngle = Math.atan2(dyCenter, dxCenter);
+                const tangentAngle = awayAngle + Math.PI / 2;
+                const avoidWeight = Math.min(1, (CENTER_AVOID_RADIUS + 28 - distCenter) / 28);
+                const diffTangent = normalizeAngle(tangentAngle - desiredAngle);
+                desiredAngle = normalizeAngle(desiredAngle + diffTangent * avoidWeight * 0.85);
+            }
+
+            // Smooth angular & speed interpolation
+            const angleDiff = normalizeAngle(desiredAngle - alligator.angle);
+            alligator.angle = normalizeAngle(alligator.angle + angleDiff * turnRate);
+            alligator.speed += (targetSpeed - alligator.speed) * 0.1;
+
+            alligator.vx = Math.cos(alligator.angle) * alligator.speed;
+            alligator.vy = Math.sin(alligator.angle) * alligator.speed;
+            alligator.x += alligator.vx;
+            alligator.y += alligator.vy;
+
+            // Keep outside hard central node exclusion zone
+            const postDistCenter = Math.hypot(alligator.x - centralNode.x, alligator.y - centralNode.y);
+            if (postDistCenter < CENTER_AVOID_RADIUS && postDistCenter > 0.01) {
+                const pushAngle = Math.atan2(alligator.y - centralNode.y, alligator.x - centralNode.x);
+                alligator.x = centralNode.x + Math.cos(pushAngle) * CENTER_AVOID_RADIUS;
+                alligator.y = centralNode.y + Math.sin(pushAngle) * CENTER_AVOID_RADIUS;
+            }
+
+            // Soft keep-in-bounds padding
+            const pad = 28;
+            alligator.x = Math.max(pad, Math.min(canvas.width - pad, alligator.x));
+            alligator.y = Math.max(pad, Math.min(canvas.height - pad, alligator.y));
+
+            // Update tail undulation and jaw animation
+            alligator.tailPhase += 0.08 + alligator.speed * 0.045;
+
+            if (alligator.snapTimer > 0) {
+                alligator.snapTimer--;
+                alligator.jawOpen *= 0.55;
+            } else {
+                alligator.jawOpen += (targetJawOpen - alligator.jawOpen) * 0.2;
+            }
+
+            // Check bite collision against all active balls
+            const updatedMouthX = alligator.x + Math.cos(alligator.angle) * GATOR_MOUTH_OFFSET;
+            const updatedMouthY = alligator.y + Math.sin(alligator.angle) * GATOR_MOUTH_OFFSET;
+
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const b = balls[i];
+                const biteDist = Math.hypot(b.x - updatedMouthX, b.y - updatedMouthY);
+                if (biteDist <= GATOR_BITE_RADIUS + b.radius) {
+                    spawnBiteParticles(b.x, b.y, b.color);
+                    balls.splice(i, 1);
+                    eatenCount++;
+                    alligator.snapTimer = 14;
+                    alligator.jawOpen = 0.05;
+                    updateCounters();
+                    break; // One chomp per frame
+                }
+            }
+        }
+
+        function updateEffects() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.95;
+                p.vy *= 0.95;
+                p.life -= p.decay;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            for (let i = launchRipples.length - 1; i >= 0; i--) {
+                const r = launchRipples[i];
+                r.radius += 1.4;
+                r.alpha -= 0.03;
+                if (r.alpha <= 0) {
+                    launchRipples.splice(i, 1);
+                }
+            }
+        }
+
+        function drawCentralNode() {
+            const pulse = Math.sin(frameCount * 0.05) * 2;
+
+            // Gravity well subtle rings
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, CENTER_AVOID_RADIUS, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, centralNode.radius + 7 + pulse, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Core body
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawBalls() {
+            for (const ball of balls) {
+                // Draw fading trajectory trail
+                if (ball.trail.length > 1) {
+                    ctx.lineWidth = 1.6;
+                    for (let i = 1; i < ball.trail.length; i++) {
+                        const alpha = (i / ball.trail.length) * 0.65;
+                        ctx.strokeStyle = ball.color;
+                        ctx.globalAlpha = alpha;
+                        ctx.beginPath();
+                        ctx.moveTo(ball.trail[i - 1].x, ball.trail[i - 1].y);
+                        ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha = 1;
+                }
+
+                // Draw ball glow & body
+                ctx.save();
+                ctx.shadowColor = ball.color;
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = ball.color;
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function drawAlligator() {
+            ctx.save();
+            ctx.translate(alligator.x, alligator.y);
+            ctx.rotate(alligator.angle);
+
+            // Lunge aura when boosting
+            if (alligator.isLunging) {
+                ctx.strokeStyle = 'rgba(74, 222, 128, 0.35)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.ellipse(4, 0, 44, 20, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Segmented undulating tail
+            const tailSegments = 7;
+            let prevX = -16;
+            let prevY = 0;
+            for (let i = 1; i <= tailSegments; i++) {
+                const segDist = 7.5;
+                const wave = Math.sin(alligator.tailPhase - i * 0.65) * (2.2 + i * 0.85);
+                const segX = prevX - segDist;
+                const segY = wave;
+                const segRadius = Math.max(2, 9.5 - i * 1.05);
+
+                ctx.fillStyle = '#15803d';
+                ctx.strokeStyle = '#4ade80';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(segX, segY, segRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                prevX = segX;
+                prevY = segY;
+            }
+
+            // Legs (front & back pairs)
+            const legSwing = Math.sin(alligator.tailPhase) * 3.5;
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            // Back legs
+            ctx.beginPath();
+            ctx.moveTo(-10, -10);
+            ctx.lineTo(-15 - legSwing, -19);
+            ctx.moveTo(-10, 10);
+            ctx.lineTo(-15 + legSwing, 19);
+            // Front legs
+            ctx.moveTo(6, -10);
+            ctx.lineTo(3 + legSwing, -19);
+            ctx.moveTo(6, 10);
+            ctx.lineTo(3 - legSwing, 19);
+            ctx.stroke();
+
+            // Main armored torso
+            ctx.fillStyle = '#166534';
+            ctx.strokeStyle = '#4ade80';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.ellipse(-2, 0, 20, 11.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Dorsal scutes (ridges along back)
+            ctx.fillStyle = '#4ade80';
+            for (let sx = -14; sx <= 6; sx += 6.5) {
+                ctx.beginPath();
+                ctx.arc(sx, -3.5, 1.5, 0, Math.PI * 2);
+                ctx.arc(sx, 3.5, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Articulated jaws (split left/right spread from top-down view when opening)
+            const jawSpread = alligator.jawOpen * 0.42;
+
+            // Left jaw
+            ctx.save();
+            ctx.translate(12, -3);
+            ctx.rotate(-jawSpread);
+            ctx.fillStyle = '#15803d';
+            ctx.strokeStyle = '#4ade80';
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.moveTo(0, -5.5);
+            ctx.lineTo(22, -3);
+            ctx.quadraticCurveTo(25, 0, 22, 3);
+            ctx.lineTo(0, 3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Teeth on left jaw
+            if (alligator.jawOpen > 0.08) {
+                ctx.fillStyle = '#ffffff';
+                for (let tx = 5; tx <= 19; tx += 4.5) {
+                    ctx.beginPath();
+                    ctx.moveTo(tx, 3);
+                    ctx.lineTo(tx + 1.5, 5.5);
+                    ctx.lineTo(tx + 3, 3);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+
+            // Right jaw
+            ctx.save();
+            ctx.translate(12, 3);
+            ctx.rotate(jawSpread);
+            ctx.fillStyle = '#15803d';
+            ctx.strokeStyle = '#4ade80';
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.moveTo(0, -3);
+            ctx.lineTo(22, -3);
+            ctx.quadraticCurveTo(25, 0, 22, 3);
+            ctx.lineTo(0, 5.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Teeth on right jaw
+            if (alligator.jawOpen > 0.08) {
+                ctx.fillStyle = '#ffffff';
+                for (let tx = 5; tx <= 19; tx += 4.5) {
+                    ctx.beginPath();
+                    ctx.moveTo(tx, -3);
+                    ctx.lineTo(tx + 1.5, -5.5);
+                    ctx.lineTo(tx + 3, -3);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+
+            // Eyes with tracking pupils
+            const eyePositions = [
+                { x: 11, y: -6.5 },
+                { x: 11, y: 6.5 }
+            ];
+            for (const eye of eyePositions) {
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath();
+                ctx.arc(eye.x, eye.y, 3.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000000';
+                const px = eye.x + Math.cos(alligator.eyeLookAngle) * 1.2;
+                const py = eye.y + Math.sin(alligator.eyeLookAngle) * 1.2;
+                ctx.beginPath();
+                ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        function drawEffects() {
+            for (const r of launchRipples) {
+                ctx.save();
+                ctx.strokeStyle = r.color;
+                ctx.globalAlpha = r.alpha;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            for (const p of particles) {
+                ctx.save();
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function loop() {
+            frameCount++;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updateBalls();
+            updateAlligator();
+            updateEffects();
+
+            drawCentralNode();
+            drawBalls();
+            drawAlligator();
+            drawEffects();
+
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        resetSimulation();
+        loop();
+    </script>
+</body>
+</html>
