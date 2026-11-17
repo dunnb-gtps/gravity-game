@@ -121,6 +121,7 @@
 
         // STATE VARIABLES
         let astronauts = [];
+        let stars = [];
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -128,6 +129,21 @@
             y: 0,
             radius: 12
         };
+
+        function initStars() {
+            const starCount = Math.floor((canvas.width * canvas.height) / 6000);
+            stars = [];
+            for (let i = 0; i < starCount; i++) {
+                stars.push({
+                    nx: Math.random(),
+                    ny: Math.random(),
+                    radius: Math.random() * 1.4 + 0.4,
+                    baseAlpha: Math.random() * 0.65 + 0.2,
+                    twinkleSpeed: Math.random() * 0.03 + 0.01,
+                    twinklePhase: Math.random() * Math.PI * 2
+                });
+            }
+        }
 
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -141,6 +157,7 @@
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+        initStars();
 
         // Canvas Click Handler: Launch an additional astronaut at click position
         canvas.addEventListener('click', (e) => {
@@ -222,6 +239,20 @@
                 if (a.trail.length > TRAIL_LENGTH) {
                     a.trail.shift();
                 }
+            }
+        }
+
+        function drawStars() {
+            for (const star of stars) {
+                star.twinklePhase += star.twinkleSpeed;
+                const alpha = star.baseAlpha * (0.75 + 0.25 * Math.sin(star.twinklePhase));
+                const x = star.nx * canvas.width;
+                const y = star.ny * canvas.height;
+
+                ctx.beginPath();
+                ctx.arc(x, y, star.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
+                ctx.fill();
             }
         }
 
@@ -329,6 +360,9 @@
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // 0. Draw Background Stars
+            drawStars();
+
             // 1. Draw Central Mass Node
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
@@ -337,38 +371,4 @@
 
             // Center mark on node
             ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
-            ctx.fill();
-
-            // 2. Draw Astronauts & Trails
-            for (const a of astronauts) {
-                // Draw path line
-                if (a.trail.length > 1) {
-                    ctx.beginPath();
-                    ctx.moveTo(a.trail[0].x, a.trail[0].y);
-                    for (let t = 1; t < a.trail.length; t++) {
-                        ctx.lineTo(a.trail[t].x, a.trail[t].y);
-                    }
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
-                    ctx.stroke();
-                }
-
-                // Draw astronaut figure
-                drawAstronaut(a.x, a.y, a.angle);
-            }
-        }
-
-        function animate() {
-            updatePhysics();
-            draw();
-            requestAnimationFrame(animate);
-        }
-
-        window.onload = function() {
-            animate();
-        };
-    </script>
-</body>
-</html>
+            ctx.arc(centralNode.
