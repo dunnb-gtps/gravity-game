@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Physics Simulation - Earth</title>
     <style>
         * {
             box-sizing: border-box;
@@ -104,7 +104,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball.
+        Click anywhere on the canvas to launch Earth.
     </div>
 
     <script>
@@ -113,13 +113,14 @@
 
         // SIMULATION CONSTANTS
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
-        const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
-        const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
+        const LAUNCH_VELOCITY = 5;        // Fixed velocity on click
+        const FIXED_LAUNCH_ANGLE = 90;    // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const EARTH_RADIUS = 9;           // Visual and collision radius of planet Earth
 
         // STATE VARIABLES
-        let balls = [];
+        let bodies = [];
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -128,11 +129,14 @@
             radius: 12
         };
 
+        /**
+         * Resizes the canvas to match its responsive container and centers the gravity node.
+         */
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
+
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
@@ -141,57 +145,68 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch ball at click position
+        // Canvas Click Handler: Directly launch Earth at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchBall(clickX, clickY);
+            launchEarth(clickX, clickY);
         });
 
-        function launchBall(x, y) {
+        /**
+         * Launches a single planet Earth body from the specified canvas coordinates.
+         */
+        function launchEarth(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
-            balls = [{
+            // Overwrite existing array to strictly maintain a single Earth on screen
+            bodies = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4,
-                trail: [] // Stores history of past {x, y} coordinates
+                radius: EARTH_RADIUS,
+                rotation: 0, // Horizontal rotation phase for spinning continents/clouds
+                trail: []    // Stores history of past {x, y} coordinates
             }];
         }
 
+        /**
+         * Clears the active Earth body from the simulation.
+         */
         function resetSimulation() {
-            balls = [];
+            bodies = [];
         }
 
+        /**
+         * Updates orbital kinematics, inverse-square gravitational acceleration,
+         * collision absorption, boundary cleanup, and Earth's axial spin.
+         */
         function updatePhysics() {
-            for (let i = balls.length - 1; i >= 0; i--) {
-                const b = balls[i];
+            for (let i = bodies.length - 1; i >= 0; i--) {
+                const earth = bodies[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove Earth if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
-                    b.y < -margin || b.y > canvas.height + margin) {
-                    balls.splice(i, 1);
+                if (earth.x < -margin || earth.x > canvas.width + margin ||
+                    earth.y < -margin || earth.y > canvas.height + margin) {
+                    bodies.splice(i, 1);
                     continue;
                 }
 
                 // Distance vector to central gravity node
-                const dx = centralNode.x - b.x;
-                const dy = centralNode.y - b.y;
+                const dx = centralNode.x - earth.x;
+                const dy = centralNode.y - earth.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
-                if (dist < centralNode.radius + b.radius) {
-                    balls.splice(i, 1);
+                // Absorption check: Earth collides with central mass
+                if (dist < centralNode.radius + earth.radius) {
+                    bodies.splice(i, 1);
                     continue;
                 }
 
@@ -203,19 +218,186 @@
                 const ay = acceleration * (dy / dist);
 
                 // Update velocity and position
-                b.vx += ax;
-                b.vy += ay;
-                b.x += b.vx;
-                b.y += b.vy;
+                earth.vx += ax;
+                earth.vy += ay;
+                earth.x += earth.vx;
+                earth.y += earth.vy;
+
+                // Advance gentle axial rotation for spinning globe effect
+                earth.rotation += 0.14;
 
                 // Record position history for line trail
-                b.trail.push({ x: b.x, y: b.y });
-                if (b.trail.length > TRAIL_LENGTH) {
-                    b.trail.shift();
+                earth.trail.push({ x: earth.x, y: earth.y });
+                if (earth.trail.length > TRAIL_LENGTH) {
+                    earth.trail.shift();
                 }
             }
         }
 
+        /**
+         * Draws a polygon helper from an array of normalized [x, y] pairs scaled by radius r.
+         */
+        function drawLandPolygon(points, offsetX, r, fillStyle) {
+            ctx.beginPath();
+            for (let i = 0; i < points.length; i++) {
+                const px = offsetX + points[i][0] * r;
+                const py = points[i][1] * r;
+                if (i === 0) {
+                    ctx.moveTo(px, py);
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            }
+            ctx.closePath();
+            ctx.fillStyle = fillStyle;
+            ctx.fill();
+        }
+
+        /**
+         * Renders planet Earth at (earth.x, earth.y) with oceans, rotating continents,
+         * polar ice caps, drifting cloud streaks, 3D shading, and atmospheric rim glow.
+         */
+        function drawEarth(earth) {
+            const r = earth.radius;
+            const span = r * 4; // Full horizontal wrap period of planetary surface
+
+            ctx.save();
+            ctx.translate(earth.x, earth.y);
+
+            // 1. Subtle outer atmospheric halo so Earth stands out clearly against black space
+            const haloGrad = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r + 3.2);
+            haloGrad.addColorStop(0, 'rgba(100, 181, 246, 0.55)');
+            haloGrad.addColorStop(0.6, 'rgba(100, 181, 246, 0.22)');
+            haloGrad.addColorStop(1, 'rgba(100, 181, 246, 0)');
+            ctx.beginPath();
+            ctx.arc(0, 0, r + 3.2, 0, Math.PI * 2);
+            ctx.fillStyle = haloGrad;
+            ctx.fill();
+
+            // 2. Clip all surface layers to Earth's circular disc
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.clip();
+
+            // 3. Oceans: Spherical blue ocean gradient (#1e88e5 to #0d47a1)
+            const oceanGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.15);
+            oceanGrad.addColorStop(0, '#2196f3');
+            oceanGrad.addColorStop(0.45, '#1e88e5');
+            oceanGrad.addColorStop(1, '#0d47a1');
+            ctx.fillStyle = oceanGrad;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+
+            // 4. Continents: Americas & Eurasia-Africa polygons wrapped smoothly across rotation
+            const surfaceShift = earth.rotation % span;
+
+            // Normalized continent shapes (relative to radius r, tiled across 0..4r)
+            const northAmerica = [
+                [0.25, -0.68], [0.85, -0.62], [1.05, -0.35],
+                [0.78, -0.08], [0.58, 0.04], [0.42, -0.15], [0.22, -0.42]
+            ];
+            const northAmericaHighlight = [
+                [0.35, -0.58], [0.75, -0.52], [0.82, -0.32], [0.55, -0.18]
+            ];
+            const southAmerica = [
+                [0.68, 0.08], [1.08, 0.22], [1.15, 0.50],
+                [0.92, 0.78], [0.76, 0.72], [0.72, 0.38]
+            ];
+            const eurasia = [
+                [1.85, -0.66], [2.65, -0.70], [3.35, -0.58],
+                [3.52, -0.25], [3.12, -0.05], [2.65, -0.12],
+                [2.25, -0.18], [1.82, -0.35]
+            ];
+            const eurasiaHighlight = [
+                [2.10, -0.55], [2.95, -0.56], [3.15, -0.32], [2.45, -0.26]
+            ];
+            const africa = [
+                [1.92, -0.14], [2.48, -0.10], [2.68, 0.18],
+                [2.45, 0.62], [2.22, 0.65], [2.08, 0.30], [1.86, 0.08]
+            ];
+            const australia = [
+                [3.12, 0.28], [3.55, 0.26], [3.62, 0.52], [3.22, 0.56]
+            ];
+
+            // Draw two tiled cycles so continents wrap seamlessly around the globe
+            for (let cycle = -1; cycle <= 0; cycle++) {
+                const baseOffset = surfaceShift + cycle * span;
+
+                // Base green landmass layer (#2e7d32)
+                drawLandPolygon(northAmerica, baseOffset, r, '#2e7d32');
+                drawLandPolygon(southAmerica, baseOffset, r, '#2e7d32');
+                drawLandPolygon(eurasia, baseOffset, r, '#2e7d32');
+                drawLandPolygon(africa, baseOffset, r, '#2e7d32');
+                drawLandPolygon(australia, baseOffset, r, '#2e7d32');
+
+                // Secondary lighter green elevation highlights (#43a047)
+                drawLandPolygon(northAmericaHighlight, baseOffset, r, '#43a047');
+                drawLandPolygon(eurasiaHighlight, baseOffset, r, '#43a047');
+            }
+
+            // 5. Polar Ice Caps (North & South)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            // North polar cap
+            ctx.beginPath();
+            ctx.ellipse(0, -r * 0.92, r * 0.62, r * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // South polar cap
+            ctx.beginPath();
+            ctx.ellipse(0, r * 0.94, r * 0.58, r * 0.20, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 6. Delicate semi-transparent cloud streaks drifting slightly faster than land
+            const cloudShift = (earth.rotation * 1.25) % span;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            const clouds = [
+                { x: 0.35, y: -0.35, w: 0.85, h: 0.13 },
+                { x: 1.35, y: 0.05,  w: 0.95, h: 0.12 },
+                { x: 2.20, y: -0.45, w: 0.90, h: 0.13 },
+                { x: 2.85, y: 0.36,  w: 0.80, h: 0.12 },
+                { x: 0.80, y: 0.52,  w: 0.75, h: 0.11 }
+            ];
+
+            for (let cycle = -1; cycle <= 0; cycle++) {
+                const cBase = cloudShift + cycle * span;
+                for (const c of clouds) {
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        cBase + c.x * r,
+                        c.y * r,
+                        (c.w * r) / 2,
+                        (c.h * r) / 2,
+                        0,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            }
+
+            // 7. 3D Spherical Shadow Shading (lit from upper-left, shaded on lower-right edge)
+            const shadowGrad = ctx.createRadialGradient(
+                -r * 0.35, -r * 0.35, r * 0.2,
+                0, 0, r
+            );
+            shadowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.10)');
+            shadowGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0.05)');
+            shadowGrad.addColorStop(0.85, 'rgba(0, 6, 24, 0.42)');
+            shadowGrad.addColorStop(1, 'rgba(0, 4, 16, 0.68)');
+            ctx.fillStyle = shadowGrad;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+
+            // 8. Soft light-blue atmospheric rim (#64b5f6) along the perimeter
+            ctx.beginPath();
+            ctx.arc(0, 0, r - 0.4, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(100, 181, 246, 0.85)';
+            ctx.lineWidth = 1.1;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        /**
+         * Renders the central gravity node, motion trail, and planet Earth.
+         */
         function draw() {
             // Clear canvas background
             ctx.fillStyle = '#000000';
@@ -233,28 +415,28 @@
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            // 2. Draw Ball & Trail
-            for (const b of balls) {
+            // 2. Draw Orbital Trail & Planet Earth
+            for (const earth of bodies) {
                 // Draw path line
-                if (b.trail.length > 1) {
+                if (earth.trail.length > 1) {
                     ctx.beginPath();
-                    ctx.moveTo(b.trail[0].x, b.trail[0].y);
-                    for (let t = 1; t < b.trail.length; t++) {
-                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                    ctx.moveTo(earth.trail[0].x, earth.trail[0].y);
+                    for (let t = 1; t < earth.trail.length; t++) {
+                        ctx.lineTo(earth.trail[t].x, earth.trail[t].y);
                     }
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 1.2;
                     ctx.stroke();
                 }
 
-                // Draw ball object
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
+                // Draw detailed planet Earth
+                drawEarth(earth);
             }
         }
 
+        /**
+         * Main animation loop running via requestAnimationFrame.
+         */
         function animate() {
             updatePhysics();
             draw();
