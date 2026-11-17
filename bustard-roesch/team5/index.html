@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Physics Simulation</title>
     <style>
         * {
             box-sizing: border-box;
@@ -28,8 +28,10 @@
         /* Top Header Bar */
         #header {
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
+            gap: 10px;
             width: 100%;
             max-width: 1100px;
             margin-bottom: 12px;
@@ -42,21 +44,100 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             font-weight: bold;
+            white-space: nowrap;
         }
 
+        /* Header Controls Toolbar */
+        .controls-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #ffffff;
+            padding: 4px 8px;
+            background: #000000;
+            height: 30px;
+        }
+
+        .control-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #cccccc;
+            white-space: nowrap;
+        }
+
+        .control-select {
+            background: #000000;
+            color: #ffffff;
+            border: none;
+            outline: none;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            padding-right: 4px;
+        }
+
+        .control-select option {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        /* Compact Monospace Color Pickers */
+        .color-picker {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 18px;
+            padding: 0;
+            border: 1px solid #ffffff;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .color-picker::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch {
+            border: none;
+        }
+
+        .color-picker::-moz-color-swatch {
+            border: none;
+        }
+
+        .btn-control,
         .btn-reset {
             background: transparent;
             color: #ffffff;
             border: 1px solid #ffffff;
-            padding: 6px 16px;
-            font-size: 14px;
+            padding: 0 12px;
+            height: 30px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 1px;
             transition: all 0.15s ease-in-out;
+            white-space: nowrap;
         }
 
+        .btn-reset {
+            padding: 0 16px;
+            font-size: 14px;
+        }
+
+        .btn-control:hover,
         .btn-reset:hover {
             background: #ffffff;
             color: #000000;
@@ -68,6 +149,7 @@
             width: 100%;
             max-width: 1100px;
             flex-grow: 1;
+            min-height: 0;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -88,6 +170,28 @@
             color: #888888;
             text-align: center;
         }
+
+        @media (max-width: 680px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 15px;
+            }
+
+            .control-group {
+                padding: 3px 6px;
+                height: 28px;
+            }
+
+            .btn-control,
+            .btn-reset {
+                height: 28px;
+                font-size: 11px;
+                padding: 0 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -95,7 +199,35 @@
     <!-- Header Section -->
     <div id="header">
         <h1>Gravity Simulation</h1>
-        <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+
+        <!-- Custom Background & Simulation Controls -->
+        <div class="controls-bar">
+            <div class="control-group" title="Choose a Stylized or Animated Background">
+                <label for="bgPreset" class="control-label">BG:</label>
+                <select id="bgPreset" class="control-select" aria-label="Background Preset">
+                    <option value="void">Void Black (Default)</option>
+                    <option value="spacetime">Spacetime Grid</option>
+                    <option value="starfield">Deep Starfield</option>
+                    <option value="nebula">Cosmic Nebula</option>
+                    <option value="cyber">Cyber Grid</option>
+                    <option value="blueprint">Physics Blueprint</option>
+                    <option value="custom-gradient" hidden>Custom Gradient</option>
+                    <option value="custom-image" hidden>Custom Image</option>
+                </select>
+            </div>
+
+            <div class="control-group" title="Adjust Core and Edge Colors for Custom Gradient">
+                <label for="coreColor" class="control-label">Core</label>
+                <input type="color" id="coreColor" class="color-picker" value="#16213e" aria-label="Core Background Color">
+                <label for="edgeColor" class="control-label">Edge</label>
+                <input type="color" id="edgeColor" class="color-picker" value="#000000" aria-label="Edge Background Color">
+            </div>
+
+            <button type="button" class="btn-control" id="uploadBgBtn" title="Upload a Custom Background Image">Upload BG</button>
+            <input type="file" id="bgImageInput" accept="image/*" hidden>
+
+            <button type="button" class="btn-reset" onclick="resetSimulation()">Reset</button>
+        </div>
     </div>
 
     <!-- Canvas Container -->
@@ -103,7 +235,7 @@
         <canvas id="simCanvas"></canvas>
     </div>
 
-    <div class="instructions">
+    <div class="instructions" id="statusBar">
         Click anywhere on the canvas to launch a ball.
     </div>
 
@@ -111,15 +243,28 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // SIMULATION CONSTANTS
+        // UI Elements for Custom Backgrounds
+        const bgPresetSelect = document.getElementById('bgPreset');
+        const coreColorInput = document.getElementById('coreColor');
+        const edgeColorInput = document.getElementById('edgeColor');
+        const uploadBgBtn = document.getElementById('uploadBgBtn');
+        const bgImageInput = document.getElementById('bgImageInput');
+        const statusBar = document.getElementById('statusBar');
+
+        // SIMULATION CONSTANTS (Preserved Exact Values)
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
-        const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
-        const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
+        const LAUNCH_VELOCITY = 5;        // Fixed velocity on click
+        const FIXED_LAUNCH_ANGLE = 90;    // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
         // STATE VARIABLES
         let balls = [];
+        let bgMode = 'void';              // 'void' | 'spacetime' | 'starfield' | 'nebula' | 'cyber' | 'blueprint' | 'custom-gradient' | 'custom-image'
+        let customCoreColor = coreColorInput.value;
+        let customEdgeColor = edgeColorInput.value;
+        let customBgImage = null;
+        let animTime = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -127,6 +272,32 @@
             y: 0,
             radius: 12
         };
+
+        // Pre-generated procedural stars for Deep Starfield preset (normalized coordinates)
+        const starfieldData = Array.from({ length: 190 }, (_, idx) => {
+            const layer = idx % 3; // 0: distant fine, 1: medium, 2: bright foreground
+            const hues = ['#ffffff', '#cfe4ff', '#ffe9cc', '#b8f2ff'];
+            return {
+                nx: ((idx * 73.137) % 100) / 100,
+                ny: ((idx * 41.913 + Math.sin(idx) * 19 + 100) % 100) / 100,
+                size: layer === 0 ? 0.8 : layer === 1 ? 1.4 : 2.1,
+                baseAlpha: layer === 0 ? 0.35 : layer === 1 ? 0.62 : 0.88,
+                twinkleSpeed: 1.2 + (idx % 7) * 0.45,
+                phase: idx * 1.7,
+                color: hues[idx % hues.length],
+                hasGlint: layer === 2 && idx % 4 === 0
+            };
+        });
+
+        // Helper for transient status feedback (replaces alert/confirm)
+        let statusTimeout = null;
+        function showStatusMessage(message, durationMs = 3200) {
+            statusBar.textContent = message;
+            if (statusTimeout) clearTimeout(statusTimeout);
+            statusTimeout = setTimeout(() => {
+                statusBar.textContent = 'Click anywhere on the canvas to launch a ball.';
+            }, durationMs);
+        }
 
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -140,6 +311,56 @@
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+
+        // Background Control Event Listeners
+        bgPresetSelect.addEventListener('change', (e) => {
+            bgMode = e.target.value;
+        });
+
+        function applyCustomGradient() {
+            customCoreColor = coreColorInput.value;
+            customEdgeColor = edgeColorInput.value;
+            bgMode = 'custom-gradient';
+            bgPresetSelect.value = 'custom-gradient';
+        }
+
+        coreColorInput.addEventListener('input', applyCustomGradient);
+        edgeColorInput.addEventListener('input', applyCustomGradient);
+
+        uploadBgBtn.addEventListener('click', () => {
+            bgImageInput.click();
+        });
+
+        bgImageInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showStatusMessage('Please select a valid image file.');
+                bgImageInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    customBgImage = img;
+                    bgMode = 'custom-image';
+                    bgPresetSelect.value = 'custom-image';
+                    showStatusMessage(`Loaded custom background: ${file.name}`);
+                };
+                img.onerror = () => {
+                    showStatusMessage('Could not decode the selected image.');
+                };
+                img.src = event.target.result;
+            };
+            reader.onerror = () => {
+                showStatusMessage('Failed to read the selected file.');
+            };
+            reader.readAsDataURL(file);
+            bgImageInput.value = '';
+        });
 
         // Canvas Click Handler: Directly launch ball at click position
         canvas.addEventListener('click', (e) => {
@@ -216,10 +437,407 @@
             }
         }
 
-        function draw() {
-            // Clear canvas background
+        /* =========================================================
+           CUSTOM BACKGROUND RENDERERS
+           ========================================================= */
+
+        function drawVoidBackground(w, h) {
             ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        function drawSpacetimeGrid(w, h, t) {
+            ctx.fillStyle = '#030509';
+            ctx.fillRect(0, 0, w, h);
+
+            // Subtle gravitational well aura
+            const wellGlow = ctx.createRadialGradient(
+                centralNode.x, centralNode.y, 8,
+                centralNode.x, centralNode.y, Math.min(w, h) * 0.45
+            );
+            wellGlow.addColorStop(0, 'rgba(90, 175, 255, 0.16)');
+            wellGlow.addColorStop(0.5, 'rgba(40, 90, 170, 0.05)');
+            wellGlow.addColorStop(1, 'rgba(3, 5, 9, 0)');
+            ctx.fillStyle = wellGlow;
+            ctx.fillRect(0, 0, w, h);
+
+            const spacing = 36;
+            const cols = Math.ceil(w / spacing) + 3;
+            const rows = Math.ceil(h / spacing) + 3;
+            const offsetX = (w % spacing) / 2 - spacing;
+            const offsetY = (h % spacing) / 2 - spacing;
+
+            // Compute warped grid vertices pulled toward central gravity node
+            const grid = [];
+            for (let r = 0; r < rows; r++) {
+                const rowPts = [];
+                for (let c = 0; c < cols; c++) {
+                    const gx = offsetX + c * spacing;
+                    const gy = offsetY + r * spacing;
+
+                    const dx = centralNode.x - gx;
+                    const dy = centralNode.y - gy;
+                    const dist = Math.hypot(dx, dy);
+
+                    const pulse = 1 + 0.05 * Math.sin(t * 2.2 - dist * 0.025);
+                    const pull = dist > 1 ? Math.min(dist * 0.72, (2400 / (dist + 42)) * pulse) : 0;
+
+                    rowPts.push({
+                        x: gx + (dx / (dist || 1)) * pull,
+                        y: gy + (dy / (dist || 1)) * pull,
+                        dist
+                    });
+                }
+                grid.push(rowPts);
+            }
+
+            ctx.lineWidth = 1;
+
+            // Horizontal mesh lines
+            for (let r = 0; r < rows; r++) {
+                ctx.beginPath();
+                for (let c = 0; c < cols; c++) {
+                    const pt = grid[r][c];
+                    if (c === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.strokeStyle = 'rgba(130, 195, 255, 0.18)';
+                ctx.stroke();
+            }
+
+            // Vertical mesh lines
+            for (let c = 0; c < cols; c++) {
+                ctx.beginPath();
+                for (let r = 0; r < rows; r++) {
+                    const pt = grid[r][c];
+                    if (r === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.strokeStyle = 'rgba(130, 195, 255, 0.18)';
+                ctx.stroke();
+            }
+
+            // Concentric orbital range rings around the central gravity node
+            ctx.save();
+            ctx.setLineDash([4, 6]);
+            for (let radius = 85; radius <= 340; radius += 85) {
+                ctx.beginPath();
+                ctx.arc(centralNode.x, centralNode.y, radius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(180, 225, 255, 0.16)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawDeepStarfield(w, h, t) {
+            ctx.fillStyle = '#020308';
+            ctx.fillRect(0, 0, w, h);
+
+            // Subtle diagonal galactic dust band
+            const dust = ctx.createLinearGradient(0, h, w, 0);
+            dust.addColorStop(0, 'rgba(15, 25, 55, 0.05)');
+            dust.addColorStop(0.5, 'rgba(38, 56, 105, 0.16)');
+            dust.addColorStop(1, 'rgba(15, 25, 55, 0.05)');
+            ctx.fillStyle = dust;
+            ctx.fillRect(0, 0, w, h);
+
+            // Render multi-layered twinkling stars
+            for (let i = 0; i < starfieldData.length; i++) {
+                const s = starfieldData[i];
+                const sx = s.nx * w;
+                const sy = s.ny * h;
+                const twinkle = Math.sin(t * s.twinkleSpeed + s.phase) * 0.25;
+                const alpha = Math.max(0.1, Math.min(1, s.baseAlpha + twinkle));
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = s.color;
+                ctx.beginPath();
+                ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (s.hasGlint) {
+                    ctx.strokeStyle = s.color;
+                    ctx.lineWidth = 0.7;
+                    ctx.beginPath();
+                    ctx.moveTo(sx - 5, sy);
+                    ctx.lineTo(sx + 5, sy);
+                    ctx.moveTo(sx, sy - 5);
+                    ctx.lineTo(sx, sy + 5);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        function drawCosmicNebula(w, h, t) {
+            ctx.fillStyle = '#04030c';
+            ctx.fillRect(0, 0, w, h);
+
+            const maxDim = Math.max(w, h);
+            const clouds = [
+                {
+                    x: w * 0.35 + Math.cos(t * 0.35) * (w * 0.14),
+                    y: h * 0.42 + Math.sin(t * 0.28) * (h * 0.12),
+                    r: maxDim * 0.52,
+                    inner: 'rgba(24, 72, 175, 0.36)',
+                    mid: 'rgba(16, 44, 118, 0.16)'
+                },
+                {
+                    x: w * 0.66 + Math.sin(t * 0.31) * (w * 0.15),
+                    y: h * 0.56 + Math.cos(t * 0.26) * (h * 0.14),
+                    r: maxDim * 0.48,
+                    inner: 'rgba(116, 38, 178, 0.32)',
+                    mid: 'rgba(68, 22, 112, 0.14)'
+                },
+                {
+                    x: w * 0.5 + Math.sin(t * 0.22 + 1.4) * (w * 0.18),
+                    y: h * 0.35 + Math.cos(t * 0.33 + 0.8) * (h * 0.12),
+                    r: maxDim * 0.42,
+                    inner: 'rgba(12, 148, 178, 0.24)',
+                    mid: 'rgba(10, 86, 115, 0.1)'
+                }
+            ];
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            for (const c of clouds) {
+                const grad = ctx.createRadialGradient(c.x, c.y, 10, c.x, c.y, c.r);
+                grad.addColorStop(0, c.inner);
+                grad.addColorStop(0.55, c.mid);
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+            }
+            ctx.restore();
+
+            // Subtle faint starlight specks through nebula
+            for (let i = 0; i < 65; i++) {
+                const s = starfieldData[i];
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.25 + 0.2 * Math.sin(t * 1.8 + s.phase)})`;
+                ctx.fillRect(s.nx * w, s.ny * h, 1.2, 1.2);
+            }
+        }
+
+        function drawCyberGrid(w, h, t) {
+            ctx.fillStyle = '#05020e';
+            ctx.fillRect(0, 0, w, h);
+
+            // Subtle magenta/cyan ambient corner glow
+            const cyberGlow = ctx.createRadialGradient(
+                centralNode.x, centralNode.y, 20,
+                centralNode.x, centralNode.y, Math.max(w, h) * 0.65
+            );
+            cyberGlow.addColorStop(0, 'rgba(0, 243, 255, 0.12)');
+            cyberGlow.addColorStop(0.6, 'rgba(130, 0, 110, 0.08)');
+            cyberGlow.addColorStop(1, 'rgba(5, 2, 14, 0.4)');
+            ctx.fillStyle = cyberGlow;
+            ctx.fillRect(0, 0, w, h);
+
+            // Fine magenta sub-grid
+            const subStep = 22;
+            ctx.strokeStyle = 'rgba(255, 0, 170, 0.08)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = (w / 2) % subStep; x < w; x += subStep) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+            }
+            for (let y = (h / 2) % subStep; y < h; y += subStep) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+
+            // Major neon cyan grid
+            const majorStep = 66;
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.22)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = (w / 2) % majorStep; x < w; x += majorStep) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+            }
+            for (let y = (h / 2) % majorStep; y < h; y += majorStep) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+
+            // Expanding sonar pulse from gravity well
+            const maxPulseR = Math.min(w, h) * 0.48;
+            const pulseR = ((t * 55) % maxPulseR);
+            const pulseAlpha = (1 - pulseR / maxPulseR) * 0.28;
+            ctx.beginPath();
+            ctx.arc(centralNode.x, centralNode.y, pulseR, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(0, 243, 255, ${pulseAlpha.toFixed(3)})`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+
+        function drawPhysicsBlueprint(w, h) {
+            // Deep navy schematic base
+            ctx.fillStyle = '#071324';
+            ctx.fillRect(0, 0, w, h);
+
+            // Minor schematic grid (20px)
+            const minor = 20;
+            ctx.strokeStyle = 'rgba(120, 190, 255, 0.08)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = centralNode.x % minor; x < w; x += minor) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+            }
+            for (let y = centralNode.y % minor; y < h; y += minor) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+
+            // Major schematic grid (100px)
+            const major = 100;
+            ctx.strokeStyle = 'rgba(135, 205, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = centralNode.x % major; x < w; x += major) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+            }
+            for (let y = centralNode.y % major; y < h; y += major) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+
+            // Principal Crosshair Axes through Gravity Node
+            ctx.strokeStyle = 'rgba(170, 225, 255, 0.34)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, centralNode.y);
+            ctx.lineTo(w, centralNode.y);
+            ctx.moveTo(centralNode.x, 0);
+            ctx.lineTo(centralNode.x, h);
+            ctx.stroke();
+
+            // Radial measurement rings & schematic labels
+            ctx.font = '10px "Courier New", monospace';
+            ctx.fillStyle = 'rgba(175, 225, 255, 0.55)';
+            const ringRadii = [80, 160, 240, 320];
+            for (const r of ringRadii) {
+                ctx.beginPath();
+                ctx.arc(centralNode.x, centralNode.y, r, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(150, 215, 255, 0.25)';
+                ctx.stroke();
+
+                ctx.fillText(`R=${r}`, centralNode.x + r + 4, centralNode.y - 4);
+            }
+
+            // Degree ticks around outer reference ring
+            const outerR = 240;
+            ctx.strokeStyle = 'rgba(175, 225, 255, 0.35)';
+            for (let deg = 0; deg < 360; deg += 15) {
+                const rad = (deg * Math.PI) / 180;
+                const innerTick = deg % 45 === 0 ? outerR - 8 : outerR - 4;
+                ctx.beginPath();
+                ctx.moveTo(centralNode.x + Math.cos(rad) * innerTick, centralNode.y + Math.sin(rad) * innerTick);
+                ctx.lineTo(centralNode.x + Math.cos(rad) * outerR, centralNode.y + Math.sin(rad) * outerR);
+                ctx.stroke();
+            }
+        }
+
+        function drawCustomGradient(w, h) {
+            if (customCoreColor.toLowerCase() === customEdgeColor.toLowerCase()) {
+                ctx.fillStyle = customCoreColor;
+                ctx.fillRect(0, 0, w, h);
+                return;
+            }
+
+            const outerRadius = Math.hypot(w, h) * 0.55;
+            const grad = ctx.createRadialGradient(
+                centralNode.x, centralNode.y, 12,
+                centralNode.x, centralNode.y, outerRadius
+            );
+            grad.addColorStop(0, customCoreColor);
+            grad.addColorStop(1, customEdgeColor);
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        function drawCustomImage(w, h) {
+            if (!customBgImage) {
+                drawVoidBackground(w, h);
+                return;
+            }
+
+            // Scale image cleanly to cover canvas while preserving aspect ratio
+            const imgW = customBgImage.naturalWidth || customBgImage.width;
+            const imgH = customBgImage.naturalHeight || customBgImage.height;
+            const scale = Math.max(w / imgW, h / imgH);
+            const drawW = imgW * scale;
+            const drawH = imgH * scale;
+            const drawX = (w - drawW) / 2;
+            const drawY = (h - drawH) / 2;
+
+            ctx.drawImage(customBgImage, drawX, drawY, drawW, drawH);
+
+            // Subtle dark dimming + radial vignette so white ball and trail stay crisp
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.36)';
+            ctx.fillRect(0, 0, w, h);
+
+            const vignette = ctx.createRadialGradient(
+                centralNode.x, centralNode.y, Math.min(w, h) * 0.2,
+                centralNode.x, centralNode.y, Math.hypot(w, h) * 0.55
+            );
+            vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignette.addColorStop(1, 'rgba(0, 0, 0, 0.42)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        function drawBackground() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            switch (bgMode) {
+                case 'spacetime':
+                    drawSpacetimeGrid(w, h, animTime);
+                    break;
+                case 'starfield':
+                    drawDeepStarfield(w, h, animTime);
+                    break;
+                case 'nebula':
+                    drawCosmicNebula(w, h, animTime);
+                    break;
+                case 'cyber':
+                    drawCyberGrid(w, h, animTime);
+                    break;
+                case 'blueprint':
+                    drawPhysicsBlueprint(w, h);
+                    break;
+                case 'custom-gradient':
+                    drawCustomGradient(w, h);
+                    break;
+                case 'custom-image':
+                    drawCustomImage(w, h);
+                    break;
+                case 'void':
+                default:
+                    drawVoidBackground(w, h);
+                    break;
+            }
+        }
+
+        function draw() {
+            // Render active custom or preset background
+            drawBackground();
+
+            // Subtle contrast shadow so foreground elements pop against any background
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+            ctx.shadowBlur = 4;
 
             // 1. Draw Central Mass Node
             ctx.beginPath();
@@ -228,6 +846,7 @@
             ctx.fill();
 
             // Center mark on node
+            ctx.shadowBlur = 0;
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
             ctx.fillStyle = '#000000';
@@ -248,21 +867,26 @@
                 }
 
                 // Draw ball object
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+                ctx.shadowBlur = 4;
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
             }
+
+            ctx.restore();
         }
 
-        function animate() {
+        function animate(timestamp) {
+            animTime = (timestamp || 0) * 0.001;
             updatePhysics();
             draw();
             requestAnimationFrame(animate);
         }
 
         window.onload = function() {
-            animate();
+            requestAnimationFrame(animate);
         };
     </script>
 </body>
