@@ -44,6 +44,26 @@
             font-weight: bold;
         }
 
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .score-box {
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 5px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            background-color: rgba(255, 255, 255, 0.06);
+        }
+
+        .score-box span {
+            color: #eeff54;
+        }
+
         .btn-reset {
             background: transparent;
             color: #ffffff;
@@ -95,7 +115,10 @@
     <!-- Header Section -->
     <div id="header">
         <h1>Gravity Simulation</h1>
-        <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        <div class="header-controls">
+            <div class="score-box">Points: <span id="scoreValue">0</span></div>
+            <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        </div>
     </div>
 
     <!-- Canvas Container -->
@@ -104,23 +127,27 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a tennis ball.
+        Click anywhere on the canvas to launch a tennis ball. Hit the center yarn ball to score a point!
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const scoreValueEl = document.getElementById('scoreValue');
 
         // SIMULATION CONSTANTS
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;         // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
 
         // STATE VARIABLES
         let balls = [];
         let bgPattern = null;
+        let score = 0;
+        let hitEffects = [];
+        let centerPulse = 0;
 
         // Central Gravity Node Definition (Yarn Ball)
         const centralNode = {
@@ -128,6 +155,10 @@
             y: 0,
             radius: 20
         };
+
+        function updateScoreDisplay() {
+            scoreValueEl.textContent = score;
+        }
 
         // Build seamless cats-and-dogs background pattern
         function createCatsAndDogsPattern() {
@@ -547,9 +578,29 @@
 
         function resetSimulation() {
             balls = [];
+            hitEffects = [];
+            centerPulse = 0;
+            score = 0;
+            updateScoreDisplay();
         }
 
         function updatePhysics() {
+            // Decay center node hit pulse
+            if (centerPulse > 0) {
+                centerPulse = Math.max(0, centerPulse - 0.06);
+            }
+
+            // Update floating +1 point effects
+            for (let i = hitEffects.length - 1; i >= 0; i--) {
+                const fx = hitEffects[i];
+                fx.y -= 1.1;
+                fx.ringRadius += 1.6;
+                fx.alpha -= 0.025;
+                if (fx.alpha <= 0) {
+                    hitEffects.splice(i, 1);
+                }
+            }
+
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
@@ -567,8 +618,17 @@
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
+                // Absorption check: ball collides with central mass -> score 1 point
                 if (dist < centralNode.radius + b.radius) {
+                    score += 1;
+                    updateScoreDisplay();
+                    centerPulse = 1;
+                    hitEffects.push({
+                        x: centralNode.x,
+                        y: centralNode.y - centralNode.radius - 10,
+                        ringRadius: centralNode.radius,
+                        alpha: 1
+                    });
                     balls.splice(i, 1);
                     continue;
                 }
@@ -800,8 +860,14 @@
             ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
             ctx.shadowBlur = 5;
 
-            // 1. Draw Central Yarn Ball Node
+            // 1. Draw Central Yarn Ball Node (with subtle bounce pulse on score)
+            const pulseScale = 1 + centerPulse * 0.22;
+            ctx.save();
+            ctx.translate(centralNode.x, centralNode.y);
+            ctx.scale(pulseScale, pulseScale);
+            ctx.translate(-centralNode.x, -centralNode.y);
             drawYarnBall(centralNode.x, centralNode.y, centralNode.radius);
+            ctx.restore();
 
             // 2. Draw Tennis Ball & Trail
             for (const b of balls) {
@@ -819,6 +885,22 @@
 
                 // Draw tennis ball object
                 drawTennisBall(b.x, b.y, b.radius, b.rotation);
+            }
+
+            // 3. Draw Score Hit Effects (+1 popup & expanding ring)
+            for (const fx of hitEffects) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(centralNode.x, centralNode.y, fx.ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(238, 255, 84, ${fx.alpha * 0.75})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.font = 'bold 18px "Courier New", Courier, monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = `rgba(238, 255, 84, ${fx.alpha})`;
+                ctx.fillText('+1', fx.x, fx.y);
+                ctx.restore();
             }
 
             ctx.restore();
