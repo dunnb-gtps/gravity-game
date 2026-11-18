@@ -14,8 +14,8 @@
         }
 
         body {
-            background-color: #000000;
-            color: #ffffff;
+            background-color: #030e08;
+            color: #e8f5ec;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -36,7 +36,7 @@
             max-width: 1100px;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #ffffff;
+            border-bottom: 1px solid #2b593e;
         }
 
         .header-left {
@@ -51,6 +51,8 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             font-weight: bold;
+            color: #f0faf3;
+            text-shadow: 0 0 12px rgba(74, 175, 114, 0.25);
         }
 
         /* HUD Counters */
@@ -64,9 +66,10 @@
         }
 
         .stat-item {
-            border: 1px solid #444444;
+            border: 1px solid #1e422d;
             padding: 3px 10px;
-            background-color: #080808;
+            background-color: #05160d;
+            color: #b4d6c0;
         }
 
         .stat-value {
@@ -84,22 +87,23 @@
             font-size: 11px;
             letter-spacing: 1px;
             padding: 5px 10px;
-            border: 1px solid #555555;
-            color: #cccccc;
+            border: 1px solid #2b593e;
+            background-color: #05160d;
+            color: #9ec7ad;
             text-transform: uppercase;
         }
 
         #mode-badge.manual {
-            border-color: #ffffff;
-            color: #000000;
-            background-color: #ffffff;
+            border-color: #a8e6be;
+            color: #031209;
+            background-color: #a8e6be;
             font-weight: bold;
         }
 
         .btn-reset {
-            background: transparent;
-            color: #ffffff;
-            border: 1px solid #ffffff;
+            background: rgba(6, 24, 14, 0.75);
+            color: #e8f5ec;
+            border: 1px solid #488561;
             padding: 6px 16px;
             font-size: 14px;
             font-weight: bold;
@@ -110,8 +114,9 @@
         }
 
         .btn-reset:hover {
-            background: #ffffff;
-            color: #000000;
+            background: #a8e6be;
+            border-color: #a8e6be;
+            color: #031209;
         }
 
         .btn-reset:active {
@@ -131,8 +136,9 @@
         }
 
         canvas {
-            background-color: #000000;
-            border: 1px solid #ffffff;
+            background-color: #020c06;
+            border: 1px solid #2b593e;
+            box-shadow: 0 0 32px rgba(4, 22, 12, 0.9);
             display: block;
             cursor: crosshair;
             width: 100%;
@@ -143,7 +149,7 @@
         .instructions {
             margin-top: 8px;
             font-size: 11px;
-            color: #888888;
+            color: #6a997c;
             text-align: center;
             line-height: 1.4;
         }
@@ -196,6 +202,10 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Offscreen canvas for caching static rainforest backdrop & perimeter botanicals
+        const bgCacheCanvas = document.createElement('canvas');
+        const bgCacheCtx = bgCacheCanvas.getContext('2d');
+
         // HUD DOM References
         const eatenCountEl = document.getElementById('eatenCount');
         const snakeLengthEl = document.getElementById('snakeLengthCount');
@@ -232,6 +242,11 @@
         let shockwaves = [];
         let ballsEaten = 0;
         let frameTick = 0;
+
+        // Procedural Jungle Environment Collections
+        let jungleSunRays = [];
+        let jungleVines = [];
+        let jungleFireflies = [];
 
         // Keyboard input tracking for optional manual steering
         const activeKeys = new Set();
@@ -271,6 +286,17 @@
             return a + (b - a) * t;
         }
 
+        // Seeded PRNG so jungle foliage & silhouettes remain coherent across resizes
+        function createSeededRandom(seed) {
+            let s = seed >>> 0;
+            return function() {
+                s += 0x6D2B79F5;
+                let t = Math.imul(s ^ (s >>> 15), 1 | s);
+                t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
         function updateHUD() {
             eatenCountEl.textContent = ballsEaten;
             snakeLengthEl.textContent = snake.segmentCount;
@@ -281,6 +307,533 @@
             } else {
                 modeBadgeEl.textContent = balls.length > 0 ? 'AI: Hunting' : 'AI: Orbiting';
                 modeBadgeEl.classList.remove('manual');
+            }
+        }
+
+        // =========================================================================
+        // JUNGLE ENVIRONMENT GENERATION & CACHED LAYER RENDERING
+        // =========================================================================
+        function drawPalmFrond(targetCtx, baseX, baseY, angle, length, curve, leafletCount, color) {
+            targetCtx.save();
+            targetCtx.strokeStyle = color;
+            targetCtx.fillStyle = color;
+            targetCtx.lineCap = 'round';
+
+            const tipX = baseX + Math.cos(angle) * length;
+            const tipY = baseY + Math.sin(angle) * length;
+            const ctrlX = (baseX + tipX) * 0.5 - Math.sin(angle) * curve;
+            const ctrlY = (baseY + tipY) * 0.5 + Math.cos(angle) * curve;
+
+            // Central rachis stem
+            targetCtx.lineWidth = Math.max(1.5, length * 0.016);
+            targetCtx.beginPath();
+            targetCtx.moveTo(baseX, baseY);
+            targetCtx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
+            targetCtx.stroke();
+
+            // Individual pointed palm leaflets along the curve
+            for (let i = 2; i <= leafletCount; i++) {
+                const t = i / (leafletCount + 1);
+                const invT = 1 - t;
+                const px = invT * invT * baseX + 2 * invT * t * ctrlX + t * t * tipX;
+                const py = invT * invT * baseY + 2 * invT * t * ctrlY + t * t * tipY;
+
+                // Tangent vector along quadratic curve
+                const tx = 2 * invT * (ctrlX - baseX) + 2 * t * (tipX - ctrlX);
+                const ty = 2 * invT * (ctrlY - baseY) + 2 * t * (tipY - ctrlY);
+                const tangentAngle = Math.atan2(ty, tx);
+
+                const leafletLen = length * 0.24 * Math.sin(t * Math.PI * 0.88 + 0.15);
+                const leafletWidth = Math.max(1.8, leafletLen * 0.14);
+
+                for (const side of [-1, 1]) {
+                    const leafAngle = tangentAngle + side * (0.68 - t * 0.18);
+                    const lx = px + Math.cos(leafAngle) * leafletLen;
+                    const ly = py + Math.sin(leafAngle) * leafletLen;
+                    const midX = (px + lx) * 0.5 - Math.sin(leafAngle) * leafletWidth * side;
+                    const midY = (py + ly) * 0.5 + Math.cos(leafAngle) * leafletWidth * side;
+
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(px, py);
+                    targetCtx.quadraticCurveTo(midX, midY, lx, ly);
+                    targetCtx.quadraticCurveTo(
+                        (px + lx) * 0.5 + Math.sin(leafAngle) * (leafletWidth * 0.35) * side,
+                        (py + ly) * 0.5 - Math.cos(leafAngle) * (leafletWidth * 0.35) * side,
+                        px,
+                        py
+                    );
+                    targetCtx.fill();
+                }
+            }
+
+            targetCtx.restore();
+        }
+
+        function drawFernFrond(targetCtx, baseX, baseY, angle, length, curve, pinnaePairs, color) {
+            targetCtx.save();
+            targetCtx.strokeStyle = color;
+            targetCtx.fillStyle = color;
+            targetCtx.lineCap = 'round';
+
+            const tipX = baseX + Math.cos(angle) * length;
+            const tipY = baseY + Math.sin(angle) * length;
+            const ctrlX = (baseX + tipX) * 0.5 - Math.sin(angle) * curve;
+            const ctrlY = (baseY + tipY) * 0.5 + Math.cos(angle) * curve;
+
+            // Fern stem
+            targetCtx.lineWidth = Math.max(1.2, length * 0.014);
+            targetCtx.beginPath();
+            targetCtx.moveTo(baseX, baseY);
+            targetCtx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
+            targetCtx.stroke();
+
+            // Dense alternating fern pinnae
+            for (let i = 1; i <= pinnaePairs; i++) {
+                const t = i / (pinnaePairs + 1);
+                const invT = 1 - t;
+                const px = invT * invT * baseX + 2 * invT * t * ctrlX + t * t * tipX;
+                const py = invT * invT * baseY + 2 * invT * t * ctrlY + t * t * tipY;
+
+                const tx = 2 * invT * (ctrlX - baseX) + 2 * t * (tipX - ctrlX);
+                const ty = 2 * invT * (ctrlY - baseY) + 2 * t * (tipY - ctrlY);
+                const tangentAngle = Math.atan2(ty, tx);
+
+                const bladeLen = length * 0.16 * Math.sin(t * Math.PI * 0.92 + 0.12);
+                const bladeW = Math.max(2.2, bladeLen * 0.36);
+
+                for (const side of [-1, 1]) {
+                    const bAngle = tangentAngle + side * 0.92;
+                    const bx = px + Math.cos(bAngle) * bladeLen;
+                    const by = py + Math.sin(bAngle) * bladeLen;
+
+                    targetCtx.beginPath();
+                    targetCtx.ellipse(
+                        (px + bx) * 0.5,
+                        (py + by) * 0.5,
+                        bladeLen * 0.52,
+                        bladeW * 0.45,
+                        bAngle,
+                        0,
+                        Math.PI * 2
+                    );
+                    targetCtx.fill();
+                }
+            }
+
+            targetCtx.restore();
+        }
+
+        function drawMonsteraLeaf(targetCtx, stemX, stemY, angle, size, fillColor, veinColor) {
+            targetCtx.save();
+            targetCtx.translate(stemX, stemY);
+            targetCtx.rotate(angle);
+
+            // Petiole stem
+            targetCtx.strokeStyle = fillColor;
+            targetCtx.lineWidth = Math.max(2, size * 0.045);
+            targetCtx.lineCap = 'round';
+            targetCtx.beginPath();
+            targetCtx.moveTo(0, 0);
+            targetCtx.lineTo(size * 0.35, 0);
+            targetCtx.stroke();
+
+            // Heart-shaped tropical leaf blade with natural fenestration notches
+            const startX = size * 0.3;
+            const leafLen = size * 0.95;
+            const maxHalfW = size * 0.46;
+
+            targetCtx.fillStyle = fillColor;
+            targetCtx.beginPath();
+            targetCtx.moveTo(startX, 0);
+
+            // Upper lobe & edge with 3 fenestration indentations
+            targetCtx.bezierCurveTo(
+                startX - size * 0.12, -maxHalfW * 0.75,
+                startX + leafLen * 0.18, -maxHalfW * 1.05,
+                startX + leafLen * 0.34, -maxHalfW * 0.92
+            );
+            // Notch 1
+            targetCtx.lineTo(startX + leafLen * 0.36, -maxHalfW * 0.48);
+            targetCtx.lineTo(startX + leafLen * 0.43, -maxHalfW * 0.86);
+            // Notch 2
+            targetCtx.quadraticCurveTo(
+                startX + leafLen * 0.54, -maxHalfW * 0.80,
+                startX + leafLen * 0.60, -maxHalfW * 0.72
+            );
+            targetCtx.lineTo(startX + leafLen * 0.58, -maxHalfW * 0.36);
+            targetCtx.lineTo(startX + leafLen * 0.67, -maxHalfW * 0.64);
+            // Taper to pointed leaf apex
+            targetCtx.quadraticCurveTo(
+                startX + leafLen * 0.86, -maxHalfW * 0.40,
+                startX + leafLen, 0
+            );
+
+            // Lower edge mirrored with fenestration notches
+            targetCtx.quadraticCurveTo(
+                startX + leafLen * 0.86, maxHalfW * 0.40,
+                startX + leafLen * 0.67, maxHalfW * 0.64
+            );
+            targetCtx.lineTo(startX + leafLen * 0.58, maxHalfW * 0.36);
+            targetCtx.lineTo(startX + leafLen * 0.60, maxHalfW * 0.72);
+            targetCtx.quadraticCurveTo(
+                startX + leafLen * 0.54, maxHalfW * 0.80,
+                startX + leafLen * 0.43, maxHalfW * 0.86
+            );
+            targetCtx.lineTo(startX + leafLen * 0.36, maxHalfW * 0.48);
+            targetCtx.lineTo(startX + leafLen * 0.34, maxHalfW * 0.92);
+            targetCtx.bezierCurveTo(
+                startX + leafLen * 0.18, maxHalfW * 1.05,
+                startX - size * 0.12, maxHalfW * 0.75,
+                startX, 0
+            );
+            targetCtx.closePath();
+            targetCtx.fill();
+
+            // Subtle midrib & lateral veins
+            targetCtx.strokeStyle = veinColor;
+            targetCtx.lineWidth = Math.max(1, size * 0.015);
+            targetCtx.beginPath();
+            targetCtx.moveTo(startX, 0);
+            targetCtx.lineTo(startX + leafLen * 0.9, 0);
+            for (const frac of [0.25, 0.48, 0.72]) {
+                const vx = startX + leafLen * frac;
+                const vw = maxHalfW * (0.72 - frac * 0.45);
+                targetCtx.moveTo(vx, 0);
+                targetCtx.lineTo(vx + leafLen * 0.08, -vw);
+                targetCtx.moveTo(vx, 0);
+                targetCtx.lineTo(vx + leafLen * 0.08, vw);
+            }
+            targetCtx.stroke();
+
+            targetCtx.restore();
+        }
+
+        function buildStaticJungleCache() {
+            const w = canvas.width;
+            const h = canvas.height;
+            if (w <= 0 || h <= 0) return;
+
+            bgCacheCanvas.width = w;
+            bgCacheCanvas.height = h;
+            const rand = createSeededRandom(4219);
+
+            // 1. Deep Rainforest Canopy Gradient (#020c06 -> #092617 -> #031109)
+            const bgGrad = bgCacheCtx.createLinearGradient(0, 0, 0, h);
+            bgGrad.addColorStop(0.0, '#020c06');
+            bgGrad.addColorStop(0.38, '#061d11');
+            bgGrad.addColorStop(0.75, '#092617');
+            bgGrad.addColorStop(1.0, '#031008');
+            bgCacheCtx.fillStyle = bgGrad;
+            bgCacheCtx.fillRect(0, 0, w, h);
+
+            // Subtle radial canopy glow near upper-center filtering through leaves
+            const canopyGlow = bgCacheCtx.createRadialGradient(
+                w * 0.48, h * 0.12, w * 0.02,
+                w * 0.5, h * 0.45, Math.max(w, h) * 0.75
+            );
+            canopyGlow.addColorStop(0.0, 'rgba(26, 98, 58, 0.22)');
+            canopyGlow.addColorStop(0.55, 'rgba(10, 42, 24, 0.08)');
+            canopyGlow.addColorStop(1.0, 'rgba(1, 8, 4, 0.42)');
+            bgCacheCtx.fillStyle = canopyGlow;
+            bgCacheCtx.fillRect(0, 0, w, h);
+
+            // 2. Distant Shadow-Green Rainforest Tree Trunks (Background Depth Layer)
+            const trunkCount = Math.max(7, Math.floor(w / 120));
+            for (let i = 0; i < trunkCount; i++) {
+                const isMidground = i % 2 === 0;
+                const tx = (i / (trunkCount - 1 || 1)) * w + (rand() - 0.5) * 65;
+                const trunkW = isMidground ? (18 + rand() * 24) : (10 + rand() * 14);
+                const lean = (rand() - 0.5) * 26;
+
+                bgCacheCtx.save();
+                bgCacheCtx.fillStyle = isMidground
+                    ? 'rgba(4, 21, 12, 0.55)'
+                    : 'rgba(8, 34, 19, 0.34)';
+
+                bgCacheCtx.beginPath();
+                // Slight root flare at bottom
+                bgCacheCtx.moveTo(tx - trunkW * 0.75, h);
+                bgCacheCtx.quadraticCurveTo(tx - trunkW * 0.45, h * 0.85, tx - trunkW * 0.42 + lean * 0.5, h * 0.5);
+                bgCacheCtx.lineTo(tx - trunkW * 0.36 + lean, 0);
+                bgCacheCtx.lineTo(tx + trunkW * 0.36 + lean, 0);
+                bgCacheCtx.lineTo(tx + trunkW * 0.42 + lean * 0.5, h * 0.5);
+                bgCacheCtx.quadraticCurveTo(tx + trunkW * 0.45, h * 0.85, tx + trunkW * 0.75, h);
+                bgCacheCtx.closePath();
+                bgCacheCtx.fill();
+
+                // Faint mossy bark highlight on sunlit left side of trunk
+                bgCacheCtx.strokeStyle = 'rgba(24, 78, 46, 0.14)';
+                bgCacheCtx.lineWidth = 1.5;
+                bgCacheCtx.beginPath();
+                bgCacheCtx.moveTo(tx - trunkW * 0.35 + lean, 0);
+                bgCacheCtx.lineTo(tx - trunkW * 0.42, h);
+                bgCacheCtx.stroke();
+                bgCacheCtx.restore();
+            }
+
+            // 3. Soft Atmospheric Mist Band near Forest Floor
+            const mistGrad = bgCacheCtx.createLinearGradient(0, h * 0.72, 0, h);
+            mistGrad.addColorStop(0, 'rgba(14, 52, 31, 0)');
+            mistGrad.addColorStop(1, 'rgba(12, 46, 27, 0.28)');
+            bgCacheCtx.fillStyle = mistGrad;
+            bgCacheCtx.fillRect(0, h * 0.72, w, h * 0.28);
+
+            // 4. Corner & Perimeter Tropical Foliage (Framing edges without obstructing play area)
+            const scale = Math.max(0.65, Math.min(1.25, Math.min(w, h) / 680));
+
+            // Back layer (deeper shadow emerald)
+            // Bottom-Left Corner Cluster
+            drawPalmFrond(bgCacheCtx, -10, h + 10, -0.58, 175 * scale, -24 * scale, 13, '#04190e');
+            drawPalmFrond(bgCacheCtx, -12, h - 25, -0.24, 155 * scale, 18 * scale, 11, '#051f11');
+            drawMonsteraLeaf(bgCacheCtx, -8, h - 5, -0.45, 115 * scale, '#062213', '#0b351e');
+            drawFernFrond(bgCacheCtx, 18, h + 8, -1.15, 135 * scale, -18 * scale, 14, '#082b18');
+            drawFernFrond(bgCacheCtx, 42, h + 10, -0.78, 120 * scale, 15 * scale, 12, '#0a331d');
+
+            // Bottom-Right Corner Cluster
+            drawPalmFrond(bgCacheCtx, w + 10, h + 10, -Math.PI + 0.56, 180 * scale, 24 * scale, 13, '#04190e');
+            drawPalmFrond(bgCacheCtx, w + 12, h - 28, -Math.PI + 0.22, 150 * scale, -18 * scale, 11, '#051f11');
+            drawMonsteraLeaf(bgCacheCtx, w + 8, h - 5, -Math.PI + 0.44, 118 * scale, '#062213', '#0b351e');
+            drawFernFrond(bgCacheCtx, w - 20, h + 8, -Math.PI + 1.12, 135 * scale, 18 * scale, 14, '#082b18');
+            drawFernFrond(bgCacheCtx, w - 45, h + 10, -Math.PI + 0.76, 115 * scale, -14 * scale, 12, '#0a331d');
+
+            // Top-Left Upper Canopy Cluster
+            drawPalmFrond(bgCacheCtx, -12, -8, 0.42, 165 * scale, 20 * scale, 12, '#04170c');
+            drawMonsteraLeaf(bgCacheCtx, -6, 6, 0.52, 102 * scale, '#051e10', '#0a311c');
+            drawFernFrond(bgCacheCtx, 14, -8, 1.05, 115 * scale, 14 * scale, 12, '#072716');
+
+            // Top-Right Upper Canopy Cluster
+            drawPalmFrond(bgCacheCtx, w + 12, -8, Math.PI - 0.42, 165 * scale, -20 * scale, 12, '#04170c');
+            drawMonsteraLeaf(bgCacheCtx, w + 6, 6, Math.PI - 0.52, 102 * scale, '#051e10', '#0a311c');
+            drawFernFrond(bgCacheCtx, w - 14, -8, Math.PI - 1.05, 115 * scale, -14 * scale, 12, '#072716');
+
+            // Subtle Mid-Side Perimeter Ferns (tucked neatly at left & right edges)
+            drawFernFrond(bgCacheCtx, -8, h * 0.48, 0.25, 95 * scale, 14 * scale, 10, '#051d10');
+            drawFernFrond(bgCacheCtx, w + 8, h * 0.52, Math.PI - 0.25, 95 * scale, -14 * scale, 10, '#051d10');
+
+            // Subtle Canopy Fringe along the very top border
+            const canopyClumps = Math.ceil(w / 55);
+            for (let c = 0; c <= canopyClumps; c++) {
+                const cx = (c / canopyClumps) * w;
+                const cr = (24 + rand() * 26) * scale;
+                bgCacheCtx.fillStyle = c % 2 === 0 ? '#031209' : '#04180d';
+                bgCacheCtx.beginPath();
+                bgCacheCtx.arc(cx, -cr * 0.25, cr, 0, Math.PI * 2);
+                bgCacheCtx.fill();
+            }
+
+            // Soft edge vignette to keep focus anchored on the central gravity arena
+            const vignette = bgCacheCtx.createRadialGradient(
+                w * 0.5, h * 0.5, Math.min(w, h) * 0.28,
+                w * 0.5, h * 0.5, Math.max(w, h) * 0.72
+            );
+            vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignette.addColorStop(1, 'rgba(1, 7, 4, 0.45)');
+            bgCacheCtx.fillStyle = vignette;
+            bgCacheCtx.fillRect(0, 0, w, h);
+        }
+
+        function initJungleEnvironment() {
+            const w = canvas.width;
+            const h = canvas.height;
+            if (w <= 0 || h <= 0) return;
+
+            buildStaticJungleCache();
+
+            const rand = createSeededRandom(9081);
+
+            // 1. Dappled Sunlight Rays filtering diagonally from top canopy
+            jungleSunRays = [];
+            const rayCount = 5;
+            for (let i = 0; i < rayCount; i++) {
+                jungleSunRays.push({
+                    topX: w * (0.14 + (i / (rayCount - 1)) * 0.68) + (rand() - 0.5) * 40,
+                    topWidth: 26 + rand() * 44,
+                    bottomWidth: 95 + rand() * 120,
+                    slant: 90 + rand() * 110,
+                    baseAlpha: 0.022 + rand() * 0.024,
+                    speed: 0.012 + rand() * 0.012,
+                    phase: rand() * Math.PI * 2
+                });
+            }
+
+            // 2. Gently Swaying Hanging Vines & Leaves from top edge
+            jungleVines = [];
+            const vineCount = Math.max(12, Math.floor(w / 62));
+            for (let i = 0; i < vineCount; i++) {
+                const normX = (i + 0.5) / vineCount;
+                const vx = normX * w + (rand() - 0.5) * 28;
+                // Shorter near the upper-middle so vines frame the top without cluttering gameplay
+                const centerDist = Math.abs(normX - 0.5) * 2; // 0 at center, 1 at edges
+                const maxLen = h * (0.11 + centerDist * 0.16) + rand() * (h * 0.07);
+                const segments = Math.max(5, Math.floor(maxLen / 18));
+
+                const leaves = [];
+                for (let s = 1; s < segments; s++) {
+                    if (rand() > 0.22) {
+                        leaves.push({
+                            segFraction: s / segments,
+                            side: (s % 2 === 0 ? 1 : -1) * (rand() > 0.15 ? 1 : -1),
+                            size: 5.5 + rand() * 5.5,
+                            tilt: 0.45 + rand() * 0.45,
+                            shade: rand() > 0.5 ? '#0b3820' : '#0f4729'
+                        });
+                    }
+                }
+
+                jungleVines.push({
+                    x: vx,
+                    length: maxLen,
+                    segments: segments,
+                    thickness: 1.1 + rand() * 1.1,
+                    swayAmp: 6 + rand() * 11,
+                    swaySpeed: 0.018 + rand() * 0.014,
+                    phase: rand() * Math.PI * 2,
+                    color: rand() > 0.5 ? '#082c19' : '#0b3820',
+                    leaves: leaves
+                });
+            }
+
+            // 3. Drifting Bioluminescent Fireflies / Spores
+            jungleFireflies = [];
+            const fireflyCount = Math.max(24, Math.floor((w * h) / 22000));
+            for (let i = 0; i < fireflyCount; i++) {
+                const isGold = rand() > 0.42;
+                jungleFireflies.push({
+                    x: rand() * w,
+                    y: rand() * h,
+                    vx: (rand() - 0.5) * 0.32,
+                    vy: -0.08 - rand() * 0.22,
+                    radius: 1.1 + rand() * 1.5,
+                    glowRadius: 6 + rand() * 8,
+                    pulseSpeed: 0.025 + rand() * 0.035,
+                    phase: rand() * Math.PI * 2,
+                    driftFreq: 0.01 + rand() * 0.015,
+                    colorRGB: isGold ? '205, 245, 130' : '115, 240, 170'
+                });
+            }
+        }
+
+        function drawJungleBackground() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // 1. Blit cached deep emerald canopy, tree silhouettes & corner foliage
+            if (bgCacheCanvas.width > 0 && bgCacheCanvas.height > 0) {
+                ctx.drawImage(bgCacheCanvas, 0, 0);
+            } else {
+                ctx.fillStyle = '#031109';
+                ctx.fillRect(0, 0, w, h);
+            }
+
+            // 2. Render Dappled Sunlight Shafts filtering from top canopy
+            for (let i = 0; i < jungleSunRays.length; i++) {
+                const ray = jungleSunRays[i];
+                const pulse = 0.72 + 0.28 * Math.sin(frameTick * ray.speed + ray.phase);
+                const alpha = ray.baseAlpha * pulse;
+                const swayShift = Math.sin(frameTick * ray.speed * 0.7 + ray.phase) * 14;
+
+                const x0 = ray.topX + swayShift;
+                const x1 = x0 + ray.topWidth;
+                const bx0 = x0 + ray.slant - ray.bottomWidth * 0.35;
+                const bx1 = x1 + ray.slant + ray.bottomWidth * 0.65;
+
+                const rayGrad = ctx.createLinearGradient(x0, 0, bx0 + ray.bottomWidth * 0.5, h * 0.88);
+                rayGrad.addColorStop(0.0, `rgba(130, 230, 165, ${alpha * 1.35})`);
+                rayGrad.addColorStop(0.55, `rgba(95, 205, 140, ${alpha * 0.65})`);
+                rayGrad.addColorStop(1.0, 'rgba(60, 160, 100, 0)');
+
+                ctx.fillStyle = rayGrad;
+                ctx.beginPath();
+                ctx.moveTo(x0, 0);
+                ctx.lineTo(x1, 0);
+                ctx.lineTo(bx1, h * 0.9);
+                ctx.lineTo(bx0, h * 0.9);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 3. Render Gently Swaying Hanging Vines & Teardrop Leaves
+            for (let i = 0; i < jungleVines.length; i++) {
+                const vine = jungleVines[i];
+                const primaryWave = Math.sin(frameTick * vine.swaySpeed + vine.phase);
+                const secondaryWave = Math.sin(frameTick * vine.swaySpeed * 1.7 + vine.phase * 1.3) * 0.25;
+
+                ctx.strokeStyle = vine.color;
+                ctx.lineWidth = vine.thickness;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(vine.x, 0);
+
+                for (let s = 1; s <= vine.segments; s++) {
+                    const t = s / vine.segments;
+                    const bend = (primaryWave + secondaryWave * t) * vine.swayAmp * (t * t);
+                    const px = vine.x + bend;
+                    const py = vine.length * t;
+                    ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+
+                // Draw teardrop leaves attached along the swaying vine
+                for (let l = 0; l < vine.leaves.length; l++) {
+                    const leaf = vine.leaves[l];
+                    const t = leaf.segFraction;
+                    const bend = (primaryWave + secondaryWave * t) * vine.swayAmp * (t * t);
+                    const lx = vine.x + bend;
+                    const ly = vine.length * t;
+
+                    // Local tangent slope for natural leaf orientation
+                    const slopeDx = (primaryWave + secondaryWave * t) * vine.swayAmp * 2 * t * (1 / Math.max(1, vine.length));
+                    const stemAngle = Math.PI / 2 - Math.atan(slopeDx);
+                    const leafAngle = stemAngle - leaf.side * leaf.tilt;
+
+                    ctx.save();
+                    ctx.translate(lx, ly);
+                    ctx.rotate(leafAngle);
+                    ctx.fillStyle = leaf.shade;
+
+                    const len = leaf.size;
+                    const wid = len * 0.44;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.quadraticCurveTo(len * 0.45, -wid, len, 0);
+                    ctx.quadraticCurveTo(len * 0.45, wid, 0, 0);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // 4. Render Drifting Bioluminescent Fireflies / Jungle Spores
+            for (let i = 0; i < jungleFireflies.length; i++) {
+                const f = jungleFireflies[i];
+
+                // Gentle organic drift
+                f.x += f.vx + Math.sin(frameTick * f.driftFreq + f.phase) * 0.22;
+                f.y += f.vy + Math.cos(frameTick * f.driftFreq * 0.8 + f.phase) * 0.12;
+
+                // Softly wrap around canvas boundaries
+                if (f.y < -15) {
+                    f.y = h + 15;
+                    f.x = (f.x + w * 0.37) % w;
+                }
+                if (f.x < -15) f.x = w + 15;
+                if (f.x > w + 15) f.x = -15;
+
+                const twinkle = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(frameTick * f.pulseSpeed + f.phase));
+
+                // Soft outer bioluminescent halo
+                const halo = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.glowRadius);
+                halo.addColorStop(0, `rgba(${f.colorRGB}, ${0.32 * twinkle})`);
+                halo.addColorStop(1, `rgba(${f.colorRGB}, 0)`);
+                ctx.fillStyle = halo;
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.glowRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Crisp luminous core
+                ctx.fillStyle = `rgba(${f.colorRGB}, ${0.78 * twinkle})`;
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
@@ -327,6 +880,9 @@
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            // Rebuild cached jungle canopy, foliage, vines & fireflies for the new dimensions
+            initJungleEnvironment();
 
             // Shift snake & history relative to the new center if already initialized
             if (snake.spineHistory.length > 0 && (prevCenterX !== 0 || prevCenterY !== 0)) {
@@ -566,7 +1122,7 @@
                 alpha: 0.95,
                 lineWidth: 2.2
             });
-            // Subtle secondary inner ring for crisp monochrome feedback
+            // Subtle secondary inner ring for crisp visual feedback
             shockwaves.push({
                 x: x,
                 y: y,
@@ -738,9 +1294,9 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
 
-                // Subtle black hairline separation on segments for crisp monochrome definition
+                // Subtle dark hairline separation on segments for crisp definition
                 if (i > 0 && i % 2 === 0) {
-                    ctx.strokeStyle = '#000000';
+                    ctx.strokeStyle = '#031209';
                     ctx.lineWidth = 0.8;
                     ctx.stroke();
                 }
@@ -770,10 +1326,10 @@
                 const eyeX = head.x + cosA * forwardOffset + perpX * sideOffset * side;
                 const eyeY = head.y + sinA * forwardOffset + perpY * sideOffset * side;
 
-                // Black eye socket against the white head
+                // Dark eye socket against the white head
                 ctx.beginPath();
                 ctx.arc(eyeX, eyeY, eyeRadius, 0, Math.PI * 2);
-                ctx.fillStyle = '#000000';
+                ctx.fillStyle = '#031209';
                 ctx.fill();
 
                 // Crisp white directional glint/pupil
@@ -795,9 +1351,8 @@
         }
 
         function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // 0. Draw Layered Atmospheric Jungle Background
+            drawJungleBackground();
 
             // 1. Draw Central Mass Node
             ctx.beginPath();
@@ -808,7 +1363,7 @@
             // Center mark on node
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = '#031209';
             ctx.fill();
 
             // 2. Draw Ball & Trail
