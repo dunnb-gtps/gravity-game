@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Physics Simulation</title>
     <style>
         /* Global Reset & Typography */
         * {
@@ -62,7 +62,7 @@
         #speedSlider {
             -webkit-appearance: none;
             appearance: none;
-            width: 180px;
+            width: 160px;
             height: 6px;
             background: rgba(255, 255, 255, 0.55);
             border: 1px solid #1e293b;
@@ -107,6 +107,53 @@
         #speedValue {
             min-width: 38px;
             text-align: right;
+        }
+
+        /* Ball Color Picker Controls */
+        .color-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .color-btn {
+            background: rgba(255, 255, 255, 0.35);
+            color: #1e293b;
+            border: 1px solid #1e293b;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .color-btn.active {
+            background: #1e293b;
+            color: #ffffff;
+        }
+
+        .swatch-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 1.5px solid #1e293b;
+            cursor: pointer;
+            transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
+        }
+
+        .swatch-btn:hover {
+            transform: scale(1.12);
+        }
+
+        .swatch-btn.active {
+            transform: scale(1.15);
+            box-shadow: 0 0 0 2px #ffffff, 0 0 0 3.5px #1e293b;
         }
 
         /* Reset Button Styling */
@@ -170,6 +217,15 @@
             <span id="speedValue">5.0</span>
         </div>
 
+        <!-- Pastel Ball Color Selector -->
+        <div class="color-control" role="group" aria-label="Ball Color Selection">
+            <span>Ball:</span>
+            <button type="button" class="color-btn active" data-mode="cycle" onclick="setColorMode('cycle', this)">Cycle</button>
+            <button type="button" class="swatch-btn" style="background: #ff9ebb;" title="Pastel Pink" aria-label="Pastel Pink" onclick="setColorMode(0, this)"></button>
+            <button type="button" class="swatch-btn" style="background: #8ecae6;" title="Pastel Blue" aria-label="Pastel Blue" onclick="setColorMode(1, this)"></button>
+            <button type="button" class="swatch-btn" style="background: #80ded9;" title="Pastel Teal" aria-label="Pastel Teal" onclick="setColorMode(2, this)"></button>
+        </div>
+
         <!-- Simulation Reset Trigger -->
         <button class="btn-reset" onclick="resetSimulation()">Reset</button>
     </div>
@@ -181,7 +237,7 @@
 
     <!-- Usage Guidance -->
     <div class="instructions">
-        Adjust the speed bar above and click anywhere on the canvas to launch a ball.
+        Adjust the speed bar above, pick a pastel ball color (or Cycle), and click anywhere on the canvas to launch balls.
     </div>
 
     <script>
@@ -197,9 +253,18 @@
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
+        // PASTEL BALL PALETTE (Pink, Blue, Teal)
+        const BALL_COLORS = [
+            { name: 'Pastel Pink', fill: '#ff9ebb' },
+            { name: 'Pastel Blue', fill: '#8ecae6' },
+            { name: 'Pastel Teal', fill: '#80ded9' }
+        ];
+
         // STATE VARIABLES
         let launchVelocity = parseFloat(speedSlider.value); // Adjustable velocity on click
         let balls = [];
+        let colorMode = 'cycle'; // 'cycle' or palette index (0, 1, 2)
+        let colorIndex = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -207,6 +272,17 @@
             y: 0,
             radius: 12
         };
+
+        /**
+         * Switches between cycling through pastel colors or locking a single color.
+         */
+        function setColorMode(mode, btnEl) {
+            colorMode = mode;
+            document.querySelectorAll('.color-btn, .swatch-btn').forEach(el => {
+                el.classList.remove('active');
+            });
+            btnEl.classList.add('active');
+        }
 
         /**
          * Updates the displayed velocity value and fills the slider track
@@ -254,7 +330,7 @@
         });
 
         /**
-         * Initializes a single orbiting projectile at (x, y) using the
+         * Initializes an orbiting pastel projectile at (x, y) using the
          * current launchVelocity and FIXED_LAUNCH_ANGLE.
          */
         function launchBall(x, y) {
@@ -263,15 +339,24 @@
             const vx = launchVelocity * Math.sin(rad);  // sin(90°) = 1  -> vx = launchVelocity
             const vy = -launchVelocity * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
-            balls = [{
+            // Select pastel color (either cycling Pink -> Blue -> Teal or fixed selection)
+            let chosenColor;
+            if (colorMode === 'cycle') {
+                chosenColor = BALL_COLORS[colorIndex].fill;
+                colorIndex = (colorIndex + 1) % BALL_COLORS.length;
+            } else {
+                chosenColor = BALL_COLORS[colorMode].fill;
+            }
+
+            balls.push({
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4,
+                radius: 6,
+                color: chosenColor,
                 trail: [] // Stores history of past {x, y} coordinates
-            }];
+            });
         }
 
         /**
@@ -279,6 +364,7 @@
          */
         function resetSimulation() {
             balls = [];
+            colorIndex = 0;
         }
 
         /**
@@ -332,7 +418,7 @@
 
         /**
          * Renders the pastel gradient backdrop, central gravity node,
-         * trajectory path, and active projectile.
+         * trajectory paths, and active pastel projectiles.
          */
         function draw() {
             // Paint diagonal pastel gradient across the canvas
@@ -355,25 +441,34 @@
             ctx.fillStyle = '#ffffff';
             ctx.fill();
 
-            // 2. Draw Ball & Trail
+            // 2. Draw Balls & Trails
             for (const b of balls) {
-                // Draw path line
+                // Draw path line with subtle slate casing and pastel core
                 if (b.trail.length > 1) {
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#1e293b';
-                    ctx.lineWidth = 1.4;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
+                    ctx.lineWidth = 2.6;
+                    ctx.stroke();
+
+                    ctx.strokeStyle = b.color;
+                    ctx.lineWidth = 1.6;
                     ctx.stroke();
                 }
 
-                // Draw ball object
+                // Draw pastel ball object with crisp slate border
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#1e293b';
+                ctx.fillStyle = b.color;
                 ctx.fill();
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = '#1e293b';
+                ctx.stroke();
             }
         }
 
