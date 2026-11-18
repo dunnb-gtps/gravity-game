@@ -122,11 +122,11 @@
         let balls = [];
         let bgPattern = null;
 
-        // Central Gravity Node Definition
+        // Central Gravity Node Definition (Yarn Ball)
         const centralNode = {
             x: 0,
             y: 0,
-            radius: 12
+            radius: 20
         };
 
         // Build seamless cats-and-dogs background pattern
@@ -137,7 +137,7 @@
             tile.height = size;
             const pctx = tile.getContext('2d');
 
-            // Deep midnight backdrop so white foreground elements stay sharp
+            // Deep midnight backdrop so foreground elements stay sharp
             pctx.fillStyle = '#121722';
             pctx.fillRect(0, 0, size, size);
 
@@ -593,27 +593,142 @@
             }
         }
 
+        // Draw the central gravity node as a detailed ball of yarn
+        function drawYarnBall(cx, cy, r) {
+            ctx.save();
+
+            // 1. Loose trailing yarn strand curling out from the bottom-right
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(cx + r * 0.45, cy + r * 0.72);
+            ctx.bezierCurveTo(
+                cx + r * 1.15, cy + r * 1.15,
+                cx + r * 1.45, cy + r * 0.55,
+                cx + r * 1.85, cy + r * 0.85
+            );
+            ctx.strokeStyle = '#c93848';
+            ctx.lineWidth = 2.6;
+            ctx.stroke();
+
+            // Disable outer drop shadow for crisp internal strand rendering
+            ctx.shadowColor = 'transparent';
+
+            // Subtle highlight along the loose strand
+            ctx.beginPath();
+            ctx.moveTo(cx + r * 0.45, cy + r * 0.72 - 0.5);
+            ctx.bezierCurveTo(
+                cx + r * 1.15, cy + r * 1.15 - 0.5,
+                cx + r * 1.45, cy + r * 0.55 - 0.5,
+                cx + r * 1.85, cy + r * 0.85 - 0.5
+            );
+            ctx.strokeStyle = 'rgba(255, 190, 198, 0.45)';
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+
+            // 2. Clip to main yarn ball sphere
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.clip();
+
+            // Base spherical gradient
+            const baseGrad = ctx.createRadialGradient(
+                cx - r * 0.3, cy - r * 0.3, r * 0.1,
+                cx, cy, r
+            );
+            baseGrad.addColorStop(0, '#f06878');
+            baseGrad.addColorStop(0.55, '#d13b4c');
+            baseGrad.addColorStop(1, '#851b27');
+            ctx.fillStyle = baseGrad;
+            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+            // Helper to draw a wrapped bundle of parallel yarn strands at an angle
+            function drawYarnBand(angle, offsetY, bandWidth, curveAmount, strandCount) {
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(angle);
+
+                // Band base fill so overlapping bundles layer naturally
+                ctx.beginPath();
+                ctx.moveTo(-r * 1.2, offsetY - bandWidth / 2);
+                ctx.quadraticCurveTo(0, offsetY - bandWidth / 2 + curveAmount, r * 1.2, offsetY - bandWidth / 2);
+                ctx.lineTo(r * 1.2, offsetY + bandWidth / 2);
+                ctx.quadraticCurveTo(0, offsetY + bandWidth / 2 + curveAmount, -r * 1.2, offsetY + bandWidth / 2);
+                ctx.closePath();
+                ctx.fillStyle = '#cf3a4b';
+                ctx.fill();
+
+                // Band edge crease
+                ctx.strokeStyle = 'rgba(75, 12, 20, 0.65)';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                // Individual parallel yarn threads within the bundle
+                for (let i = 0; i < strandCount; i++) {
+                    const frac = (i + 0.5) / strandCount - 0.5;
+                    const yPos = offsetY + frac * bandWidth;
+
+                    // Dark thread groove
+                    ctx.beginPath();
+                    ctx.moveTo(-r * 1.2, yPos);
+                    ctx.quadraticCurveTo(0, yPos + curveAmount, r * 1.2, yPos);
+                    ctx.strokeStyle = 'rgba(82, 14, 24, 0.55)';
+                    ctx.lineWidth = 1.1;
+                    ctx.stroke();
+
+                    // Soft yarn fiber highlight
+                    ctx.beginPath();
+                    ctx.moveTo(-r * 1.2, yPos - 0.8);
+                    ctx.quadraticCurveTo(0, yPos + curveAmount - 0.8, r * 1.2, yPos - 0.8);
+                    ctx.strokeStyle = 'rgba(255, 185, 195, 0.35)';
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // Layer crisscrossing yarn bundles to create the wound-ball texture
+            drawYarnBand(-0.55, -r * 0.35, r * 0.68, r * 0.25, 4);
+            drawYarnBand(0.75, -r * 0.25, r * 0.72, -r * 0.22, 4);
+            drawYarnBand(-0.15, r * 0.28, r * 0.75, r * 0.28, 4);
+            drawYarnBand(1.15, r * 0.22, r * 0.65, -r * 0.25, 4);
+            drawYarnBand(-0.85, r * 0.05, r * 0.58, r * 0.18, 3);
+
+            // 3. Spherical 3D shading overlay
+            const shadeGrad = ctx.createRadialGradient(
+                cx - r * 0.35, cy - r * 0.35, r * 0.05,
+                cx, cy, r
+            );
+            shadeGrad.addColorStop(0, 'rgba(255, 225, 230, 0.28)');
+            shadeGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+            shadeGrad.addColorStop(1, 'rgba(35, 4, 10, 0.58)');
+            ctx.fillStyle = shadeGrad;
+            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+            ctx.restore();
+
+            // 4. Crisp outer rim
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 215, 220, 0.45)';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+            ctx.restore();
+        }
+
         function draw() {
             // Draw Cats & Dogs Background Pattern
             ctx.fillStyle = bgPattern || '#121722';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Subtle shadow so white simulation elements stay crisp over the background
+            // Subtle shadow so foreground elements stay crisp over the background
             ctx.save();
             ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
             ctx.shadowBlur = 5;
 
-            // 1. Draw Central Mass Node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
-            ctx.fill();
+            // 1. Draw Central Yarn Ball Node
+            drawYarnBall(centralNode.x, centralNode.y, centralNode.radius);
 
             // 2. Draw Ball & Trail
             for (const b of balls) {
