@@ -720,6 +720,267 @@
             }
         }
 
+        // Draw the central guy holding a banana gun
+        function drawBananaGunGuy(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Soft luminous jungle aura behind the character for clear contrast
+            const nodeAura = ctx.createRadialGradient(0, 0, 8, 0, 0, 38);
+            nodeAura.addColorStop(0, 'rgba(216, 243, 220, 0.34)');
+            nodeAura.addColorStop(0.55, 'rgba(116, 198, 157, 0.14)');
+            nodeAura.addColorStop(1, 'rgba(116, 198, 157, 0)');
+            ctx.beginPath();
+            ctx.arc(0, 0, 38, 0, Math.PI * 2);
+            ctx.fillStyle = nodeAura;
+            ctx.fill();
+
+            // Subtle ground shadow beneath his boots
+            ctx.beginPath();
+            ctx.ellipse(0, 24, 13, 3.8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(3, 12, 8, 0.55)';
+            ctx.fill();
+
+            // Determine facing direction and banana-gun aim angle toward active ball
+            let facing = 1;
+            let aimAngle = -0.14;
+            if (balls.length > 0) {
+                const target = balls[0];
+                const dx = target.x - x;
+                const dy = target.y - y;
+                facing = dx < 0 ? -1 : 1;
+                const rawAngle = Math.atan2(dy, Math.max(Math.abs(dx), 10));
+                aimAngle = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, rawAngle));
+            }
+
+            // Subtle idle breathing bob
+            const bob = Math.sin(animTime * 0.08) * 1.1;
+
+            ctx.scale(facing, 1);
+
+            // --- LEGS & JUNGLE BOOTS ---
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Back leg
+            ctx.beginPath();
+            ctx.moveTo(-2.5, 8 + bob * 0.4);
+            ctx.lineTo(-5.5, 15 + bob * 0.2);
+            ctx.lineTo(-6.5, 22);
+            ctx.strokeStyle = '#36543d';
+            ctx.lineWidth = 4.6;
+            ctx.stroke();
+
+            // Back boot
+            ctx.fillStyle = '#26170e';
+            ctx.beginPath();
+            ctx.roundRect(-9, 20.5, 6.5, 3.5, 1.5);
+            ctx.fill();
+
+            // Front leg
+            ctx.beginPath();
+            ctx.moveTo(2.5, 8 + bob * 0.4);
+            ctx.lineTo(5.5, 15 + bob * 0.2);
+            ctx.lineTo(7, 22);
+            ctx.strokeStyle = '#476b4f';
+            ctx.lineWidth = 4.8;
+            ctx.stroke();
+
+            // Front boot
+            ctx.fillStyle = '#331f13';
+            ctx.beginPath();
+            ctx.roundRect(4.5, 20.5, 7, 3.5, 1.5);
+            ctx.fill();
+
+            // --- TORSO & EXPLORER VEST ---
+            ctx.save();
+            ctx.translate(0, bob);
+
+            // Inner khaki shirt
+            ctx.fillStyle = '#d4b483';
+            ctx.beginPath();
+            ctx.roundRect(-6.5, -6, 13, 15, 3);
+            ctx.fill();
+
+            // Open jungle vest panels
+            ctx.fillStyle = '#24523a';
+            ctx.beginPath();
+            ctx.roundRect(-6.8, -6, 5.2, 14.5, 2);
+            ctx.roundRect(1.6, -6, 5.2, 14.5, 2);
+            ctx.fill();
+
+            // Belt & brass buckle
+            ctx.fillStyle = '#26170e';
+            ctx.fillRect(-6.6, 7.2, 13.2, 2.3);
+            ctx.fillStyle = '#ffd166';
+            ctx.fillRect(-1.2, 7.0, 3.2, 2.7);
+
+            // Red neck bandana
+            ctx.fillStyle = '#e63946';
+            ctx.beginPath();
+            ctx.moveTo(-5, -6.5);
+            ctx.lineTo(5, -6.5);
+            ctx.lineTo(0.5, -2.5);
+            ctx.closePath();
+            ctx.fill();
+
+            // --- HEAD, HAIR & SUNGLASSES ---
+            // Neck
+            ctx.fillStyle = '#e5a776';
+            ctx.fillRect(-2.2, -9, 4.4, 3.5);
+
+            // Head
+            ctx.beginPath();
+            ctx.arc(0.5, -14.5, 7.2, 0, Math.PI * 2);
+            ctx.fillStyle = '#f2b885';
+            ctx.fill();
+
+            // Tousled brown hair
+            ctx.fillStyle = '#2e1a0f';
+            ctx.beginPath();
+            ctx.moveTo(-6.8, -14.5);
+            ctx.quadraticCurveTo(-7.8, -21.5, -1.5, -22.2);
+            ctx.lineTo(0.5, -24.5);
+            ctx.lineTo(2.5, -22);
+            ctx.lineTo(6.2, -23.2);
+            ctx.lineTo(6.5, -19.5);
+            ctx.quadraticCurveTo(8.5, -18.5, 7.2, -16.2);
+            ctx.quadraticCurveTo(2, -18.5, -4, -16.5);
+            ctx.lineTo(-5.2, -12.8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Cool dark sunglasses
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(-1.2, -16.4, 9.2, 3.8, 1.2);
+            ctx.fill();
+
+            // Sunglasses frame temple & specular shine
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.moveTo(-5.5, -15.2);
+            ctx.lineTo(-1, -15.2);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0.4, -15.6);
+            ctx.lineTo(2.4, -14.0);
+            ctx.moveTo(4.8, -15.6);
+            ctx.lineTo(6.6, -14.0);
+            ctx.stroke();
+
+            // Confident grin
+            ctx.strokeStyle = '#6b3e26';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(2.5, -11.4, 2.4, 0.15, Math.PI * 0.72);
+            ctx.stroke();
+
+            // --- ARM & BANANA GUN ---
+            ctx.save();
+            ctx.translate(2, -2.5);
+            ctx.rotate(aimAngle);
+
+            // Extended arm
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(10.5, 0.5);
+            ctx.strokeStyle = '#f2b885';
+            ctx.lineWidth = 4.2;
+            ctx.stroke();
+
+            // Short vest sleeve
+            ctx.beginPath();
+            ctx.moveTo(-0.5, 0);
+            ctx.lineTo(3.8, 0.2);
+            ctx.strokeStyle = '#24523a';
+            ctx.lineWidth = 5.2;
+            ctx.stroke();
+
+            // Banana Gun held at hand position (10.5, 0.5)
+            ctx.save();
+            ctx.translate(10.5, 0.5);
+
+            // Banana stem / pistol grip butt
+            ctx.fillStyle = '#4a2e14';
+            ctx.beginPath();
+            ctx.moveTo(-2.5, 2.5);
+            ctx.lineTo(-5.5, 5.8);
+            ctx.lineTo(-4.0, 6.8);
+            ctx.lineTo(-1.5, 4.2);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main curved ripe yellow banana barrel
+            ctx.beginPath();
+            ctx.moveTo(-2.8, 2.6);
+            ctx.quadraticCurveTo(0.2, -1.6, 8.8, -0.6);
+            ctx.quadraticCurveTo(14.5, -1.6, 19.2, -5.4);
+            ctx.lineTo(19.6, -3.6);
+            ctx.quadraticCurveTo(14.2, 2.8, 6.2, 4.4);
+            ctx.quadraticCurveTo(0.6, 5.2, -2.0, 4.2);
+            ctx.closePath();
+            ctx.fillStyle = '#ffe135';
+            ctx.fill();
+            ctx.strokeStyle = '#b58900';
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+
+            // Lower golden shading along banana belly
+            ctx.beginPath();
+            ctx.moveTo(-1.5, 3.6);
+            ctx.quadraticCurveTo(6.2, 4.4, 19.0, -3.8);
+            ctx.quadraticCurveTo(13.2, 1.4, 5.8, 2.7);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(234, 179, 8, 0.55)';
+            ctx.fill();
+
+            // Top specular highlight along banana spine
+            ctx.beginPath();
+            ctx.moveTo(1.2, -0.4);
+            ctx.quadraticCurveTo(9.5, 0.2, 17.6, -4.4);
+            ctx.strokeStyle = '#fef9c3';
+            ctx.lineWidth = 1.1;
+            ctx.stroke();
+
+            // Dark brown banana blossom tip (muzzle)
+            ctx.fillStyle = '#3b230e';
+            ctx.beginPath();
+            ctx.moveTo(19.0, -5.5);
+            ctx.lineTo(21.2, -6.3);
+            ctx.lineTo(21.4, -4.6);
+            ctx.lineTo(19.4, -3.6);
+            ctx.closePath();
+            ctx.fill();
+
+            // Hand / fingers gripping the banana handle
+            ctx.fillStyle = '#f2b885';
+            ctx.beginPath();
+            ctx.arc(0.4, 1.2, 2.7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#c98855';
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+
+            // Subtle golden sparkle at banana muzzle while tracking an active ball
+            if (balls.length > 0) {
+                const glint = 0.45 + 0.45 * Math.sin(animTime * 0.2);
+                ctx.fillStyle = `rgba(255, 250, 205, ${glint})`;
+                ctx.beginPath();
+                ctx.arc(22.4, -5.6, 1.6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+            ctx.restore();
+            ctx.restore();
+            ctx.restore();
+        }
+
         function draw() {
             // 0. Draw cached procedural jungle background
             ctx.drawImage(bgCanvas, 0, 0);
@@ -727,29 +988,8 @@
             // Subtle drifting jungle fireflies
             drawFireflies();
 
-            // 1. Draw Central Mass Node (crisp luminous appearance + center mark)
-            const nodeAura = ctx.createRadialGradient(
-                centralNode.x, centralNode.y, centralNode.radius * 0.8,
-                centralNode.x, centralNode.y, centralNode.radius * 2.6
-            );
-            nodeAura.addColorStop(0, 'rgba(216, 243, 220, 0.38)');
-            nodeAura.addColorStop(0.6, 'rgba(116, 198, 157, 0.14)');
-            nodeAura.addColorStop(1, 'rgba(116, 198, 157, 0)');
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius * 2.6, 0, Math.PI * 2);
-            ctx.fillStyle = nodeAura;
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#061711';
-            ctx.fill();
+            // 1. Draw Central Character (Guy with a Banana Gun)
+            drawBananaGunGuy(centralNode.x, centralNode.y);
 
             // 2. Draw Ball & Rainbow Trail
             for (const b of balls) {
