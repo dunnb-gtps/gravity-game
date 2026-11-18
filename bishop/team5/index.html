@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Simulation - Earth & Black Hole</title>
+    <title>Gravity Simulation - Planetary System & Black Hole</title>
     <style>
         * {
             box-sizing: border-box;
@@ -142,7 +142,7 @@
     <!-- Header Section -->
     <div id="header">
         <h1>Gravity Simulation</h1>
-        <div id="status-indicator">Ready</div>
+        <div id="status-indicator">Ready · Next: Earth</div>
         <button class="btn-reset" onclick="resetSimulation()">Reset</button>
     </div>
 
@@ -152,7 +152,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch Earth. Avoid the black hole's event horizon!
+        Click anywhere on the canvas to launch different planets. Avoid the black hole's event horizon!
     </div>
 
     <script>
@@ -164,16 +164,11 @@
         const GRAVITY_CONSTANT = 2350;     // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
+        const TRAIL_LENGTH = 280;          // Number of historic trail points stored
         const SOFTENING_FACTOR = 180;      // Lowered softening for steeper pull near singularity
 
-        // EARTH CONSTANTS
-        const EARTH_RADIUS = 10;           // Radius of Earth in pixels
-        const EARTH_AXIAL_TILT = -0.36;    // ~23.5° axial tilt in radians
-
-        // Stylized spherical continent polygons (lon, lat in radians)
+        // EARTH CONTINENTS & CLOUDS (lon, lat in radians)
         const EARTH_CONTINENTS = [
-            // North America
             {
                 centerLon: -1.75,
                 color: '#3ca35a',
@@ -183,7 +178,6 @@
                     [-2.12, -0.58]
                 ]
             },
-            // South America
             {
                 centerLon: -1.05,
                 color: '#46b566',
@@ -192,7 +186,6 @@
                     [-0.95, 0.88], [-1.18, 0.95], [-1.25, 0.42]
                 ]
             },
-            // Europe & Africa
             {
                 centerLon: 0.35,
                 color: '#43ad60',
@@ -203,7 +196,6 @@
                     [-0.18, -0.05], [-0.15, -0.45]
                 ]
             },
-            // Asia
             {
                 centerLon: 1.55,
                 color: '#389c54',
@@ -213,7 +205,6 @@
                     [0.95, -0.35]
                 ]
             },
-            // Australia
             {
                 centerLon: 2.25,
                 color: '#57b863',
@@ -224,7 +215,6 @@
             }
         ];
 
-        // Stylized drifting cloud bands (lon, lat in radians)
         const EARTH_CLOUDS = [
             { centerLon: -1.4, points: [[-1.9, -0.65], [-1.1, -0.70], [-0.95, -0.52], [-1.75, -0.48]] },
             { centerLon: -0.4, points: [[-0.85, 0.15], [-0.10, 0.10], [0.05, 0.26], [-0.75, 0.30]] },
@@ -232,10 +222,155 @@
             { centerLon: 2.1,  points: [[1.65, 0.42], [2.45, 0.36], [2.52, 0.52], [1.72, 0.56]] }
         ];
 
+        // MARS SURFACE REGIONS
+        const MARS_REGIONS = [
+            {
+                centerLon: -0.9,
+                color: '#782414',
+                points: [[-1.4, -0.3], [-0.6, -0.4], [-0.4, 0.1], [-0.8, 0.45], [-1.3, 0.2]]
+            },
+            {
+                centerLon: 0.8,
+                color: '#6b1d0f',
+                points: [[0.3, -0.5], [1.2, -0.35], [1.3, 0.25], [0.7, 0.4], [0.4, 0.0]]
+            },
+            {
+                centerLon: 2.3,
+                color: '#852b18',
+                points: [[1.9, -0.2], [2.6, -0.25], [2.7, 0.3], [2.0, 0.25]]
+            }
+        ];
+
+        // VENUS SULFURIC CLOUD SWIRLS
+        const VENUS_SWIRLS = [
+            { centerLon: -1.5, points: [[-2.1, -0.45], [-1.1, -0.65], [-0.9, -0.42], [-1.9, -0.22]] },
+            { centerLon: 0.2,  points: [[-0.4, 0.15], [0.7, -0.05], [0.85, 0.18], [-0.25, 0.38]] },
+            { centerLon: 1.8,  points: [[1.2, -0.35], [2.3, -0.15], [2.4, 0.08], [1.3, -0.12]] }
+        ];
+
+        // PLUTO HEART GLACIER (TOMBAUGH REGIO) & DARK TERRAIN
+        const PLUTO_FEATURES = [
+            {
+                centerLon: -1.4,
+                color: '#4a3525',
+                points: [[-2.0, 0.05], [-0.9, -0.05], [-0.8, 0.35], [-1.9, 0.4]]
+            },
+            {
+                centerLon: 0.3,
+                color: '#f5ece1',
+                points: [[-0.1, -0.25], [0.3, -0.05], [0.7, -0.25], [0.85, 0.1], [0.3, 0.55], [-0.25, 0.1]]
+            }
+        ];
+
+        // DISTINCT PLANET DEFINITIONS
+        const PLANET_TYPES = [
+            {
+                id: 'earth',
+                name: 'Earth',
+                radius: 10,
+                axialTilt: -0.36,
+                spinRate: 0.024,
+                trailColor: 'rgba(130, 205, 255, 0.85)',
+                rimColor: 'rgba(130, 205, 255, 0.75)',
+                glowInner: 'rgba(90, 175, 255, 0.45)',
+                glowMid: 'rgba(56, 142, 235, 0.18)'
+            },
+            {
+                id: 'mars',
+                name: 'Mars',
+                radius: 8.5,
+                axialTilt: -0.44,
+                spinRate: 0.023,
+                trailColor: 'rgba(235, 115, 75, 0.85)',
+                rimColor: 'rgba(245, 135, 95, 0.7)',
+                glowInner: 'rgba(230, 100, 60, 0.35)',
+                glowMid: 'rgba(180, 65, 35, 0.12)'
+            },
+            {
+                id: 'jupiter',
+                name: 'Jupiter',
+                radius: 15.5,
+                axialTilt: -0.06,
+                spinRate: 0.042,
+                trailColor: 'rgba(226, 185, 138, 0.85)',
+                rimColor: 'rgba(235, 198, 152, 0.65)',
+                glowInner: 'rgba(225, 185, 135, 0.32)',
+                glowMid: 'rgba(195, 145, 95, 0.12)'
+            },
+            {
+                id: 'saturn',
+                name: 'Saturn',
+                radius: 12.5,
+                axialTilt: -0.47,
+                spinRate: 0.038,
+                hasRings: true,
+                trailColor: 'rgba(240, 214, 148, 0.85)',
+                rimColor: 'rgba(245, 220, 160, 0.65)',
+                glowInner: 'rgba(238, 210, 140, 0.3)',
+                glowMid: 'rgba(200, 170, 105, 0.1)'
+            },
+            {
+                id: 'neptune',
+                name: 'Neptune',
+                radius: 11.5,
+                axialTilt: -0.49,
+                spinRate: 0.032,
+                trailColor: 'rgba(85, 145, 255, 0.85)',
+                rimColor: 'rgba(105, 165, 255, 0.75)',
+                glowInner: 'rgba(65, 130, 255, 0.42)',
+                glowMid: 'rgba(35, 85, 220, 0.16)'
+            },
+            {
+                id: 'venus',
+                name: 'Venus',
+                radius: 9.5,
+                axialTilt: 3.09,
+                spinRate: -0.014,
+                trailColor: 'rgba(245, 200, 115, 0.85)',
+                rimColor: 'rgba(255, 215, 135, 0.7)',
+                glowInner: 'rgba(245, 195, 105, 0.4)',
+                glowMid: 'rgba(210, 155, 65, 0.15)'
+            },
+            {
+                id: 'uranus',
+                name: 'Uranus',
+                radius: 11.5,
+                axialTilt: 1.42,
+                spinRate: -0.028,
+                hasRings: true,
+                trailColor: 'rgba(135, 232, 238, 0.85)',
+                rimColor: 'rgba(165, 245, 248, 0.72)',
+                glowInner: 'rgba(125, 230, 238, 0.38)',
+                glowMid: 'rgba(70, 190, 205, 0.14)'
+            },
+            {
+                id: 'mercury',
+                name: 'Mercury',
+                radius: 7,
+                axialTilt: -0.03,
+                spinRate: 0.012,
+                trailColor: 'rgba(180, 180, 188, 0.8)',
+                rimColor: 'rgba(195, 195, 205, 0.65)',
+                glowInner: 'rgba(170, 170, 180, 0.24)',
+                glowMid: 'rgba(120, 120, 130, 0.08)'
+            },
+            {
+                id: 'pluto',
+                name: 'Pluto',
+                radius: 6.5,
+                axialTilt: 2.08,
+                spinRate: -0.016,
+                trailColor: 'rgba(215, 192, 170, 0.8)',
+                rimColor: 'rgba(225, 205, 185, 0.65)',
+                glowInner: 'rgba(205, 185, 165, 0.25)',
+                glowMid: 'rgba(155, 135, 115, 0.08)'
+            }
+        ];
+
         // BLACK HOLE CONSTANTS
         const EVENT_HORIZON_RADIUS = 16;   // Radius of the pitch-black singularity core
         const SUCTION_RADIUS = 56;         // Outer radius of the accretion suction danger zone
-        const CAPTURE_DURATION = 18;       // Frames over which a captured Earth spirals into nothing
+        const CAPTURE_DURATION = 18;       // Frames over which a captured planet spirals into nothing
         const ACCRETION_PARTICLE_COUNT = 34;
 
         // STATE VARIABLES
@@ -244,6 +379,8 @@
         let accretionParticles = [];
         let diskRotation = 0;
         let inSuctionZone = false;
+        let planetCycleIndex = 0;
+        let lastEventMessage = '';
 
         // Central Black Hole Node Definition
         const blackHole = {
@@ -254,11 +391,31 @@
         };
 
         /**
+         * Selects the next distinct planet type, prioritizing planets not currently active on screen
+         */
+        function getNextPlanetDef() {
+            const activeIds = new Set(balls.map(b => b.planet.id));
+
+            for (let offset = 0; offset < PLANET_TYPES.length; offset++) {
+                const candidate = PLANET_TYPES[(planetCycleIndex + offset) % PLANET_TYPES.length];
+                if (!activeIds.has(candidate.id)) {
+                    return candidate;
+                }
+            }
+
+            return PLANET_TYPES[planetCycleIndex % PLANET_TYPES.length];
+        }
+
+        /**
          * Updates the subtle monochrome status indicator in the header
          */
         function setStatus(text, stateClass = '') {
-            statusEl.textContent = text;
-            statusEl.className = stateClass;
+            if (statusEl.textContent !== text) {
+                statusEl.textContent = text;
+            }
+            if (statusEl.className !== stateClass) {
+                statusEl.className = stateClass;
+            }
         }
 
         /**
@@ -274,7 +431,6 @@
                     baseRadius: orbitRadius,
                     size: Math.random() < 0.35 ? 1.5 : 1,
                     alpha: 0.25 + Math.random() * 0.65,
-                    // Keplerian-style angular speed: faster closer to the event horizon
                     speed: (0.045 + Math.random() * 0.025) * (24 / orbitRadius)
                 });
             }
@@ -300,7 +456,6 @@
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
             
-            // Recenter black hole dynamically
             blackHole.x = canvas.width / 2;
             blackHole.y = canvas.height / 2;
         }
@@ -309,32 +464,35 @@
         resizeCanvas();
         initAccretionParticles();
 
-        // Canvas Click Handler: Directly launch Earth at click position
+        // Canvas Click Handler: Launch a new distinct planet at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchEarth(clickX, clickY);
+            launchPlanet(clickX, clickY);
         });
 
         /**
-         * Launches Earth at the specified coordinates
+         * Spawns and launches a new planet at the specified coordinates
          */
-        function launchEarth(x, y) {
-            // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
+        function launchPlanet(x, y) {
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
-            const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
-            const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
+            const vx = LAUNCH_VELOCITY * Math.sin(rad);
+            const vy = -LAUNCH_VELOCITY * Math.cos(rad);
 
-            // Overwrite existing array to strictly maintain a single Earth on screen
-            balls = [{
+            const planetDef = getNextPlanetDef();
+            planetCycleIndex = (PLANET_TYPES.indexOf(planetDef) + 1) % PLANET_TYPES.length;
+            lastEventMessage = '';
+
+            balls.push({
+                planet: planetDef,
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: EARTH_RADIUS,
-                initialRadius: EARTH_RADIUS,
+                radius: planetDef.radius,
+                initialRadius: planetDef.radius,
                 rotation: 0.4,
                 cloudRotation: 0.8,
                 trail: [],
@@ -343,33 +501,64 @@
                 captureDist: 0,
                 captureAngle: 0,
                 spinDirection: 1
-            }];
+            });
 
-            inSuctionZone = false;
-            setStatus('Orbiting', 'active');
+            updateStatusDisplay();
         }
 
         /**
-         * Clears active Earth and resets simulation state
+         * Clears all active planets and resets simulation state
          */
         function resetSimulation() {
             balls = [];
             ripples = [];
             inSuctionZone = false;
-            setStatus('Ready', '');
+            planetCycleIndex = 0;
+            lastEventMessage = '';
+            setStatus(`Ready · Next: ${PLANET_TYPES[0].name}`, '');
+        }
+
+        /**
+         * Updates the header status text based on all active planets
+         */
+        function updateStatusDisplay() {
+            const nextPlanet = getNextPlanetDef();
+
+            if (balls.length === 0) {
+                if (lastEventMessage) {
+                    setStatus(`${lastEventMessage} · Next: ${nextPlanet.name}`, lastEventMessage.includes('Consumed') ? 'danger' : '');
+                } else {
+                    setStatus(`Ready · Next: ${nextPlanet.name}`, '');
+                }
+                return;
+            }
+
+            const capturedBall = balls.find(b => b.captured);
+            if (capturedBall) {
+                setStatus(`${capturedBall.planet.name} Sucked In (${balls.length} Active)`, 'danger');
+                return;
+            }
+
+            if (inSuctionZone) {
+                setStatus(`Suction Zone · ${balls.length} Active · Next: ${nextPlanet.name}`, 'danger');
+                return;
+            }
+
+            if (balls.length === 1) {
+                setStatus(`Orbiting: ${balls[0].planet.name} · Next: ${nextPlanet.name}`, 'active');
+            } else {
+                setStatus(`${balls.length} Planets Orbiting · Next: ${nextPlanet.name}`, 'active');
+            }
         }
 
         /**
          * Updates ambient black hole rotation, accretion particles, and gravitational ripples
          */
         function updateBlackHoleEffects() {
-            // Rotate accretion disk rings (slightly faster when Earth is inside the suction zone)
             diskRotation += inSuctionZone ? 0.032 : 0.016;
 
-            // Update swirling accretion particles
             for (const p of accretionParticles) {
                 p.angle += p.speed * (inSuctionZone ? 1.45 : 1);
-                // Subtle inward drift with smooth respawn at outer accretion edge
                 p.radius -= 0.04;
                 if (p.radius <= EVENT_HORIZON_RADIUS + 1.5) {
                     p.radius = SUCTION_RADIUS - 3;
@@ -377,7 +566,6 @@
                 }
             }
 
-            // Update expanding gravitational ripples
             for (let i = ripples.length - 1; i >= 0; i--) {
                 const r = ripples[i];
                 r.radius += 2.2;
@@ -390,7 +578,7 @@
         }
 
         /**
-         * Updates Earth's trajectory, axial spin, suction zone pull, and event horizon capture spiral
+         * Updates all active planets' trajectories, axial spin, suction zone pull, and capture spirals
          */
         function updatePhysics() {
             inSuctionZone = false;
@@ -403,41 +591,38 @@
                     b.captureFrame++;
                     const t = Math.min(1, b.captureFrame / CAPTURE_DURATION);
 
-                    // Rapidly spiral inward toward the singularity center while shrinking to 0
                     const currentDist = b.captureDist * Math.pow(1 - t, 1.6);
                     b.captureAngle += b.spinDirection * (0.28 + 0.35 * t);
 
                     b.x = blackHole.x + Math.cos(b.captureAngle) * currentDist;
                     b.y = blackHole.y + Math.sin(b.captureAngle) * currentDist;
                     b.radius = Math.max(0, b.initialRadius * (1 - t));
-                    b.rotation += 0.18;
+                    b.rotation += 0.18 * Math.sign(b.planet.spinRate || 1);
                     b.cloudRotation += 0.22;
 
-                    // Record spiral trail points into the singularity
                     b.trail.push({ x: b.x, y: b.y });
                     if (b.trail.length > TRAIL_LENGTH) {
                         b.trail.shift();
                     }
 
-                    // Remove Earth once fully collapsed into the singularity
                     if (b.captureFrame >= CAPTURE_DURATION) {
                         spawnRipple(EVENT_HORIZON_RADIUS, 72, 1.2);
+                        lastEventMessage = `${b.planet.name} Consumed`;
                         balls.splice(i, 1);
-                        setStatus('Consumed by Black Hole', 'danger');
                     }
                     continue;
                 }
 
-                // Remove Earth if it travels too far off-screen (prevents memory leak)
+                // Remove planet if it travels too far off-screen
                 const margin = 500;
                 if (b.x < -margin || b.x > canvas.width + margin || 
                     b.y < -margin || b.y > canvas.height + margin) {
+                    lastEventMessage = `${b.planet.name} Lost in Space`;
                     balls.splice(i, 1);
-                    setStatus('Lost in Space', '');
                     continue;
                 }
 
-                // Distance vector from Earth to black hole center
+                // Distance vector from planet to black hole center
                 const dx = blackHole.x - b.x;
                 const dy = blackHole.y - b.y;
                 const distSq = dx * dx + dy * dy;
@@ -450,39 +635,29 @@
                     b.captureDist = dist;
                     b.captureAngle = Math.atan2(b.y - blackHole.y, b.x - blackHole.x);
 
-                    // Preserve angular spin direction based on entry velocity cross product
                     const cross = (-dx) * b.vy - (-dy) * b.vx;
                     b.spinDirection = cross >= 0 ? 1 : -1;
 
-                    // Trigger bright white shockwave ring on the event horizon
                     spawnRipple(EVENT_HORIZON_RADIUS, 105, 2.2);
-                    setStatus('Sucked In', 'danger');
                     continue;
                 }
 
-                // Normalized radial inward unit vector
                 const nx = dx / dist;
                 const ny = dy / dist;
 
-                // Core inverse-square gravitational acceleration
                 let acceleration = GRAVITY_CONSTANT / (distSq + SOFTENING_FACTOR);
 
-                // Inner Suction Zone Physics (dist < SUCTION_RADIUS)
+                // Inner Suction Zone Physics
                 if (dist < blackHole.suctionRadius) {
                     inSuctionZone = true;
-                    setStatus('Suction Zone', 'danger');
 
-                    // Smooth intensity factor from 0 at outer edge (56) to ~0.71 near event horizon (16)
                     const suctionFactor = 1 - (dist / blackHole.suctionRadius);
 
-                    // Spin faster as tidal forces intensify inside the suction zone
-                    b.rotation += 0.024 + 0.05 * suctionFactor;
+                    b.rotation += b.planet.spinRate * (1 + 2.1 * suctionFactor);
                     b.cloudRotation += 0.032 + 0.06 * suctionFactor;
 
-                    // Extra inward radial suction pull
                     acceleration += 0.16 * suctionFactor + 0.48 * (suctionFactor * suctionFactor);
 
-                    // Slight tangential drag to decay grazing orbits into inward spirals
                     const tx = -ny;
                     const ty = nx;
                     const tangentialSpeed = b.vx * tx + b.vy * ty;
@@ -491,23 +666,22 @@
                     b.vx -= tx * tangentialDrag;
                     b.vy -= ty * tangentialDrag;
                 } else {
-                    b.rotation += 0.024;
+                    b.rotation += b.planet.spinRate;
                     b.cloudRotation += 0.032;
-                    setStatus('Orbiting', 'active');
                 }
 
-                // Apply gravitational + suction acceleration
                 b.vx += acceleration * nx;
                 b.vy += acceleration * ny;
                 b.x += b.vx;
                 b.y += b.vy;
 
-                // Record position history for line trail
                 b.trail.push({ x: b.x, y: b.y });
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
                 }
             }
+
+            updateStatusDisplay();
         }
 
         /**
@@ -518,7 +692,7 @@
         }
 
         /**
-         * Projects a spherical polygon onto the front hemisphere of Earth
+         * Projects a spherical polygon onto the front hemisphere of a planet
          */
         function drawSphericalPolygon(points, centerLon, rotation, r, fillStyle) {
             const relCenter = wrapLongitude(centerLon + rotation);
@@ -529,7 +703,6 @@
                 const [lon, lat] = points[i];
                 let relLon = wrapLongitude(lon + rotation);
 
-                // Clamp vertices slightly past the horizon to the limb edge so the sphere clips cleanly
                 if (relLon > Math.PI / 2) relLon = Math.PI / 2;
                 if (relLon < -Math.PI / 2) relLon = -Math.PI / 2;
 
@@ -548,99 +721,323 @@
         }
 
         /**
-         * Renders Earth with oceans, rotating continents, polar ice caps, clouds, and atmospheric glow
+         * Projects an elliptical storm spot or crater onto the front hemisphere with limb foreshortening
          */
-        function drawEarth(b) {
+        function drawSphericalSpot(lon, lat, rotation, r, rx, ry, fillStyle, strokeStyle = null) {
+            const relLon = wrapLongitude(lon + rotation);
+            const foreshorten = Math.cos(relLon);
+            if (foreshorten <= 0.05) return;
+
+            const px = r * Math.cos(lat) * Math.sin(relLon);
+            const py = r * Math.sin(lat);
+
+            ctx.beginPath();
+            ctx.ellipse(px, py, rx * foreshorten, ry, 0, 0, Math.PI * 2);
+            ctx.fillStyle = fillStyle;
+            ctx.fill();
+
+            if (strokeStyle) {
+                ctx.strokeStyle = strokeStyle;
+                ctx.lineWidth = Math.max(0.5, r * 0.05);
+                ctx.stroke();
+            }
+        }
+
+        /**
+         * Draws horizontal atmospheric bands across a gas/ice giant sphere
+         */
+        function drawAtmosphericBands(r, bands) {
+            for (const band of bands) {
+                const y = band.y * r;
+                const h = band.h * r;
+                ctx.fillStyle = band.color;
+                ctx.fillRect(-r, y - h / 2, r * 2, h);
+            }
+        }
+
+        /**
+         * Draws back or front half of planetary rings (Saturn / Uranus)
+         */
+        function drawPlanetRings(planetId, r, axialTilt, isFront) {
+            ctx.save();
+            ctx.rotate(axialTilt);
+
+            const startAngle = isFront ? 0 : Math.PI;
+            const endAngle = isFront ? Math.PI : Math.PI * 2;
+
+            if (planetId === 'saturn') {
+                // Outer A-ring
+                ctx.beginPath();
+                ctx.ellipse(0, 0, r * 2.25, r * 0.62, 0, startAngle, endAngle);
+                ctx.strokeStyle = 'rgba(218, 192, 138, 0.62)';
+                ctx.lineWidth = Math.max(1, r * 0.22);
+                ctx.stroke();
+
+                // Bright inner B-ring (separated by Cassini division gap)
+                ctx.beginPath();
+                ctx.ellipse(0, 0, r * 1.72, r * 0.47, 0, startAngle, endAngle);
+                ctx.strokeStyle = 'rgba(245, 224, 172, 0.85)';
+                ctx.lineWidth = Math.max(1.2, r * 0.28);
+                ctx.stroke();
+
+                // Faint inner C-ring
+                ctx.beginPath();
+                ctx.ellipse(0, 0, r * 1.38, r * 0.38, 0, startAngle, endAngle);
+                ctx.strokeStyle = 'rgba(185, 162, 118, 0.35)';
+                ctx.lineWidth = Math.max(0.7, r * 0.14);
+                ctx.stroke();
+            } else if (planetId === 'uranus') {
+                // Delicate translucent ring system
+                ctx.beginPath();
+                ctx.ellipse(0, 0, r * 1.85, r * 0.48, 0, startAngle, endAngle);
+                ctx.strokeStyle = 'rgba(180, 245, 250, 0.42)';
+                ctx.lineWidth = Math.max(0.8, r * 0.12);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.ellipse(0, 0, r * 1.55, r * 0.40, 0, startAngle, endAngle);
+                ctx.strokeStyle = 'rgba(140, 225, 235, 0.25)';
+                ctx.lineWidth = Math.max(0.6, r * 0.08);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        /**
+         * Renders each planet with its unique surface details, bands, rings, lighting, and label
+         */
+        function drawPlanet(b) {
             const r = b.radius;
             if (r <= 0.1) return;
+
+            const p = b.planet;
 
             ctx.save();
             ctx.translate(b.x, b.y);
 
             // 1. Soft Outer Atmospheric Glow
-            const atmoGrad = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r * 1.35);
-            atmoGrad.addColorStop(0, 'rgba(90, 175, 255, 0.45)');
-            atmoGrad.addColorStop(0.55, 'rgba(56, 142, 235, 0.18)');
-            atmoGrad.addColorStop(1, 'rgba(56, 142, 235, 0)');
+            const atmoGrad = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r * 1.38);
+            atmoGrad.addColorStop(0, p.glowInner);
+            atmoGrad.addColorStop(0.55, p.glowMid);
+            atmoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
             ctx.beginPath();
-            ctx.arc(0, 0, r * 1.35, 0, Math.PI * 2);
+            ctx.arc(0, 0, r * 1.38, 0, Math.PI * 2);
             ctx.fillStyle = atmoGrad;
             ctx.fill();
 
-            // 2. Clip to Planetary Sphere and Apply Axial Tilt
+            // 2. Back Half of Planetary Rings (for Saturn & Uranus)
+            if (p.hasRings) {
+                drawPlanetRings(p.id, r, p.axialTilt, false);
+            }
+
+            // 3. Clip to Planetary Sphere and Apply Axial Tilt
             ctx.save();
             ctx.beginPath();
             ctx.arc(0, 0, r, 0, Math.PI * 2);
             ctx.clip();
 
-            ctx.rotate(EARTH_AXIAL_TILT);
+            ctx.rotate(p.axialTilt);
 
-            // 3. Ocean Sphere Base Gradient
-            const oceanGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
-            oceanGrad.addColorStop(0, '#38a3eb');
-            oceanGrad.addColorStop(0.55, '#196ec2');
-            oceanGrad.addColorStop(1, '#092c5c');
+            // 4. Planet-Specific Base & Surface Features
+            if (p.id === 'earth') {
+                const oceanGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+                oceanGrad.addColorStop(0, '#38a3eb');
+                oceanGrad.addColorStop(0.55, '#196ec2');
+                oceanGrad.addColorStop(1, '#092c5c');
+                ctx.fillStyle = oceanGrad;
+                ctx.fillRect(-r, -r, r * 2, r * 2);
 
-            ctx.fillStyle = oceanGrad;
-            ctx.fillRect(-r, -r, r * 2, r * 2);
+                for (const continent of EARTH_CONTINENTS) {
+                    drawSphericalPolygon(continent.points, continent.centerLon, b.rotation, r, continent.color);
+                }
 
-            // 4. Rotating Continents
-            for (const continent of EARTH_CONTINENTS) {
-                drawSphericalPolygon(continent.points, continent.centerLon, b.rotation, r, continent.color);
+                // Polar Ice Caps
+                ctx.fillStyle = 'rgba(240, 248, 255, 0.9)';
+                ctx.beginPath();
+                ctx.ellipse(0, -r * 0.92, r * 0.45, r * 0.16, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(0, r * 0.93, r * 0.42, r * 0.15, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Drifting Clouds
+                for (const cloud of EARTH_CLOUDS) {
+                    drawSphericalPolygon(cloud.points, cloud.centerLon, b.cloudRotation, r, 'rgba(255, 255, 255, 0.42)');
+                }
+
+            } else if (p.id === 'mars') {
+                const marsGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+                marsGrad.addColorStop(0, '#f07c4f');
+                marsGrad.addColorStop(0.6, '#c24121');
+                marsGrad.addColorStop(1, '#5e1809');
+                ctx.fillStyle = marsGrad;
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                for (const region of MARS_REGIONS) {
+                    drawSphericalPolygon(region.points, region.centerLon, b.rotation, r, region.color);
+                }
+
+                // Northern Polar Ice Cap
+                ctx.fillStyle = 'rgba(255, 246, 240, 0.92)';
+                ctx.beginPath();
+                ctx.ellipse(0, -r * 0.92, r * 0.42, r * 0.16, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else if (p.id === 'jupiter') {
+                ctx.fillStyle = '#d9b88f';
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                drawAtmosphericBands(r, [
+                    { y: -0.78, h: 0.22, color: '#9c7854' },
+                    { y: -0.52, h: 0.20, color: '#f0dfc8' },
+                    { y: -0.28, h: 0.24, color: '#b5633c' },
+                    { y: 0.0,   h: 0.24, color: '#f5e8d5' },
+                    { y: 0.28,  h: 0.26, color: '#a85332' },
+                    { y: 0.56,  h: 0.20, color: '#e6d0b3' },
+                    { y: 0.80,  h: 0.22, color: '#8f6d4c' }
+                ]);
+
+                // Iconic Rotating Great Red Spot
+                drawSphericalSpot(
+                    0.5, 0.32, b.rotation, r,
+                    r * 0.32, r * 0.18,
+                    '#cf4629', 'rgba(245, 210, 175, 0.65)'
+                );
+
+            } else if (p.id === 'saturn') {
+                ctx.fillStyle = '#e6c98a';
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                drawAtmosphericBands(r, [
+                    { y: -0.75, h: 0.25, color: '#b89b62' },
+                    { y: -0.42, h: 0.22, color: '#f5e4b8' },
+                    { y: -0.10, h: 0.26, color: '#d9b673' },
+                    { y: 0.22,  h: 0.24, color: '#f0dcab' },
+                    { y: 0.55,  h: 0.24, color: '#c4a366' },
+                    { y: 0.82,  h: 0.22, color: '#9c804c' }
+                ]);
+
+            } else if (p.id === 'neptune') {
+                const nepGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+                nepGrad.addColorStop(0, '#5496ff');
+                nepGrad.addColorStop(0.55, '#2256db');
+                nepGrad.addColorStop(1, '#0b1e6b');
+                ctx.fillStyle = nepGrad;
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                drawAtmosphericBands(r, [
+                    { y: -0.35, h: 0.18, color: 'rgba(18, 45, 145, 0.45)' },
+                    { y: 0.25,  h: 0.22, color: 'rgba(15, 38, 130, 0.45)' }
+                ]);
+
+                // Great Dark Spot & High-Altitude White Methane Streak
+                drawSphericalSpot(0.2, 0.22, b.rotation, r, r * 0.28, r * 0.16, '#0c2175');
+                drawSphericalSpot(0.35, -0.28, b.rotation * 1.15, r, r * 0.36, r * 0.06, 'rgba(225, 242, 255, 0.72)');
+
+            } else if (p.id === 'venus') {
+                const venGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+                venGrad.addColorStop(0, '#fff0c2');
+                venGrad.addColorStop(0.55, '#e3aa4b');
+                venGrad.addColorStop(1, '#855314');
+                ctx.fillStyle = venGrad;
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                for (const swirl of VENUS_SWIRLS) {
+                    drawSphericalPolygon(swirl.points, swirl.centerLon, b.rotation, r, 'rgba(176, 114, 34, 0.45)');
+                }
+
+            } else if (p.id === 'uranus') {
+                const uraGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+                uraGrad.addColorStop(0, '#b8fcff');
+                uraGrad.addColorStop(0.6, '#5cd0dc');
+                uraGrad.addColorStop(1, '#1d6b7a');
+                ctx.fillStyle = uraGrad;
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                drawAtmosphericBands(r, [
+                    { y: -0.30, h: 0.16, color: 'rgba(210, 255, 255, 0.22)' },
+                    { y: 0.28,  h: 0.18, color: 'rgba(35, 135, 150, 0.25)' }
+                ]);
+
+            } else if (p.id === 'mercury') {
+                const merGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+                merGrad.addColorStop(0, '#d2d2d9');
+                merGrad.addColorStop(0.6, '#8c8c94');
+                merGrad.addColorStop(1, '#3d3d42');
+                ctx.fillStyle = merGrad;
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                // Impact Craters (including Caloris Basin)
+                drawSphericalSpot(-0.6, -0.25, b.rotation, r, r * 0.28, r * 0.25, '#73737a', 'rgba(220, 220, 228, 0.45)');
+                drawSphericalSpot(0.5, 0.32, b.rotation, r, r * 0.20, r * 0.18, '#66666e', 'rgba(210, 210, 218, 0.35)');
+                drawSphericalSpot(1.8, -0.40, b.rotation, r, r * 0.22, r * 0.20, '#6e6e75', 'rgba(215, 215, 222, 0.4)');
+                drawSphericalSpot(-2.1, 0.35, b.rotation, r, r * 0.18, r * 0.16, '#63636b');
+
+            } else if (p.id === 'pluto') {
+                const pluGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+                pluGrad.addColorStop(0, '#e3d0bc');
+                pluGrad.addColorStop(0.6, '#a68b72');
+                pluGrad.addColorStop(1, '#4d3b2c');
+                ctx.fillStyle = pluGrad;
+                ctx.fillRect(-r, -r, r * 2, r * 2);
+
+                for (const feat of PLUTO_FEATURES) {
+                    drawSphericalPolygon(feat.points, feat.centerLon, b.rotation, r, feat.color);
+                }
             }
 
-            // 5. Polar Ice Caps (North & South)
-            ctx.fillStyle = 'rgba(240, 248, 255, 0.9)';
-            ctx.beginPath();
-            ctx.ellipse(0, -r * 0.92, r * 0.45, r * 0.16, 0, 0, Math.PI * 2);
-            ctx.fill();
+            // Unrotate tilt before applying camera-relative 3D shadow terminator
+            ctx.rotate(-p.axialTilt);
 
-            ctx.beginPath();
-            ctx.ellipse(0, r * 0.93, r * 0.42, r * 0.15, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 6. Drifting Cloud Layer
-            for (const cloud of EARTH_CLOUDS) {
-                drawSphericalPolygon(cloud.points, cloud.centerLon, b.cloudRotation, r, 'rgba(255, 255, 255, 0.42)');
-            }
-
-            // Unrotate tilt before applying camera-relative 3D shading
-            ctx.rotate(-EARTH_AXIAL_TILT);
-
-            // 7. 3D Spherical Shadow Terminator & Atmospheric Limb Highlight
+            // 5. 3D Spherical Shadow Terminator & Limb Highlight
             const shadowGrad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.25, 0, 0, r);
             shadowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
-            shadowGrad.addColorStop(0.65, 'rgba(0, 10, 28, 0.15)');
-            shadowGrad.addColorStop(1, 'rgba(0, 5, 18, 0.72)');
+            shadowGrad.addColorStop(0.65, 'rgba(0, 8, 20, 0.16)');
+            shadowGrad.addColorStop(1, 'rgba(0, 4, 14, 0.74)');
 
             ctx.fillStyle = shadowGrad;
             ctx.fillRect(-r, -r, r * 2, r * 2);
 
             ctx.restore(); // End sphere clip
 
-            // 8. Crisp Blue Atmospheric Rim Border
+            // 6. Crisp Planetary Rim Border
             ctx.beginPath();
             ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(130, 205, 255, 0.7)';
-            ctx.lineWidth = Math.max(0.5, r * 0.08);
+            ctx.strokeStyle = p.rimColor;
+            ctx.lineWidth = Math.max(0.5, r * 0.075);
             ctx.stroke();
+
+            // 7. Front Half of Planetary Rings (for Saturn & Uranus)
+            if (p.hasRings) {
+                drawPlanetRings(p.id, r, p.axialTilt, true);
+            }
+
+            // 8. Subtle Planet Name Label
+            const scaleRatio = r / b.initialRadius;
+            if (scaleRatio > 0.35) {
+                ctx.font = "9px 'Courier New', monospace";
+                ctx.textAlign = 'center';
+                ctx.fillStyle = `rgba(255, 255, 255, ${(0.65 * scaleRatio).toFixed(2)})`;
+                const labelOffset = p.hasRings ? r + 13 : r + 11;
+                ctx.fillText(p.name.toUpperCase(), 0, labelOffset);
+            }
 
             ctx.restore();
         }
 
         /**
-         * Renders the accretion disk, suction zone, Earth trail, and black hole singularity
+         * Renders the accretion disk, suction zone, planet trails, black hole singularity, and planets
          */
         function draw() {
-            // Clear canvas background
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const cx = blackHole.x;
             const cy = blackHole.y;
 
-            // 1. Draw Faint Outer Dashed Suction-Zone Danger Ring (r = 56)
+            // 1. Draw Faint Outer Dashed Suction-Zone Danger Ring
             ctx.save();
             ctx.beginPath();
             ctx.setLineDash([4, 6]);
@@ -666,7 +1063,6 @@
             ctx.save();
             ctx.translate(cx, cy);
 
-            // Inner fast accretion ring
             ctx.save();
             ctx.rotate(diskRotation * 1.8);
             ctx.beginPath();
@@ -682,7 +1078,6 @@
             ctx.stroke();
             ctx.restore();
 
-            // Mid counter-rotating accretion arc
             ctx.save();
             ctx.rotate(-diskRotation * 1.15);
             ctx.beginPath();
@@ -711,7 +1106,7 @@
                 ctx.fill();
             }
 
-            // 5. Draw Earth Motion Trail (drawn underneath singularity core so trails vanish into the void)
+            // 5. Draw Each Planet's Orbital Motion Trail
             for (const b of balls) {
                 if (b.trail.length > 1) {
                     ctx.beginPath();
@@ -719,7 +1114,7 @@
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = 'rgba(180, 224, 255, 0.85)';
+                    ctx.strokeStyle = b.planet.trailColor;
                     ctx.lineWidth = 1.2;
                     ctx.stroke();
                 }
@@ -740,13 +1135,11 @@
             ctx.fillStyle = coronaGrad;
             ctx.fill();
 
-            // Pitch-black event horizon fill
             ctx.beginPath();
             ctx.arc(cx, cy, EVENT_HORIZON_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            // Glowing white photon ring border
             ctx.shadowColor = '#ffffff';
             ctx.shadowBlur = 14;
             ctx.strokeStyle = '#ffffff';
@@ -754,9 +1147,9 @@
             ctx.stroke();
             ctx.restore();
 
-            // 7. Draw Active Earth (including during its spiral collapse into the singularity)
+            // 7. Draw All Active Planets
             for (const b of balls) {
-                drawEarth(b);
+                drawPlanet(b);
             }
         }
 
