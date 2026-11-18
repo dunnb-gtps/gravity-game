@@ -14,7 +14,7 @@
         }
 
         body {
-            background-color: #000000;
+            background: radial-gradient(ellipse at bottom, #071929 0%, #02050e 100%);
             color: #ffffff;
             display: flex;
             flex-direction: column;
@@ -34,7 +34,7 @@
             max-width: 1100px;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #ffffff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.85);
         }
 
         h1 {
@@ -42,10 +42,11 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             font-weight: bold;
+            text-shadow: 0 0 10px rgba(40, 255, 170, 0.35);
         }
 
         .btn-reset {
-            background: transparent;
+            background: rgba(4, 15, 28, 0.6);
             color: #ffffff;
             border: 1px solid #ffffff;
             padding: 6px 16px;
@@ -74,8 +75,8 @@
         }
 
         canvas {
-            background-color: #000000;
-            border: 1px solid #ffffff;
+            background-color: #02050e;
+            border: 1px solid rgba(255, 255, 255, 0.85);
             display: block;
             cursor: crosshair;
             width: 100%;
@@ -85,7 +86,7 @@
         .instructions {
             margin-top: 8px;
             font-size: 11px;
-            color: #888888;
+            color: #9ab3c7;
             text-align: center;
         }
     </style>
@@ -120,6 +121,8 @@
 
         // STATE VARIABLES
         let balls = [];
+        let stars = [];
+        let auroraTime = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -127,6 +130,82 @@
             y: 0,
             radius: 12
         };
+
+        // Aurora Ribbon Configurations
+        const auroraLayers = [
+            {
+                baseYRatio: 0.36,
+                heightRatio: 0.28,
+                freq1: 0.0045,
+                freq2: 0.011,
+                speed1: 0.55,
+                speed2: -0.85,
+                amp1: 42,
+                amp2: 18,
+                phase: 0.0,
+                colors: [
+                    { stop: 0.0, color: 'rgba(130, 50, 235, 0)' },
+                    { stop: 0.35, color: 'rgba(125, 65, 245, 0.14)' },
+                    { stop: 0.68, color: 'rgba(0, 210, 215, 0.22)' },
+                    { stop: 0.90, color: 'rgba(35, 255, 145, 0.32)' },
+                    { stop: 1.0, color: 'rgba(35, 255, 145, 0)' }
+                ],
+                edgeColor: 'rgba(70, 255, 165, 0.28)'
+            },
+            {
+                baseYRatio: 0.52,
+                heightRatio: 0.32,
+                freq1: 0.0038,
+                freq2: 0.0095,
+                speed1: -0.45,
+                speed2: 0.75,
+                amp1: 50,
+                amp2: 22,
+                phase: 2.1,
+                colors: [
+                    { stop: 0.0, color: 'rgba(95, 45, 220, 0)' },
+                    { stop: 0.30, color: 'rgba(110, 60, 235, 0.12)' },
+                    { stop: 0.65, color: 'rgba(15, 225, 195, 0.24)' },
+                    { stop: 0.88, color: 'rgba(55, 255, 130, 0.34)' },
+                    { stop: 1.0, color: 'rgba(55, 255, 130, 0)' }
+                ],
+                edgeColor: 'rgba(90, 255, 155, 0.32)'
+            },
+            {
+                baseYRatio: 0.68,
+                heightRatio: 0.24,
+                freq1: 0.0052,
+                freq2: 0.013,
+                speed1: 0.65,
+                speed2: 0.45,
+                amp1: 35,
+                amp2: 15,
+                phase: 4.3,
+                colors: [
+                    { stop: 0.0, color: 'rgba(150, 55, 245, 0)' },
+                    { stop: 0.40, color: 'rgba(140, 70, 250, 0.12)' },
+                    { stop: 0.72, color: 'rgba(0, 200, 230, 0.18)' },
+                    { stop: 0.92, color: 'rgba(40, 245, 165, 0.24)' },
+                    { stop: 1.0, color: 'rgba(40, 245, 165, 0)' }
+                ],
+                edgeColor: 'rgba(65, 245, 180, 0.22)'
+            }
+        ];
+
+        function generateStars() {
+            const count = Math.floor((canvas.width * canvas.height) / 9500);
+            stars = [];
+            for (let i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 1.3 + 0.3,
+                    baseAlpha: Math.random() * 0.65 + 0.2,
+                    twinkleSpeed: Math.random() * 2.2 + 0.8,
+                    twinklePhase: Math.random() * Math.PI * 2
+                });
+            }
+        }
 
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -136,6 +215,8 @@
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            generateStars();
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -173,6 +254,8 @@
         }
 
         function updatePhysics() {
+            auroraTime += 0.014;
+
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
@@ -218,10 +301,96 @@
             }
         }
 
+        function drawNorthernLights() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // 1. Deep Arctic Night Sky Gradient
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+            skyGrad.addColorStop(0, '#01030a');
+            skyGrad.addColorStop(0.55, '#040d1d');
+            skyGrad.addColorStop(1, '#081c2e');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // 2. Twinkling Starfield
+            for (let i = 0; i < stars.length; i++) {
+                const s = stars[i];
+                const alpha = s.baseAlpha * (0.65 + 0.35 * Math.sin(auroraTime * s.twinkleSpeed + s.twinklePhase));
+                ctx.fillStyle = `rgba(225, 240, 255, ${alpha.toFixed(3)})`;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 3. Flowing Aurora Borealis Curtains
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+
+            const step = 12;
+            for (let l = 0; l < auroraLayers.length; l++) {
+                const layer = auroraLayers[l];
+                const baseY = h * layer.baseYRatio;
+                const ribbonH = h * layer.heightRatio;
+
+                const bottomPoints = [];
+                const topPoints = [];
+                let minTopY = h;
+                let maxBotY = 0;
+
+                for (let x = -step; x <= w + step; x += step) {
+                    const wave1 = Math.sin(x * layer.freq1 + auroraTime * layer.speed1 + layer.phase) * layer.amp1;
+                    const wave2 = Math.cos(x * layer.freq2 + auroraTime * layer.speed2 - layer.phase) * layer.amp2;
+                    const shimmer = Math.sin(x * 0.028 - auroraTime * 1.4 + l) * (ribbonH * 0.16);
+
+                    const botY = baseY + wave1 + wave2;
+                    const topY = botY - ribbonH - shimmer;
+
+                    bottomPoints.push({ x, y: botY });
+                    topPoints.push({ x, y: topY });
+
+                    if (topY < minTopY) minTopY = topY;
+                    if (botY > maxBotY) maxBotY = botY;
+                }
+
+                // Vertical Aurora Color Gradient (Violet top -> Cyan mid -> Emerald green base)
+                const auroraGrad = ctx.createLinearGradient(0, minTopY, 0, maxBotY);
+                for (const c of layer.colors) {
+                    auroraGrad.addColorStop(c.stop, c.color);
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(topPoints[0].x, topPoints[0].y);
+                for (let i = 1; i < topPoints.length; i++) {
+                    ctx.lineTo(topPoints[i].x, topPoints[i].y);
+                }
+                for (let i = bottomPoints.length - 1; i >= 0; i--) {
+                    ctx.lineTo(bottomPoints[i].x, bottomPoints[i].y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = auroraGrad;
+                ctx.fill();
+
+                // Luminous lower curtain ridge
+                ctx.beginPath();
+                ctx.moveTo(bottomPoints[0].x, bottomPoints[0].y);
+                for (let i = 1; i < bottomPoints.length; i++) {
+                    ctx.lineTo(bottomPoints[i].x, bottomPoints[i].y);
+                }
+                ctx.strokeStyle = layer.edgeColor;
+                ctx.lineWidth = 2.2;
+                ctx.shadowColor = 'rgba(45, 255, 160, 0.45)';
+                ctx.shadowBlur = 14;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            ctx.restore();
+        }
+
         function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Render Northern Lights background
+            drawNorthernLights();
 
             // 1. Draw Central Mass Node
             ctx.beginPath();
@@ -283,4 +452,3 @@
     </script>
 </body>
 </html>
-```[cite: 1]
