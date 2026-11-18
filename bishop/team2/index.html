@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider-Man Gravity Simulation</title>
+    <title>Spider-Man & Gwen Stacy Gravity Simulation</title>
     <style>
         * {
             box-sizing: border-box;
@@ -27,16 +27,18 @@
             padding: 14px 16px;
         }
 
-        /* Top Header Bar - Spider-Man Comic Styling */
+        /* Top Header Bar - Spider-Verse Comic Styling */
         #header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
             width: 100%;
             max-width: 1100px;
             margin-bottom: 12px;
             padding: 8px 14px;
-            background: linear-gradient(90deg, rgba(226, 54, 54, 0.16) 0%, rgba(11, 19, 43, 0.9) 45%, rgba(226, 54, 54, 0.12) 100%);
+            background: linear-gradient(90deg, rgba(226, 54, 54, 0.16) 0%, rgba(11, 19, 43, 0.92) 50%, rgba(236, 72, 153, 0.16) 100%);
             border: 1.5px solid #E23636;
             border-radius: 8px;
             box-shadow: 0 4px 18px rgba(226, 54, 54, 0.2), inset 0 0 12px rgba(56, 189, 248, 0.08);
@@ -56,13 +58,102 @@
         }
 
         h1 {
-            font-size: clamp(15px, 2.4vw, 20px);
-            letter-spacing: 2px;
+            font-size: clamp(14px, 2.2vw, 19px);
+            letter-spacing: 1.8px;
             text-transform: uppercase;
             font-weight: 900;
             font-style: italic;
             color: #FFFFFF;
             text-shadow: 2px 2px 0px #E23636, -1px -1px 0px #060A18;
+        }
+
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Character Selector Pill Bar */
+        .character-selector {
+            display: flex;
+            align-items: center;
+            background: rgba(6, 10, 24, 0.85);
+            border: 1.5px solid rgba(148, 163, 184, 0.35);
+            border-radius: 7px;
+            padding: 3px;
+            gap: 4px;
+        }
+
+        .char-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            color: #CBD5E1;
+            border: 1.5px solid transparent;
+            border-radius: 5px;
+            padding: 5px 11px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .char-btn svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .char-btn:hover {
+            color: #FFFFFF;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Active Spider-Man State */
+        .char-btn[data-char="spiderman"].active {
+            background-color: #E23636;
+            color: #FFFFFF;
+            border-color: #FFFFFF;
+            box-shadow: 0 0 12px rgba(226, 54, 54, 0.65);
+        }
+
+        /* Active Gwen Stacy State */
+        .char-btn[data-char="gwen"].active {
+            background: linear-gradient(135deg, #EC4899 0%, #DB2777 100%);
+            color: #FFFFFF;
+            border-color: #22D3EE;
+            box-shadow: 0 0 12px rgba(236, 72, 153, 0.65);
+        }
+
+        /* Active Duo / Alternate State */
+        .char-btn[data-char="duo"].active {
+            background: linear-gradient(90deg, #E23636 0%, #9333EA 50%, #EC4899 100%);
+            color: #FFFFFF;
+            border-color: #FFFFFF;
+            box-shadow: 0 0 12px rgba(168, 85, 247, 0.6);
+        }
+
+        /* Active Ball Counter Pill */
+        .orbit-counter {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #93C5FD;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 6px;
+            padding: 6px 10px;
+            white-space: nowrap;
+        }
+
+        .orbit-counter span {
+            color: #FFFFFF;
+            font-weight: 900;
         }
 
         /* Spider-Man Red/White Reset Button with Crisp Hover Inversion */
@@ -71,12 +162,12 @@
             color: #FFFFFF;
             border: 2px solid #FFFFFF;
             border-radius: 6px;
-            padding: 7px 18px;
-            font-size: 13px;
+            padding: 6px 16px;
+            font-size: 12px;
             font-weight: 900;
             cursor: pointer;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
+            letter-spacing: 1.4px;
             box-shadow: 0 3px 10px rgba(226, 54, 54, 0.45);
             transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out, border-color 0.15s ease-in-out, transform 0.1s ease;
         }
@@ -141,7 +232,36 @@
             </svg>
             <h1>SPIDER-VERSE GRAVITY SIM</h1>
         </div>
-        <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+
+        <div class="controls-group">
+            <!-- Character Launch Selector -->
+            <div class="character-selector" role="group" aria-label="Select hero ball to launch">
+                <button type="button" class="char-btn active" data-char="spiderman" onclick="selectCharacter('spiderman')">
+                    <svg viewBox="0 0 64 64" aria-hidden="true">
+                        <ellipse cx="32" cy="32" rx="22" ry="26" fill="#E23636" stroke="#090D1C" stroke-width="4"/>
+                        <path d="M14 27 C17 20, 26 22, 28 31 C24 35, 16 34, 14 27 Z" fill="#FFFFFF" stroke="#090D1C" stroke-width="3"/>
+                        <path d="M50 27 C47 20, 38 22, 36 31 C40 35, 48 34, 50 27 Z" fill="#FFFFFF" stroke="#090D1C" stroke-width="3"/>
+                    </svg>
+                    Spider-Man
+                </button>
+                <button type="button" class="char-btn" data-char="gwen" onclick="selectCharacter('gwen')">
+                    <svg viewBox="0 0 64 64" aria-hidden="true">
+                        <path d="M10 38 C8 16, 20 6, 32 6 C44 6, 56 16, 54 38 C52 50, 42 58, 32 58 C22 58, 12 50, 10 38 Z" fill="#F8FAFC" stroke="#090D1C" stroke-width="4"/>
+                        <ellipse cx="32" cy="34" rx="17" ry="19" fill="#EC4899"/>
+                        <ellipse cx="32" cy="35" rx="14" ry="16" fill="#FFFFFF"/>
+                        <path d="M18 31 C20 25, 27 27, 29 34 C25 37, 19 36, 18 31 Z" fill="#FFFFFF" stroke="#090D1C" stroke-width="3"/>
+                        <path d="M46 31 C44 25, 37 27, 35 34 C39 37, 45 36, 46 31 Z" fill="#FFFFFF" stroke="#090D1C" stroke-width="3"/>
+                    </svg>
+                    Gwen Stacy
+                </button>
+                <button type="button" class="char-btn" data-char="duo" onclick="selectCharacter('duo')">
+                    Duo Alt
+                </button>
+            </div>
+
+            <div class="orbit-counter">Orbits: <span id="ballCount">0</span></div>
+            <button type="button" class="btn-reset" onclick="resetSimulation()">Reset</button>
+        </div>
     </div>
 
     <!-- Canvas Container -->
@@ -150,12 +270,13 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch Spider-Man and spin a web orbit.
+        Choose Spider-Man, Gwen Stacy, or Duo Alt, then click anywhere on the canvas to launch multiple web orbits.
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const ballCountEl = document.getElementById('ballCount');
 
         // =========================================================================
         // PRESERVED BASELINE SIMULATION CONSTANTS
@@ -165,6 +286,7 @@
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const MAX_BALLS = 36;              // Cap simultaneous balls to maintain smooth 60fps
 
         // =========================================================================
         // STATE VARIABLES
@@ -174,6 +296,8 @@
         let webParticles = [];     // Web-burst & web-splat particles
         let skylineBuildings = []; // Cached NYC skyline geometry
         let frameTick = 0;         // Animation clock for Spider-Sense pulse
+        let selectedMode = 'spiderman'; // 'spiderman' | 'gwen' | 'duo'
+        let duoToggle = false;     // Alternates between Spider-Man and Gwen Stacy in 'duo' mode
 
         // Central Gravity Node Definition (Spider-Emblem & Spider-Sense Core)
         const centralNode = {
@@ -181,6 +305,30 @@
             y: 0,
             radius: 15
         };
+
+        /**
+         * Updates the active hero mode ('spiderman', 'gwen', or 'duo').
+         */
+        function selectCharacter(mode) {
+            selectedMode = mode;
+            document.querySelectorAll('.char-btn').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.char === mode);
+            });
+        }
+
+        // Optional keyboard shortcuts (1 = Spider-Man, 2 = Gwen Stacy, 3 = Duo Alt, R = Reset)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '1') selectCharacter('spiderman');
+            else if (e.key === '2') selectCharacter('gwen');
+            else if (e.key === '3') selectCharacter('duo');
+            else if (e.key.toLowerCase() === 'r') resetSimulation();
+        });
+
+        function updateBallCounter() {
+            if (ballCountEl && ballCountEl.textContent !== String(balls.length)) {
+                ballCountEl.textContent = String(balls.length);
+            }
+        }
 
         /**
          * Procedurally generates a deterministic, low-contrast nighttime NYC skyline
@@ -192,7 +340,6 @@
             const h = canvas.height;
             if (w <= 0 || h <= 0) return;
 
-            // Deterministic pseudo-random helper so resize keeps a cohesive cityscape
             let seed = 4219;
             const rand = () => {
                 seed = (seed * 16807) % 2147483647;
@@ -239,7 +386,6 @@
                     spireH = 10 + rand() * 14;
                 }
 
-                // Generate sparse, dim warm/cool windows
                 const windows = [];
                 const cols = Math.floor((bw - 8) / 7);
                 const rows = Math.floor((bh - 12) / 9);
@@ -276,18 +422,16 @@
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
 
-            // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
 
-            // Rebuild NYC skyline for updated dimensions
             buildCitySkyline();
         }
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch Spider-Man gravity ball at click position
+        // Canvas Click Handler: Launch a new Spider-Man or Gwen Stacy gravity ball
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -297,34 +441,47 @@
         });
 
         /**
-         * Launches the Spider-Man gravity ball from (x, y) at FIXED_LAUNCH_ANGLE (90°)
-         * with LAUNCH_VELOCITY (5), maintaining strictly one active ball.
+         * Launches a new Spider-Man or Gwen Stacy gravity ball from (x, y) at
+         * FIXED_LAUNCH_ANGLE (90°) with LAUNCH_VELOCITY (5), allowing multiple
+         * balls to orbit simultaneously.
          */
         function launchBall(x, y) {
-            // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
-            balls = [{
+            // Resolve character for this launch
+            let character = selectedMode;
+            if (selectedMode === 'duo') {
+                character = duoToggle ? 'gwen' : 'spiderman';
+                duoToggle = !duoToggle;
+            }
+
+            if (balls.length >= MAX_BALLS) {
+                balls.shift();
+            }
+
+            balls.push({
+                character: character,
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
                 radius: 10,
                 tilt: 0,
-                trail: [{ x: x, y: y }] // Start web trail cleanly at launch origin
-            }];
+                trail: [{ x: x, y: y }]
+            });
 
-            // Trigger comic "THWIP!" pop and subtle web-burst particles at launch point
-            spawnLaunchEffects(x, y);
+            updateBallCounter();
+            spawnLaunchEffects(x, y, character);
         }
 
         /**
-         * Spawns a fading "THWIP!" comic callout and tiny silken web-burst particles on launch.
+         * Spawns a fading "THWIP!" comic callout and character-themed silken web-burst particles.
          */
-        function spawnLaunchEffects(x, y) {
+        function spawnLaunchEffects(x, y, character) {
+            const isGwen = character === 'gwen';
+
             comicPops.push({
                 text: 'THWIP!',
                 x: x,
@@ -332,13 +489,22 @@
                 vy: -0.55,
                 alpha: 1.0,
                 scale: 0.7,
-                angle: -0.18
+                angle: isGwen ? 0.16 : -0.18,
+                shadowColor: isGwen ? '#EC4899' : '#E23636',
+                strokeColor: isGwen ? '#1E1B4B' : '#050814'
             });
 
             const burstCount = 10;
             for (let i = 0; i < burstCount; i++) {
                 const angle = (Math.PI * 2 * i) / burstCount + (Math.random() * 0.25);
                 const speed = 1.4 + Math.random() * 2.2;
+                let particleColor = '#FFFFFF';
+                if (isGwen) {
+                    particleColor = i % 3 === 0 ? '#EC4899' : (i % 3 === 1 ? '#22D3EE' : '#FFFFFF');
+                } else {
+                    particleColor = i % 3 === 0 ? '#7DD3FC' : '#FFFFFF';
+                }
+
                 webParticles.push({
                     x: x,
                     y: y,
@@ -347,19 +513,27 @@
                     length: 5 + Math.random() * 6,
                     alpha: 0.95,
                     decay: 0.032 + Math.random() * 0.015,
-                    color: i % 3 === 0 ? '#7DD3FC' : '#FFFFFF'
+                    color: particleColor
                 });
             }
         }
 
         /**
-         * Spawns a radial web-splat particle burst when Spider-Man reaches the central emblem.
+         * Spawns a radial web-splat particle burst when a hero reaches the central emblem.
          */
-        function spawnImpactWebSplat(x, y) {
+        function spawnImpactWebSplat(x, y, character) {
+            const isGwen = character === 'gwen';
             const splatCount = 14;
             for (let i = 0; i < splatCount; i++) {
                 const angle = (Math.PI * 2 * i) / splatCount + (Math.random() * 0.2);
                 const speed = 1.6 + Math.random() * 2.8;
+                let color = '#FFFFFF';
+                if (isGwen) {
+                    color = i % 3 === 0 ? '#EC4899' : (i % 3 === 1 ? '#22D3EE' : '#FFFFFF');
+                } else {
+                    color = i % 4 === 0 ? '#E23636' : '#FFFFFF';
+                }
+
                 webParticles.push({
                     x: x,
                     y: y,
@@ -368,7 +542,7 @@
                     length: 6 + Math.random() * 8,
                     alpha: 1.0,
                     decay: 0.028 + Math.random() * 0.014,
-                    color: i % 4 === 0 ? '#E23636' : '#FFFFFF'
+                    color: color
                 });
             }
         }
@@ -377,6 +551,8 @@
             balls = [];
             comicPops = [];
             webParticles = [];
+            duoToggle = false;
+            updateBallCounter();
         }
 
         // =========================================================================
@@ -388,7 +564,7 @@
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove ball if it travels too far off-screen
                 const margin = 500;
                 if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
@@ -404,7 +580,7 @@
 
                 // Absorption check: ball collides with central mass
                 if (dist < centralNode.radius + b.radius) {
-                    spawnImpactWebSplat(b.x, b.y);
+                    spawnImpactWebSplat(b.x, b.y, b.character);
                     balls.splice(i, 1);
                     continue;
                 }
@@ -433,6 +609,8 @@
                 }
             }
 
+            updateBallCounter();
+
             // Update fading "THWIP!" comic callouts
             for (let i = comicPops.length - 1; i >= 0; i--) {
                 const pop = comicPops[i];
@@ -459,13 +637,9 @@
         }
 
         // =========================================================================
-        // SPIDER-MAN & NYC VISUAL RENDERERS
+        // SPIDER-MAN, GWEN STACY & NYC VISUAL RENDERERS
         // =========================================================================
 
-        /**
-         * Renders Spider-Man swinging across the left background skyline with a
-         * subtle Spider-Verse rim glow so he blends naturally behind orbital trails.
-         */
         function drawBackgroundSpiderMan(w, h) {
             const scale = Math.max(0.62, Math.min(1.15, Math.min(w / 1000, h / 620)));
             const sway = Math.sin(frameTick * 0.024);
@@ -475,7 +649,6 @@
             const baseY = h * 0.61 + Math.abs(sway) * 3 * scale;
             const bodyTilt = -0.14 + sway * 0.045;
 
-            // Calculate Spider-Man's raised web-gripping hand in world space
             const localHandX = 18 * scale;
             const localHandY = -34 * scale;
             const cosT = Math.cos(bodyTilt);
@@ -486,7 +659,6 @@
             ctx.save();
             ctx.globalAlpha = 0.84;
 
-            // Taut silky web line extending up to top-left skyline anchor
             ctx.strokeStyle = 'rgba(224, 242, 254, 0.36)';
             ctx.lineWidth = 1.4 * scale;
             ctx.beginPath();
@@ -498,7 +670,6 @@
             ctx.rotate(bodyTilt);
             ctx.scale(scale, scale);
 
-            // Subtle Spider-Verse crimson/cyan ambient rim glow
             const rimGlow = ctx.createRadialGradient(0, -4, 4, 0, -4, 52);
             rimGlow.addColorStop(0, 'rgba(226, 54, 54, 0.24)');
             rimGlow.addColorStop(0.6, 'rgba(56, 189, 248, 0.10)');
@@ -511,7 +682,7 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // 1. Back Leg (left leg extended dynamically for mid-swing balance)
+            // Back Leg
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 8.5;
             ctx.beginPath();
@@ -521,7 +692,6 @@
             ctx.lineTo(-40, 34);
             ctx.stroke();
 
-            // Blue thigh
             ctx.strokeStyle = '#1D4ED8';
             ctx.lineWidth = 6.2;
             ctx.beginPath();
@@ -529,7 +699,6 @@
             ctx.lineTo(-21, 16);
             ctx.stroke();
 
-            // Red boot
             ctx.strokeStyle = '#E23636';
             ctx.lineWidth = 5.8;
             ctx.beginPath();
@@ -538,7 +707,7 @@
             ctx.lineTo(-40, 34);
             ctx.stroke();
 
-            // 2. Back Arm (left arm extended outward in iconic thwip pose)
+            // Back Arm
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 7;
             ctx.beginPath();
@@ -561,7 +730,7 @@
             ctx.lineTo(-34, 2);
             ctx.stroke();
 
-            // 3. Athletic Torso (Blue sides + Crimson red chest panel)
+            // Torso
             ctx.fillStyle = '#1D4ED8';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.8;
@@ -574,7 +743,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Red central chest & abs taper
             ctx.fillStyle = '#E23636';
             ctx.beginPath();
             ctx.moveTo(-8, -15);
@@ -584,7 +752,6 @@
             ctx.closePath();
             ctx.fill();
 
-            // Subtle black web lines & chest spider emblem
             ctx.strokeStyle = 'rgba(9, 13, 28, 0.55)';
             ctx.lineWidth = 0.85;
             ctx.beginPath();
@@ -601,7 +768,7 @@
             ctx.ellipse(0.5, -5.5, 1.8, 2.6, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // 4. Front Leg (right leg bent high in classic Spider-Man crouch)
+            // Front Leg
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 9;
             ctx.beginPath();
@@ -611,7 +778,6 @@
             ctx.lineTo(21, 24);
             ctx.stroke();
 
-            // Blue thigh
             ctx.strokeStyle = '#1D4ED8';
             ctx.lineWidth = 6.5;
             ctx.beginPath();
@@ -619,7 +785,6 @@
             ctx.lineTo(22, -2);
             ctx.stroke();
 
-            // Red knee-to-boot
             ctx.strokeStyle = '#E23636';
             ctx.lineWidth = 6;
             ctx.beginPath();
@@ -628,7 +793,7 @@
             ctx.lineTo(21, 24);
             ctx.stroke();
 
-            // 5. Front Arm (right arm reaching up holding web strand)
+            // Front Arm
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 7.2;
             ctx.beginPath();
@@ -651,7 +816,7 @@
             ctx.lineTo(18, -34);
             ctx.stroke();
 
-            // 6. Spider-Man Head / Mask
+            // Head / Mask
             ctx.save();
             ctx.translate(3, -24);
             ctx.rotate(0.14);
@@ -664,7 +829,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Subtle mask web lines
             ctx.strokeStyle = 'rgba(9, 13, 28, 0.5)';
             ctx.lineWidth = 0.75;
             ctx.beginPath();
@@ -674,12 +838,10 @@
             ctx.lineTo(8, 0);
             ctx.stroke();
 
-            // Expressive white eye lenses
             ctx.fillStyle = '#FFFFFF';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.4;
 
-            // Left lens
             ctx.beginPath();
             ctx.moveTo(-0.5, 0.4);
             ctx.quadraticCurveTo(-2.5, -3.5, -6.2, -2.2);
@@ -688,7 +850,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Right lens
             ctx.beginPath();
             ctx.moveTo(2.0, 0.4);
             ctx.quadraticCurveTo(4.2, -3.5, 7.6, -2.0);
@@ -701,10 +862,6 @@
             ctx.restore();
         }
 
-        /**
-         * Renders Gwen Stacy (Spider-Gwen / Ghost-Spider) swinging across the right
-         * background skyline in her signature white hood, magenta accents, and cyan shoes.
-         */
         function drawBackgroundGwenStacy(w, h) {
             const scale = Math.max(0.62, Math.min(1.15, Math.min(w / 1000, h / 620)));
             const sway = Math.sin(frameTick * 0.024 + 1.9);
@@ -714,7 +871,6 @@
             const baseY = h * 0.57 + Math.abs(sway) * 3 * scale;
             const bodyTilt = 0.14 + sway * 0.045;
 
-            // Calculate Gwen's raised web-gripping hand in world space
             const localHandX = -15 * scale;
             const localHandY = -35 * scale;
             const cosT = Math.cos(bodyTilt);
@@ -725,7 +881,6 @@
             ctx.save();
             ctx.globalAlpha = 0.86;
 
-            // Taut silky web line extending up to top-right skyline anchor
             ctx.strokeStyle = 'rgba(244, 214, 255, 0.38)';
             ctx.lineWidth = 1.4 * scale;
             ctx.beginPath();
@@ -737,7 +892,6 @@
             ctx.rotate(bodyTilt);
             ctx.scale(scale, scale);
 
-            // Subtle Spider-Verse magenta & cyan chromatic backlight glow
             const rimGlow = ctx.createRadialGradient(0, -4, 4, 0, -4, 54);
             rimGlow.addColorStop(0, 'rgba(236, 72, 153, 0.24)');
             rimGlow.addColorStop(0.6, 'rgba(34, 211, 238, 0.12)');
@@ -750,7 +904,7 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // 1. Back Leg (right leg extended gracefully downward-right)
+            // Back Leg
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 7.6;
             ctx.beginPath();
@@ -759,7 +913,6 @@
             ctx.lineTo(29, 37);
             ctx.stroke();
 
-            // Dark navy-black suit legging
             ctx.strokeStyle = '#111827';
             ctx.lineWidth = 5.4;
             ctx.beginPath();
@@ -768,7 +921,6 @@
             ctx.lineTo(29, 37);
             ctx.stroke();
 
-            // Signature magenta side trim on leg
             ctx.strokeStyle = '#EC4899';
             ctx.lineWidth = 1.3;
             ctx.beginPath();
@@ -777,7 +929,6 @@
             ctx.lineTo(29, 35);
             ctx.stroke();
 
-            // Iconic cyan/teal ballet flat shoe
             ctx.fillStyle = '#22D3EE';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.2;
@@ -786,7 +937,7 @@
             ctx.fill();
             ctx.stroke();
 
-            // 2. Back Arm (left arm extended gracefully outward-right)
+            // Back Arm
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 6.4;
             ctx.beginPath();
@@ -795,7 +946,6 @@
             ctx.lineTo(33, 2);
             ctx.stroke();
 
-            // Crisp white sleeve
             ctx.strokeStyle = '#F8FAFC';
             ctx.lineWidth = 4.4;
             ctx.beginPath();
@@ -804,7 +954,6 @@
             ctx.lineTo(33, 2);
             ctx.stroke();
 
-            // Cyan wrist cuff accent
             ctx.strokeStyle = '#22D3EE';
             ctx.lineWidth = 2.2;
             ctx.beginPath();
@@ -812,7 +961,7 @@
             ctx.lineTo(31, 0.8);
             ctx.stroke();
 
-            // 3. Sleek Torso (White upper suit, black waist/sides, magenta underarm trim)
+            // Torso
             ctx.fillStyle = '#111827';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.7;
@@ -825,7 +974,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Crisp white chest & shoulder overlay
             ctx.fillStyle = '#F8FAFC';
             ctx.beginPath();
             ctx.moveTo(-9.5, -14);
@@ -836,7 +984,6 @@
             ctx.closePath();
             ctx.fill();
 
-            // Signature magenta/hot-pink underarm web accents
             ctx.strokeStyle = '#EC4899';
             ctx.lineWidth = 1.6;
             ctx.beginPath();
@@ -846,7 +993,7 @@
             ctx.lineTo(5.5, 0);
             ctx.stroke();
 
-            // 4. Front Leg (left leg bent in graceful mid-air crouch)
+            // Front Leg
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 8;
             ctx.beginPath();
@@ -863,7 +1010,6 @@
             ctx.lineTo(-12, 22);
             ctx.stroke();
 
-            // Magenta stripe along front thigh
             ctx.strokeStyle = '#EC4899';
             ctx.lineWidth = 1.3;
             ctx.beginPath();
@@ -871,7 +1017,6 @@
             ctx.lineTo(-19, 0.5);
             ctx.stroke();
 
-            // Cyan/teal ballet shoe on front foot
             ctx.fillStyle = '#22D3EE';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.2;
@@ -880,7 +1025,7 @@
             ctx.fill();
             ctx.stroke();
 
-            // 5. Front Arm (right arm reaching up gripping web strand)
+            // Front Arm
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 6.6;
             ctx.beginPath();
@@ -897,7 +1042,6 @@
             ctx.lineTo(-15, -35);
             ctx.stroke();
 
-            // Cyan wrist cuff
             ctx.strokeStyle = '#22D3EE';
             ctx.lineWidth = 2.2;
             ctx.beginPath();
@@ -905,12 +1049,11 @@
             ctx.lineTo(-14.6, -32);
             ctx.stroke();
 
-            // 6. Iconic White Hood & Ghost-Spider Mask
+            // White Hood & Ghost-Spider Mask
             ctx.save();
             ctx.translate(-2.5, -23);
             ctx.rotate(-0.12);
 
-            // Draped white hood outer silhouette
             ctx.fillStyle = '#F8FAFC';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.7;
@@ -924,13 +1067,11 @@
             ctx.fill();
             ctx.stroke();
 
-            // Vibrant magenta/hot-pink inner hood lining
             ctx.fillStyle = '#EC4899';
             ctx.beginPath();
             ctx.ellipse(-1.5, -1.2, 7.6, 8.6, -0.1, 0, Math.PI * 2);
             ctx.fill();
 
-            // White mask face inside the hood
             ctx.fillStyle = '#FFFFFF';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.3;
@@ -939,12 +1080,10 @@
             ctx.fill();
             ctx.stroke();
 
-            // Expressive Spider-Gwen eye lenses (white with bold dark & pink-tinted rims)
             ctx.fillStyle = '#FFFFFF';
             ctx.strokeStyle = '#090D1C';
             ctx.lineWidth = 1.45;
 
-            // Left lens (facing inward)
             ctx.beginPath();
             ctx.moveTo(-3.2, 0.2);
             ctx.quadraticCurveTo(-5.2, -3.4, -8.2, -2.0);
@@ -953,7 +1092,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Right lens
             ctx.beginPath();
             ctx.moveTo(-0.8, 0.2);
             ctx.quadraticCurveTo(1.2, -3.4, 4.2, -1.8);
@@ -966,16 +1104,11 @@
             ctx.restore();
         }
 
-        /**
-         * Renders the deep midnight-blue sky gradient, faint concentric spider-web
-         * background grid, low-contrast nighttime NYC silhouette skyline, and
-         * Spider-Man & Gwen Stacy swinging in the background.
-         */
         function drawBackdrop() {
             const w = canvas.width;
             const h = canvas.height;
 
-            // 1. Deep midnight-blue sky gradient (#050814 to #0D1630)
+            // 1. Deep midnight-blue sky gradient
             const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
             skyGrad.addColorStop(0, '#050814');
             skyGrad.addColorStop(0.58, '#080E22');
@@ -983,7 +1116,6 @@
             ctx.fillStyle = skyGrad;
             ctx.fillRect(0, 0, w, h);
 
-            // Subtle ambient Spider-Verse radial glow behind the central node
             const maxDim = Math.max(w, h);
             const ambientGlow = ctx.createRadialGradient(
                 centralNode.x, centralNode.y, 10,
@@ -995,7 +1127,7 @@
             ctx.fillStyle = ambientGlow;
             ctx.fillRect(0, 0, w, h);
 
-            // 2. Faint concentric web-grid rings & radial spokes centered on gravity node
+            // 2. Faint concentric web-grid rings & radial spokes
             ctx.save();
             ctx.strokeStyle = 'rgba(165, 210, 255, 0.045)';
             ctx.lineWidth = 1;
@@ -1013,7 +1145,6 @@
                 ctx.stroke();
             }
 
-            // Concentric scalloped web rings
             const ringSpacing = 95;
             for (let r = ringSpacing; r < outerRadius; r += ringSpacing) {
                 ctx.beginPath();
@@ -1025,7 +1156,6 @@
                     const y1 = centralNode.y + Math.sin(a1) * r;
                     const x2 = centralNode.x + Math.cos(a2) * r;
                     const y2 = centralNode.y + Math.sin(a2) * r;
-                    // Slight inward catenary dip like a real spider web
                     const cx = centralNode.x + Math.cos(midA) * (r * 0.94);
                     const cy = centralNode.y + Math.sin(midA) * (r * 0.94);
 
@@ -1037,7 +1167,6 @@
             ctx.restore();
 
             // 3. Low-contrast nighttime NYC skyline along bottom edge
-            // Back layer buildings
             for (const b of skylineBuildings) {
                 if (b.layer !== 0) continue;
                 ctx.fillStyle = '#070C1D';
@@ -1047,19 +1176,16 @@
                 }
             }
 
-            // Foreground layer buildings & subtle lit windows
             for (const b of skylineBuildings) {
                 if (b.layer !== 1) continue;
                 ctx.fillStyle = '#040712';
                 ctx.fillRect(b.x, b.y, b.w, b.h);
 
                 if (b.isLandmark) {
-                    // Stepped Art-Deco crown for iconic NYC skyscraper silhouette
                     ctx.fillRect(b.x + 6, b.y - 10, b.w - 12, 10);
                     ctx.fillRect(b.x + 12, b.y - 18, b.w - 24, 8);
                     ctx.fillRect(b.x + b.w * 0.5 - 1.2, b.y - 18 - b.spireH, 2.4, b.spireH);
 
-                    // Subtle pulsing crimson aviation warning beacon on top of spire
                     const beaconPulse = 0.45 + 0.45 * Math.sin(frameTick * 0.06);
                     ctx.fillStyle = `rgba(226, 54, 54, ${beaconPulse})`;
                     ctx.beginPath();
@@ -1069,7 +1195,6 @@
                     ctx.fillRect(b.x + b.w * 0.5 - 1, b.y - b.spireH, 2, b.spireH);
                 }
 
-                // Tiny low-contrast windows
                 for (const win of b.windows) {
                     ctx.fillStyle = win.warm
                         ? 'rgba(255, 214, 130, 0.16)'
@@ -1083,14 +1208,10 @@
             drawBackgroundGwenStacy(w, h);
         }
 
-        /**
-         * Renders the Central Gravity Node (radius = 15) with pulsing crimson/cyan
-         * Spider-Sense rings, crimson-and-black core, and crisp Spider-Man chest emblem.
-         */
         function drawCentralSpiderCore() {
             const cx = centralNode.x;
             const cy = centralNode.y;
-            const r = centralNode.radius; // 15
+            const r = centralNode.radius;
 
             ctx.save();
 
@@ -1110,7 +1231,6 @@
                 ctx.stroke();
             }
 
-            // Soft crimson core halo
             const halo = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 2.1);
             halo.addColorStop(0, 'rgba(226, 54, 54, 0.45)');
             halo.addColorStop(1, 'rgba(226, 54, 54, 0)');
@@ -1128,13 +1248,12 @@
             ctx.strokeStyle = '#FFFFFF';
             ctx.stroke();
 
-            // Inner dark navy-black emblem medallion
             ctx.beginPath();
             ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
             ctx.fillStyle = '#080C1C';
             ctx.fill();
 
-            // 3. Crisp custom-drawn Spider-Man chest emblem silhouette in center
+            // 3. Spider-Man chest emblem silhouette
             ctx.translate(cx, cy);
             ctx.fillStyle = '#E23636';
             ctx.strokeStyle = '#E23636';
@@ -1142,7 +1261,6 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // Spider abdomen (lower oval) & cephalothorax (upper oval)
             ctx.beginPath();
             ctx.ellipse(0, 2.2, 2.3, 3.4, 0, 0, Math.PI * 2);
             ctx.fill();
@@ -1151,18 +1269,13 @@
             ctx.ellipse(0, -2.1, 1.5, 1.7, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // 8 angular spider legs (symmetric left & right)
             const legPaths = [
-                // Upper inner pair (reaching sharply upward)
                 [[-1.2, -2.2], [-3.8, -5.2], [-2.8, -8.5]],
                 [[1.2, -2.2],  [3.8, -5.2],  [2.8, -8.5]],
-                // Upper outer pair (reaching outward & up)
                 [[-1.5, -1.2], [-6.2, -3.5], [-7.5, -7.2]],
                 [[1.5, -1.2],  [6.2, -3.5],  [7.5, -7.2]],
-                // Lower outer pair (reaching outward & down)
                 [[-1.6, 0.2],  [-6.5, 2.4],  [-7.4, 6.8]],
                 [[1.6, 0.2],   [6.5, 2.4],   [7.4, 6.8]],
-                // Lower inner pair (reaching sharply downward)
                 [[-1.4, 1.5],  [-4.2, 5.0],  [-2.9, 8.8]],
                 [[1.4, 1.5],   [4.2, 5.0],   [2.9, 8.8]]
             ];
@@ -1179,35 +1292,41 @@
         }
 
         /**
-         * Renders the orbital trail as a silky white spider-web strand with subtle
-         * cyan-white glow and periodic delicate web cross-nodes along the path.
+         * Renders the orbital trail as a silky spider-web strand themed to the hero:
+         * - Spider-Man: Cyan-white outer glow + crisp white core strand
+         * - Gwen Stacy: Magenta-pink outer glow + crisp white/cyan core strand
          */
-        function drawWebTrail(trail) {
+        function drawWebTrail(trail, character) {
             if (trail.length < 2) return;
 
+            const isGwen = character === 'gwen';
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // Outer Spider-Verse cyan-white silken glow pass
+            // Outer Spider-Verse chromatic silken glow pass
             ctx.beginPath();
             ctx.moveTo(trail[0].x, trail[0].y);
             for (let t = 1; t < trail.length; t++) {
                 ctx.lineTo(trail[t].x, trail[t].y);
             }
-            ctx.strokeStyle = 'rgba(125, 225, 255, 0.28)';
+            ctx.strokeStyle = isGwen
+                ? 'rgba(236, 72, 153, 0.34)'
+                : 'rgba(125, 225, 255, 0.28)';
             ctx.lineWidth = 4.2;
             ctx.stroke();
 
-            // Crisp silky white core web strand with progressive fade near tail
+            // Crisp silky web core strand with progressive fade near tail
             for (let t = 1; t < trail.length; t++) {
-                const progress = t / trail.length; // 0 at tail -> 1 at Spider-Man
+                const progress = t / trail.length;
                 const alpha = 0.22 + progress * 0.78;
 
                 ctx.beginPath();
                 ctx.moveTo(trail[t - 1].x, trail[t - 1].y);
                 ctx.lineTo(trail[t].x, trail[t].y);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                ctx.strokeStyle = isGwen
+                    ? `rgba(255, 240, 250, ${alpha})`
+                    : `rgba(255, 255, 255, ${alpha})`;
                 ctx.lineWidth = 1.1 + progress * 0.9;
                 ctx.stroke();
 
@@ -1219,10 +1338,11 @@
                     const perpAngle = tangentAngle + Math.PI / 2;
                     const barbLen = 3.2 + progress * 1.6;
 
-                    ctx.strokeStyle = `rgba(210, 242, 255, ${alpha * 0.75})`;
+                    ctx.strokeStyle = isGwen
+                        ? `rgba(34, 211, 238, ${alpha * 0.8})`
+                        : `rgba(210, 242, 255, ${alpha * 0.75})`;
                     ctx.lineWidth = 0.9;
 
-                    // Delicate cross-strand bar
                     ctx.beginPath();
                     ctx.moveTo(
                         pCurr.x - Math.cos(perpAngle) * barbLen,
@@ -1234,8 +1354,9 @@
                     );
                     ctx.stroke();
 
-                    // Tiny silken anchor bead
-                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.fillStyle = isGwen
+                        ? `rgba(244, 114, 182, ${alpha})`
+                        : `rgba(255, 255, 255, ${alpha})`;
                     ctx.beginPath();
                     ctx.arc(pCurr.x, pCurr.y, 1.35, 0, Math.PI * 2);
                     ctx.fill();
@@ -1246,9 +1367,7 @@
         }
 
         /**
-         * Renders the moving Spider-Man gravity ball (radius = 10) as an iconic
-         * Spider-Man mask with crimson red base, radiating black web lines,
-         * and signature white eye lenses with thick black outlines.
+         * Renders a moving Spider-Man gravity ball (radius = 10).
          */
         function drawSpiderManBall(b) {
             ctx.save();
@@ -1256,13 +1375,11 @@
             ctx.rotate(b.tilt);
 
             const rx = 9.4;
-            const ry = 10.6; // Classic slightly oval Spider-Man head silhouette (avg radius = 10)
+            const ry = 10.6;
 
-            // Subtle comic drop shadow / crimson rim glow
             ctx.shadowColor = 'rgba(226, 54, 54, 0.55)';
             ctx.shadowBlur = 8;
 
-            // 1. Crimson Red Mask Base (#E23636) with subtle 3D comic shading
             const maskGrad = ctx.createRadialGradient(-2.5, -3.5, 1.5, 0, 0, ry * 1.15);
             maskGrad.addColorStop(0, '#FF4D4D');
             maskGrad.addColorStop(0.55, '#E23636');
@@ -1273,30 +1390,27 @@
             ctx.fillStyle = maskGrad;
             ctx.fill();
 
-            // Reset shadow before drawing crisp ink lines
             ctx.shadowBlur = 0;
 
-            // Clip inside mask for clean web-line rendering
             ctx.save();
             ctx.beginPath();
             ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
             ctx.clip();
 
-            // 2. Fine black radiating web lines across the mask
             const bridgeX = 0;
             const bridgeY = 0.8;
             ctx.strokeStyle = 'rgba(12, 14, 22, 0.72)';
             ctx.lineWidth = 0.85;
 
             const webAngles = [
-                -Math.PI / 2,        // Top center
-                -Math.PI * 0.72,     // Upper left
-                -Math.PI * 0.28,     // Upper right
-                Math.PI,             // Mid left
-                0,                   // Mid right
-                Math.PI * 0.72,      // Lower left
-                Math.PI * 0.28,      // Lower right
-                Math.PI / 2          // Chin center
+                -Math.PI / 2,
+                -Math.PI * 0.72,
+                -Math.PI * 0.28,
+                Math.PI,
+                0,
+                Math.PI * 0.72,
+                Math.PI * 0.28,
+                Math.PI / 2
             ];
 
             for (const a of webAngles) {
@@ -1306,7 +1420,6 @@
                 ctx.stroke();
             }
 
-            // Concentric curved web rings on mask
             ctx.lineWidth = 0.75;
             ctx.beginPath();
             ctx.arc(bridgeX, bridgeY, 4.6, 0, Math.PI * 2);
@@ -1316,16 +1429,14 @@
             ctx.arc(bridgeX, bridgeY, 8.2, 0, Math.PI * 2);
             ctx.stroke();
 
-            ctx.restore(); // End mask clip
+            ctx.restore();
 
-            // Crisp black outer mask ink outline
             ctx.beginPath();
             ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
             ctx.strokeStyle = '#090B12';
             ctx.lineWidth = 1.6;
             ctx.stroke();
 
-            // 3. Signature White Spider-Man Eye Lenses with Thick Black Outlines
             ctx.fillStyle = '#FFFFFF';
             ctx.strokeStyle = '#090B12';
             ctx.lineWidth = 1.65;
@@ -1353,8 +1464,104 @@
         }
 
         /**
-         * Renders web-burst particles and comic "THWIP!" text pops.
+         * Renders a moving Gwen Stacy (Ghost-Spider) gravity ball (radius = 10)
+         * featuring her draped white hood, vibrant magenta lining, white mask,
+         * and signature Ghost-Spider eye lenses.
          */
+        function drawGwenStacyBall(b) {
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(b.tilt);
+
+            const rx = 10.2;
+            const ry = 10.8;
+
+            // Spider-Verse magenta & cyan rim glow
+            ctx.shadowColor = 'rgba(236, 72, 153, 0.65)';
+            ctx.shadowBlur = 9;
+
+            // 1. Draped White Hood Outer Silhouette
+            const hoodGrad = ctx.createRadialGradient(-2, -4, 1.5, 0, 0, ry * 1.2);
+            hoodGrad.addColorStop(0, '#FFFFFF');
+            hoodGrad.addColorStop(0.7, '#F1F5F9');
+            hoodGrad.addColorStop(1, '#CBD5E1');
+
+            ctx.beginPath();
+            ctx.moveTo(-rx, 1.5);
+            ctx.quadraticCurveTo(-rx - 0.5, -ry * 0.95, 0, -ry * 1.06);
+            ctx.quadraticCurveTo(rx + 0.5, -ry * 0.95, rx, 1.5);
+            ctx.quadraticCurveTo(rx * 0.85, ry * 0.95, 0, ry * 1.02);
+            ctx.quadraticCurveTo(-rx * 0.85, ry * 0.95, -rx, 1.5);
+            ctx.closePath();
+            ctx.fillStyle = hoodGrad;
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+
+            // Bold black ink outline around hood
+            ctx.strokeStyle = '#090B12';
+            ctx.lineWidth = 1.65;
+            ctx.stroke();
+
+            // 2. Vibrant Magenta / Hot-Pink Inner Hood Shadow Lining
+            ctx.beginPath();
+            ctx.ellipse(0, 0.6, 7.8, 8.6, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#EC4899';
+            ctx.fill();
+
+            // 3. Crisp White Ghost-Spider Face Mask inside Hood
+            ctx.beginPath();
+            ctx.ellipse(0, 1.1, 6.7, 7.6, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.strokeStyle = '#090B12';
+            ctx.lineWidth = 1.15;
+            ctx.stroke();
+
+            // Subtle cyan Spider-Verse highlight arc along top-left hood rim
+            ctx.beginPath();
+            ctx.arc(0, 0, 9.2, -Math.PI * 0.82, -Math.PI * 0.42);
+            ctx.strokeStyle = 'rgba(34, 211, 238, 0.75)';
+            ctx.lineWidth = 1.1;
+            ctx.stroke();
+
+            // 4. Expressive Ghost-Spider Eye Lenses (white with dark & magenta-tinted rims)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#090B12';
+            ctx.lineWidth = 1.55;
+            ctx.lineJoin = 'round';
+
+            // Left Eye Lens
+            ctx.beginPath();
+            ctx.moveTo(-1.1, 1.4);
+            ctx.quadraticCurveTo(-2.7, -2.4, -6.2, -1.4);
+            ctx.quadraticCurveTo(-6.0, 2.7, -1.1, 1.4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Right Eye Lens
+            ctx.beginPath();
+            ctx.moveTo(1.1, 1.4);
+            ctx.quadraticCurveTo(2.7, -2.4, 6.2, -1.4);
+            ctx.quadraticCurveTo(6.0, 2.7, 1.1, 1.4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Delicate pink inner eye rim accents
+            ctx.strokeStyle = '#EC4899';
+            ctx.lineWidth = 0.65;
+            ctx.beginPath();
+            ctx.moveTo(-1.8, 1.0);
+            ctx.quadraticCurveTo(-3.2, -1.4, -5.4, -0.9);
+            ctx.moveTo(1.8, 1.0);
+            ctx.quadraticCurveTo(3.2, -1.4, 5.4, -0.9);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
         function drawComicEffects() {
             // 1. Web-burst & web-splat particles
             for (const p of webParticles) {
@@ -1384,16 +1591,13 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                // Comic drop shadow
-                ctx.fillStyle = '#E23636';
+                ctx.fillStyle = pop.shadowColor || '#E23636';
                 ctx.fillText(pop.text, 2, 2);
 
-                // Thick black ink outline
-                ctx.strokeStyle = '#050814';
+                ctx.strokeStyle = pop.strokeColor || '#050814';
                 ctx.lineWidth = 3.5;
                 ctx.strokeText(pop.text, 0, 0);
 
-                // Bright white comic lettering
                 ctx.fillStyle = '#FFFFFF';
                 ctx.fillText(pop.text, 0, 0);
 
@@ -1405,19 +1609,27 @@
         // MAIN DRAW & ANIMATION LOOP
         // =========================================================================
         function draw() {
-            // 1. Nighttime NYC & Spider-Verse Backdrop (with Spider-Man & Gwen Stacy)
+            // 1. Nighttime NYC & Spider-Verse Backdrop
             drawBackdrop();
 
             // 2. Central Spider-Emblem & Spider-Sense Core
             drawCentralSpiderCore();
 
-            // 3. Spider-Man Ball & Silky Web Trail
+            // 3. Draw all active web trails first so hero masks sit cleanly on top
             for (const b of balls) {
-                drawWebTrail(b.trail);
-                drawSpiderManBall(b);
+                drawWebTrail(b.trail, b.character);
             }
 
-            // 4. Comic "THWIP!" Pops & Web-Burst Particles
+            // 4. Draw all Spider-Man & Gwen Stacy gravity balls
+            for (const b of balls) {
+                if (b.character === 'gwen') {
+                    drawGwenStacyBall(b);
+                } else {
+                    drawSpiderManBall(b);
+                }
+            }
+
+            // 5. Comic "THWIP!" Pops & Web-Burst Particles
             drawComicEffects();
         }
 
