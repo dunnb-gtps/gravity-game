@@ -125,6 +125,7 @@
         // STATE VARIABLES
         let balls = [];
         let twinklingStars = [];
+        let backgroundMeteors = [];
         let alienShip = null;
         let launchParticles = [];
         let shockwaves = [];
@@ -141,12 +142,194 @@
             { r: 255, g: 208, b: 220 }  // Soft rose
         ];
 
+        // Rocky mineral palettes for background meteors
+        const METEOR_PALETTES = [
+            { light: '#9aa5b4', mid: '#52606d', dark: '#1f2933', glow: 'rgba(154, 165, 180, 0.14)' }, // Cool iron-nickel
+            { light: '#a39589', mid: '#5c5046', dark: '#241e1a', glow: 'rgba(184, 156, 130, 0.13)' }, // Warm silicate rock
+            { light: '#8c96a8', mid: '#475166', dark: '#1a202c', glow: 'rgba(130, 160, 210, 0.14)' }, // Cosmic slate
+            { light: '#9c8f96', mid: '#544950', dark: '#211b1f', glow: 'rgba(176, 142, 165, 0.12)' }  // Dusty carbonaceous
+        ];
+
         // Central Gravity Node Definition
         const centralNode = {
             x: 0,
             y: 0,
             radius: 12
         };
+
+        /**
+         * Creates a single procedural background meteor with craggy vertices and craters.
+         */
+        function createBackgroundMeteor(w, h) {
+            // Depth factor (0.35 = distant & small, 1.0 = closer & larger)
+            const depth = 0.35 + Math.random() * 0.65;
+            const radius = 4 + depth * 11;
+
+            // Gentle floating drift velocity (px/sec)
+            const speed = 10 + depth * 26;
+            const driftAngle = Math.random() * Math.PI * 2;
+            const vx = Math.cos(driftAngle) * speed;
+            const vy = Math.sin(driftAngle) * speed;
+
+            // Irregular craggy polygon outline (9 to 13 vertices)
+            const vertexCount = 9 + Math.floor(Math.random() * 5);
+            const vertices = [];
+            for (let i = 0; i < vertexCount; i++) {
+                const angle = (i / vertexCount) * Math.PI * 2;
+                const radialScale = 0.74 + Math.random() * 0.34;
+                vertices.push({ angle, scale: radialScale });
+            }
+
+            // Surface craters
+            const craterCount = depth > 0.6 ? (2 + Math.floor(Math.random() * 3)) : 1;
+            const craters = [];
+            for (let i = 0; i < craterCount; i++) {
+                const cAngle = Math.random() * Math.PI * 2;
+                const cDist = Math.random() * radius * 0.48;
+                craters.push({
+                    x: Math.cos(cAngle) * cDist,
+                    y: Math.sin(cAngle) * cDist,
+                    r: radius * (0.14 + Math.random() * 0.16)
+                });
+            }
+
+            return {
+                x: Math.random() * w,
+                y: Math.random() * h,
+                vx,
+                vy,
+                radius,
+                depth,
+                alpha: 0.38 + depth * 0.44,
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * (0.35 + depth * 0.55),
+                vertices,
+                craters,
+                palette: METEOR_PALETTES[Math.floor(Math.random() * METEOR_PALETTES.length)],
+                tailLength: radius * (1.8 + depth * 2.2)
+            };
+        }
+
+        /**
+         * Initializes the floating background meteor field scaled to viewport size.
+         */
+        function initBackgroundMeteors() {
+            const w = canvas.width;
+            const h = canvas.height;
+            if (w <= 0 || h <= 0) return;
+
+            const targetCount = Math.max(12, Math.min(22, Math.floor((w * h) / 42000)));
+            backgroundMeteors = [];
+            for (let i = 0; i < targetCount; i++) {
+                backgroundMeteors.push(createBackgroundMeteor(w, h));
+            }
+            // Sort by depth so smaller distant meteors render behind larger closer ones
+            backgroundMeteors.sort((a, b) => a.depth - b.depth);
+        }
+
+        /**
+         * Updates background meteor drift, rotation, and seamless edge wrapping.
+         */
+        function updateBackgroundMeteors(dt) {
+            const w = canvas.width;
+            const h = canvas.height;
+            if (w <= 0 || h <= 0) return;
+
+            for (let i = 0; i < backgroundMeteors.length; i++) {
+                const m = backgroundMeteors[i];
+                m.x += m.vx * dt;
+                m.y += m.vy * dt;
+                m.rotation += m.rotSpeed * dt;
+
+                const wrapMargin = m.radius * 2 + m.tailLength;
+                if (m.x < -wrapMargin) m.x = w + wrapMargin;
+                else if (m.x > w + wrapMargin) m.x = -wrapMargin;
+
+                if (m.y < -wrapMargin) m.y = h + wrapMargin;
+                else if (m.y > h + wrapMargin) m.y = -wrapMargin;
+            }
+        }
+
+        /**
+         * Renders floating meteors in the background layer with subtle cosmic wakes,
+         * 3D directional lighting, and surface craters.
+         */
+        function drawBackgroundMeteors() {
+            for (let i = 0; i < backgroundMeteors.length; i++) {
+                const m = backgroundMeteors[i];
+                const r = m.radius;
+
+                ctx.save();
+                ctx.globalAlpha = m.alpha;
+
+                // 1. Subtle cosmic dust wake trailing opposite the drift direction
+                const moveAngle = Math.atan2(m.vy, m.vx);
+                const tailEndX = m.x - Math.cos(moveAngle) * m.tailLength;
+                const tailEndY = m.y - Math.sin(moveAngle) * m.tailLength;
+                const perpX = -Math.sin(moveAngle) * (r * 0.55);
+                const perpY = Math.cos(moveAngle) * (r * 0.55);
+
+                const wakeGrad = ctx.createLinearGradient(m.x, m.y, tailEndX, tailEndY);
+                wakeGrad.addColorStop(0.0, m.palette.glow);
+                wakeGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+                ctx.fillStyle = wakeGrad;
+                ctx.beginPath();
+                ctx.moveTo(m.x + perpX, m.y + perpY);
+                ctx.lineTo(tailEndX, tailEndY);
+                ctx.lineTo(m.x - perpX, m.y - perpY);
+                ctx.closePath();
+                ctx.fill();
+
+                // 2. Rotating craggy meteor body
+                ctx.translate(m.x, m.y);
+                ctx.rotate(m.rotation);
+
+                ctx.beginPath();
+                for (let v = 0; v < m.vertices.length; v++) {
+                    const vert = m.vertices[v];
+                    const vx = Math.cos(vert.angle) * r * vert.scale;
+                    const vy = Math.sin(vert.angle) * r * vert.scale;
+                    if (v === 0) ctx.moveTo(vx, vy);
+                    else ctx.lineTo(vx, vy);
+                }
+                ctx.closePath();
+
+                // Directional 3D rocky shading
+                const rockGrad = ctx.createRadialGradient(-r * 0.32, -r * 0.32, r * 0.1, 0, 0, r * 1.15);
+                rockGrad.addColorStop(0.0, m.palette.light);
+                rockGrad.addColorStop(0.55, m.palette.mid);
+                rockGrad.addColorStop(1.0, m.palette.dark);
+                ctx.fillStyle = rockGrad;
+                ctx.fill();
+
+                // Clip craters cleanly inside the meteor silhouette
+                ctx.save();
+                ctx.clip();
+                for (let c = 0; c < m.craters.length; c++) {
+                    const crater = m.craters[c];
+                    ctx.fillStyle = 'rgba(10, 12, 18, 0.42)';
+                    ctx.beginPath();
+                    ctx.arc(crater.x, crater.y, crater.r, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Subtle lit crater rim
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+                    ctx.lineWidth = 0.7;
+                    ctx.beginPath();
+                    ctx.arc(crater.x, crater.y, crater.r, -0.3, Math.PI * 0.85);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // Faint starlight rim outline
+                ctx.strokeStyle = `rgba(210, 224, 245, ${(0.18 * m.depth).toFixed(3)})`;
+                ctx.lineWidth = 0.85;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
 
         /**
          * Builds the layered deep-space galaxy background onto an offscreen canvas
@@ -387,6 +570,16 @@
 
             // Regenerate cached galaxy and starfield for new dimensions
             generateGalaxyBackground();
+
+            // Initialize or adjust floating background meteors
+            if (backgroundMeteors.length === 0) {
+                initBackgroundMeteors();
+            } else {
+                for (const m of backgroundMeteors) {
+                    m.x = Math.min(canvas.width, Math.max(0, m.x));
+                    m.y = Math.min(canvas.height, Math.max(0, m.y));
+                }
+            }
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -1043,6 +1236,9 @@
             // Render galaxy & twinkling starfield background
             drawGalaxyBackground(timestamp);
 
+            // Render floating background meteors behind active simulation objects
+            drawBackgroundMeteors();
+
             // 1. Draw Central Mass Node
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
@@ -1084,6 +1280,7 @@
             const dt = Math.min(0.05, Math.max(0.001, (timestamp - lastTimestamp) / 1000));
             lastTimestamp = timestamp;
 
+            updateBackgroundMeteors(dt);
             updateAlienAndEffects(dt);
             updatePhysics();
             draw(timestamp);
