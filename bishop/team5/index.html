@@ -14,7 +14,7 @@
         }
 
         body {
-            background-color: #000000;
+            background-color: #04030a;
             color: #ffffff;
             display: flex;
             flex-direction: column;
@@ -101,7 +101,7 @@
         }
 
         canvas {
-            background-color: #000000;
+            background-color: #04030a;
             border: 1px solid #ffffff;
             display: block;
             cursor: crosshair;
@@ -159,6 +159,10 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
         const statusEl = document.getElementById('status-indicator');
+
+        // Offscreen canvas for pre-rendered spiral galaxy & nebula backdrop
+        const bgCanvas = document.createElement('canvas');
+        const bgCtx = bgCanvas.getContext('2d');
 
         // SIMULATION CONSTANTS (Tuned for stronger black hole gravity)
         const GRAVITY_CONSTANT = 2350;     // Strength of gravitational pull (G)
@@ -382,6 +386,14 @@
         let planetCycleIndex = 0;
         let lastEventMessage = '';
 
+        // GALAXY, ALIENS & SPACESHIPS STATE
+        let galaxyTime = 0;
+        let twinklingStars = [];
+        let shootingStars = [];
+        let spaceships = [];
+        let ufos = [];
+        let spaceAliens = [];
+
         // Central Black Hole Node Definition
         const blackHole = {
             x: 0,
@@ -389,6 +401,778 @@
             eventHorizonRadius: EVENT_HORIZON_RADIUS,
             suctionRadius: SUCTION_RADIUS
         };
+
+        /**
+         * Pre-renders the deep-space spiral galaxy, colorful nebulae, dust lanes, and starfield
+         */
+        function buildGalaxyBackground() {
+            const w = canvas.width;
+            const h = canvas.height;
+            bgCanvas.width = w;
+            bgCanvas.height = h;
+
+            if (w === 0 || h === 0) return;
+
+            // 1. Deep Cosmic Void Base
+            const baseGrad = bgCtx.createRadialGradient(w * 0.5, h * 0.5, 40, w * 0.5, h * 0.5, Math.max(w, h) * 0.85);
+            baseGrad.addColorStop(0, '#090618');
+            baseGrad.addColorStop(0.55, '#050410');
+            baseGrad.addColorStop(1, '#020106');
+            bgCtx.fillStyle = baseGrad;
+            bgCtx.fillRect(0, 0, w, h);
+
+            // 2. Large Sweeping Nebula Clouds (Violet, Magenta, Cyan, Royal Blue)
+            const nebulae = [
+                { x: w * 0.24, y: h * 0.30, rx: w * 0.38, ry: h * 0.26, rot: -0.35, c1: 'rgba(112, 42, 205, 0.22)', c2: 'rgba(55, 22, 130, 0.08)' },
+                { x: w * 0.76, y: h * 0.68, rx: w * 0.40, ry: h * 0.28, rot: -0.32, c1: 'rgba(195, 52, 148, 0.19)', c2: 'rgba(95, 24, 98, 0.07)' },
+                { x: w * 0.74, y: h * 0.24, rx: w * 0.30, ry: h * 0.22, rot: 0.40,  c1: 'rgba(26, 135, 205, 0.18)', c2: 'rgba(14, 65, 130, 0.06)' },
+                { x: w * 0.26, y: h * 0.74, rx: w * 0.32, ry: h * 0.22, rot: 0.25,  c1: 'rgba(42, 165, 175, 0.15)', c2: 'rgba(18, 72, 105, 0.05)' }
+            ];
+
+            for (const neb of nebulae) {
+                bgCtx.save();
+                bgCtx.translate(neb.x, neb.y);
+                bgCtx.rotate(neb.rot);
+                bgCtx.scale(1, neb.ry / neb.rx);
+                const grad = bgCtx.createRadialGradient(0, 0, neb.rx * 0.05, 0, 0, neb.rx);
+                grad.addColorStop(0, neb.c1);
+                grad.addColorStop(0.55, neb.c2);
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                bgCtx.fillStyle = grad;
+                bgCtx.beginPath();
+                bgCtx.arc(0, 0, neb.rx, 0, Math.PI * 2);
+                bgCtx.fill();
+                bgCtx.restore();
+            }
+
+            // 3. Tilted Spiral Galaxy Arms Sweeping Across the Canvas
+            bgCtx.save();
+            bgCtx.translate(w * 0.5, h * 0.5);
+            bgCtx.rotate(-0.34);
+            bgCtx.scale(1.18, 0.54);
+
+            const maxArmR = Math.max(w, h) * 0.68;
+            const armCount = 4;
+            const armColors = [
+                'rgba(168, 115, 255, ',
+                'rgba(235, 118, 198, ',
+                'rgba(105, 195, 255, ',
+                'rgba(255, 212, 148, '
+            ];
+
+            // Soft spiral arm gas glow
+            for (let arm = 0; arm < armCount; arm++) {
+                const baseAngle = (arm * Math.PI * 2) / armCount;
+                for (let step = 18; step < 95; step++) {
+                    const t = step / 95;
+                    const r = t * maxArmR;
+                    const theta = baseAngle + t * 3.6;
+                    const gx = Math.cos(theta) * r;
+                    const gy = Math.sin(theta) * r;
+                    const blobR = 26 + t * 44;
+                    const alpha = (1 - t * 0.72) * 0.045;
+
+                    const armGrad = bgCtx.createRadialGradient(gx, gy, 1, gx, gy, blobR);
+                    armGrad.addColorStop(0, `${armColors[arm]}${alpha.toFixed(3)})`);
+                    armGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    bgCtx.fillStyle = armGrad;
+                    bgCtx.beginPath();
+                    bgCtx.arc(gx, gy, blobR, 0, Math.PI * 2);
+                    bgCtx.fill();
+                }
+            }
+
+            // Thousands of fine stardust particles along the spiral arms
+            const starDustCount = 1350;
+            for (let i = 0; i < starDustCount; i++) {
+                const arm = i % armCount;
+                const baseAngle = (arm * Math.PI * 2) / armCount;
+                const t = Math.pow(Math.random(), 0.78);
+                const r = 38 + t * maxArmR;
+                const spread = (Math.random() - 0.5) * (0.28 + t * 0.48);
+                const theta = baseAngle + t * 3.6 + spread;
+
+                const sx = Math.cos(theta) * r + (Math.random() - 0.5) * 18;
+                const sy = Math.sin(theta) * r + (Math.random() - 0.5) * 18;
+                const size = Math.random() < 0.15 ? 1.5 : 0.95;
+                const alpha = (0.18 + Math.random() * 0.52) * (1 - t * 0.45);
+
+                bgCtx.fillStyle = `${armColors[arm]}${alpha.toFixed(2)})`;
+                bgCtx.beginPath();
+                bgCtx.arc(sx, sy, size, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+
+            bgCtx.restore();
+
+            // 4. Distant Mini Spiral Galaxies in the Corners
+            const miniGalaxies = [
+                { x: w * 0.13, y: h * 0.18, r: 24, angle: 0.55, hue: 'rgba(180, 155, 255, ' },
+                { x: w * 0.88, y: h * 0.22, r: 19, angle: -0.45, hue: 'rgba(255, 175, 215, ' },
+                { x: w * 0.85, y: h * 0.84, r: 26, angle: 0.30, hue: 'rgba(135, 215, 255, ' }
+            ];
+
+            for (const mg of miniGalaxies) {
+                bgCtx.save();
+                bgCtx.translate(mg.x, mg.y);
+                bgCtx.rotate(mg.angle);
+                bgCtx.scale(1, 0.42);
+                const coreGrad = bgCtx.createRadialGradient(0, 0, 1, 0, 0, mg.r);
+                coreGrad.addColorStop(0, 'rgba(255, 245, 225, 0.55)');
+                coreGrad.addColorStop(0.35, `${mg.hue}0.28)`);
+                coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                bgCtx.fillStyle = coreGrad;
+                bgCtx.beginPath();
+                bgCtx.arc(0, 0, mg.r, 0, Math.PI * 2);
+                bgCtx.fill();
+                bgCtx.restore();
+            }
+
+            // 5. Crisp Background Starfield
+            const starColors = ['#ffffff', '#dceeff', '#ffe9c4', '#f3d9ff', '#bfe8ff'];
+            const starCount = Math.floor((w * h) / 3600);
+            for (let i = 0; i < starCount; i++) {
+                const sx = Math.random() * w;
+                const sy = Math.random() * h;
+                const radius = Math.random() < 0.12 ? 1.45 : (Math.random() < 0.45 ? 0.95 : 0.65);
+                const alpha = 0.28 + Math.random() * 0.68;
+                bgCtx.fillStyle = starColors[i % starColors.length];
+                bgCtx.globalAlpha = alpha;
+                bgCtx.beginPath();
+                bgCtx.arc(sx, sy, radius, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+            bgCtx.globalAlpha = 1;
+        }
+
+        /**
+         * Initializes animated twinkling stars, spaceships, UFOs, and floating space aliens
+         */
+        function initCosmicEntities() {
+            const w = canvas.width || 1000;
+            const h = canvas.height || 650;
+
+            // Animated twinkling foreground stars
+            twinklingStars = [];
+            for (let i = 0; i < 42; i++) {
+                twinklingStars.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    size: 1.1 + Math.random() * 1.4,
+                    phase: Math.random() * Math.PI * 2,
+                    speed: 0.03 + Math.random() * 0.04,
+                    color: i % 3 === 0 ? '#bae6fd' : (i % 3 === 1 ? '#fef08a' : '#ffffff')
+                });
+            }
+
+            shootingStars = [];
+
+            // Cruising Spaceships (Starfighters, Cruisers, Retro Rockets)
+            spaceships = [
+                createSpaceship('interceptor', w * 0.15, h * 0.22, 1.35, 0.22, 0.95),
+                createSpaceship('cruiser', w * 0.82, h * 0.78, -0.95, -0.18, 0.88),
+                createSpaceship('rocket', w * 0.72, h * 0.16, -1.15, 0.34, 0.82),
+                createSpaceship('interceptor', w * 0.22, h * 0.82, 1.55, -0.28, 0.68)
+            ];
+
+            // Flying Saucers (UFOs) with Alien Pilots inside
+            ufos = [
+                {
+                    x: w * 0.20,
+                    y: h * 0.32,
+                    vx: 0.68,
+                    bobPhase: 0.4,
+                    bobSpeed: 0.035,
+                    scale: 0.95,
+                    alienColor: '#6ee777', // Classic lime-green alien
+                    lightHue: '#34d399',
+                    beamTimer: 40
+                },
+                {
+                    x: w * 0.78,
+                    y: h * 0.28,
+                    vx: -0.58,
+                    bobPhase: 2.3,
+                    bobSpeed: 0.03,
+                    scale: 0.85,
+                    alienColor: '#c084fc', // Cosmic lavender alien
+                    lightHue: '#e879f9',
+                    beamTimer: 160
+                },
+                {
+                    x: w * 0.76,
+                    y: h * 0.74,
+                    vx: -0.74,
+                    bobPhase: 4.1,
+                    bobSpeed: 0.038,
+                    scale: 0.9,
+                    alienColor: '#38bdf8', // Aquamarine alien
+                    lightHue: '#22d3ee',
+                    beamTimer: 270
+                }
+            ];
+
+            // Cute Free-Floating Space Aliens in Bubble Helmets
+            spaceAliens = [
+                {
+                    x: w * 0.14,
+                    y: h * 0.68,
+                    vx: 0.28,
+                    vy: -0.16,
+                    phase: 0.8,
+                    tilt: -0.15,
+                    spin: 0.008,
+                    scale: 0.92,
+                    bodyColor: '#5eead4',
+                    suitColor: '#f472b6'
+                },
+                {
+                    x: w * 0.86,
+                    y: h * 0.48,
+                    vx: -0.24,
+                    vy: 0.19,
+                    phase: 2.7,
+                    tilt: 0.2,
+                    spin: -0.007,
+                    scale: 0.85,
+                    bodyColor: '#86efac',
+                    suitColor: '#60a5fa'
+                }
+            ];
+        }
+
+        function createSpaceship(type, x, y, vx, vy, scale) {
+            return {
+                type,
+                x,
+                y,
+                vx,
+                vy,
+                scale,
+                trail: [],
+                pulsePhase: Math.random() * Math.PI * 2
+            };
+        }
+
+        /**
+         * Updates positions and animations of background stars, spaceships, UFOs, and aliens
+         */
+        function updateCosmicEntities() {
+            galaxyTime += 0.016;
+            const w = canvas.width;
+            const h = canvas.height;
+            const pad = 90;
+
+            // Occasional Shooting Star
+            if (Math.random() < 0.012 && shootingStars.length < 2) {
+                const fromLeft = Math.random() < 0.5;
+                shootingStars.push({
+                    x: fromLeft ? Math.random() * w * 0.6 : w * (0.4 + Math.random() * 0.6),
+                    y: Math.random() * h * 0.45,
+                    vx: (fromLeft ? 1 : -1) * (6.5 + Math.random() * 4.5),
+                    vy: 2.8 + Math.random() * 2.5,
+                    life: 1.0,
+                    decay: 0.025 + Math.random() * 0.015
+                });
+            }
+
+            for (let i = shootingStars.length - 1; i >= 0; i--) {
+                const s = shootingStars[i];
+                s.x += s.vx;
+                s.y += s.vy;
+                s.life -= s.decay;
+                if (s.life <= 0) {
+                    shootingStars.splice(i, 1);
+                }
+            }
+
+            // Update Spaceships
+            for (const ship of spaceships) {
+                ship.pulsePhase += 0.12;
+                ship.x += ship.vx;
+                ship.y += ship.vy + Math.sin(galaxyTime * 1.4 + ship.pulsePhase * 0.1) * 0.12;
+
+                ship.trail.push({ x: ship.x, y: ship.y });
+                if (ship.trail.length > 26) {
+                    ship.trail.shift();
+                }
+
+                // Wrap smoothly across screen borders
+                let wrapped = false;
+                if (ship.x > w + pad) { ship.x = -pad; wrapped = true; }
+                else if (ship.x < -pad) { ship.x = w + pad; wrapped = true; }
+                if (ship.y > h + pad) { ship.y = -pad; wrapped = true; }
+                else if (ship.y < -pad) { ship.y = h + pad; wrapped = true; }
+
+                if (wrapped) {
+                    ship.trail = [];
+                    ship.y = h * (0.12 + Math.random() * 0.76);
+                }
+            }
+
+            // Update Alien UFOs
+            for (const ufo of ufos) {
+                ufo.bobPhase += ufo.bobSpeed;
+                ufo.beamTimer = (ufo.beamTimer + 1) % 340;
+                ufo.x += ufo.vx;
+                ufo.y += Math.sin(ufo.bobPhase) * 0.42;
+
+                if (ufo.x > w + pad) {
+                    ufo.x = -pad;
+                    ufo.y = h * (0.15 + Math.random() * 0.7);
+                } else if (ufo.x < -pad) {
+                    ufo.x = w + pad;
+                    ufo.y = h * (0.15 + Math.random() * 0.7);
+                }
+            }
+
+            // Update Free-Floating Space Aliens
+            for (const alien of spaceAliens) {
+                alien.phase += 0.03;
+                alien.tilt = Math.sin(alien.phase * 0.7) * 0.24;
+                alien.x += alien.vx + Math.cos(alien.phase * 0.5) * 0.12;
+                alien.y += alien.vy + Math.sin(alien.phase) * 0.22;
+
+                if (alien.x > w + 60) alien.x = -60;
+                else if (alien.x < -60) alien.x = w + 60;
+                if (alien.y > h + 60) alien.y = -60;
+                else if (alien.y < -60) alien.y = h + 60;
+            }
+        }
+
+        /**
+         * Draws a cruising sci-fi spaceship with engine exhaust and navigation lights
+         */
+        function drawSpaceship(ship) {
+            const angle = Math.atan2(ship.vy, ship.vx);
+
+            // Engine exhaust contrail
+            if (ship.trail.length > 2) {
+                for (let i = 1; i < ship.trail.length; i++) {
+                    const ratio = i / ship.trail.length;
+                    ctx.beginPath();
+                    ctx.moveTo(ship.trail[i - 1].x, ship.trail[i - 1].y);
+                    ctx.lineTo(ship.trail[i].x, ship.trail[i].y);
+                    ctx.strokeStyle = ship.type === 'rocket'
+                        ? `rgba(255, 165, 75, ${(ratio * 0.35).toFixed(3)})`
+                        : `rgba(85, 215, 255, ${(ratio * 0.35).toFixed(3)})`;
+                    ctx.lineWidth = ratio * 3.2 * ship.scale;
+                    ctx.stroke();
+                }
+            }
+
+            ctx.save();
+            ctx.translate(ship.x, ship.y);
+            ctx.rotate(angle);
+            ctx.scale(ship.scale, ship.scale);
+
+            const flicker = 0.8 + Math.sin(ship.pulsePhase * 2.5) * 0.25;
+
+            if (ship.type === 'interceptor') {
+                // Twin cyan ion thruster flames
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.85)';
+                ctx.beginPath();
+                ctx.moveTo(-13, -4);
+                ctx.lineTo(-24 * flicker, -2.5);
+                ctx.lineTo(-13, -1);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(-13, 1);
+                ctx.lineTo(-24 * flicker, 2.5);
+                ctx.lineTo(-13, 4);
+                ctx.fill();
+
+                // Swept delta wings
+                ctx.fillStyle = '#64748b';
+                ctx.beginPath();
+                ctx.moveTo(8, 0);
+                ctx.lineTo(-12, -13);
+                ctx.lineTo(-9, 0);
+                ctx.lineTo(-12, 13);
+                ctx.closePath();
+                ctx.fill();
+
+                // Sleek metallic fuselage
+                const hullGrad = ctx.createLinearGradient(-14, 0, 18, 0);
+                hullGrad.addColorStop(0, '#94a3b8');
+                hullGrad.addColorStop(0.6, '#e2e8f0');
+                hullGrad.addColorStop(1, '#38bdf8');
+                ctx.fillStyle = hullGrad;
+                ctx.beginPath();
+                ctx.moveTo(19, 0);
+                ctx.lineTo(-8, -5.5);
+                ctx.lineTo(-14, -3.5);
+                ctx.lineTo(-14, 3.5);
+                ctx.lineTo(-8, 5.5);
+                ctx.closePath();
+                ctx.fill();
+
+                // Glowing cockpit canopy
+                ctx.fillStyle = '#22d3ee';
+                ctx.beginPath();
+                ctx.ellipse(3, 0, 5.5, 2.3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Wingtip strobe lights
+                ctx.fillStyle = Math.sin(ship.pulsePhase) > 0 ? '#f43f5e' : '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(-11, -12, 1.3, 0, Math.PI * 2);
+                ctx.arc(-11, 12, 1.3, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else if (ship.type === 'cruiser') {
+                // Warm amber plasma engine glow
+                const thrustGrad = ctx.createRadialGradient(-18, 0, 1, -22, 0, 13 * flicker);
+                thrustGrad.addColorStop(0, 'rgba(255, 240, 180, 0.95)');
+                thrustGrad.addColorStop(0.5, 'rgba(251, 146, 60, 0.65)');
+                thrustGrad.addColorStop(1, 'rgba(251, 146, 60, 0)');
+                ctx.fillStyle = thrustGrad;
+                ctx.beginPath();
+                ctx.arc(-21, 0, 13 * flicker, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Engine nacelles
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(-17, -9, 12, 3.5);
+                ctx.fillRect(-17, 5.5, 12, 3.5);
+
+                // Heavy starship hull
+                ctx.fillStyle = '#cbd5e1';
+                ctx.beginPath();
+                ctx.moveTo(22, 0);
+                ctx.lineTo(10, -7);
+                ctx.lineTo(-15, -6.5);
+                ctx.lineTo(-18, 0);
+                ctx.lineTo(-15, 6.5);
+                ctx.lineTo(10, 7);
+                ctx.closePath();
+                ctx.fill();
+
+                // Hull accent stripe & illuminated deck windows
+                ctx.fillStyle = '#6366f1';
+                ctx.fillRect(-10, -2, 22, 4);
+
+                ctx.fillStyle = '#fef08a';
+                for (let wx = -6; wx <= 8; wx += 4.5) {
+                    ctx.fillRect(wx, -1, 2.2, 2);
+                }
+
+            } else {
+                // Retro-futuristic rocket with porthole
+                ctx.fillStyle = 'rgba(251, 146, 60, 0.9)';
+                ctx.beginPath();
+                ctx.moveTo(-13, -3.5);
+                ctx.lineTo(-24 * flicker, 0);
+                ctx.lineTo(-13, 3.5);
+                ctx.closePath();
+                ctx.fill();
+
+                // Red tail fins
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(-7, -4);
+                ctx.lineTo(-15, -10);
+                ctx.lineTo(-13, -3);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(-7, 4);
+                ctx.lineTo(-15, 10);
+                ctx.lineTo(-13, 3);
+                ctx.closePath();
+                ctx.fill();
+
+                // Silver rocket body
+                ctx.fillStyle = '#f1f5f9';
+                ctx.beginPath();
+                ctx.ellipse(2, 0, 15, 5.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Crimson nose cone
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(18, 0);
+                ctx.lineTo(10, -4.3);
+                ctx.lineTo(10, 4.3);
+                ctx.closePath();
+                ctx.fill();
+
+                // Porthole window
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(2, 0, 2.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#64748b';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        /**
+         * Draws a flying saucer (UFO) with spinning neon rim lights, alien pilot, and occasional tractor beam
+         */
+        function drawUFO(ufo) {
+            ctx.save();
+            ctx.translate(ufo.x, ufo.y);
+            ctx.scale(ufo.scale, ufo.scale);
+            ctx.rotate(Math.sin(ufo.bobPhase) * 0.08);
+
+            // 1. Optional Pulsing Tractor Beam
+            if (ufo.beamTimer < 110) {
+                const beamAlpha = Math.sin((ufo.beamTimer / 110) * Math.PI) * 0.22;
+                const beamGrad = ctx.createLinearGradient(0, 6, 0, 56);
+                beamGrad.addColorStop(0, `rgba(110, 231, 183, ${beamAlpha.toFixed(3)})`);
+                beamGrad.addColorStop(1, 'rgba(110, 231, 183, 0)');
+
+                ctx.fillStyle = beamGrad;
+                ctx.beginPath();
+                ctx.moveTo(-8, 6);
+                ctx.lineTo(8, 6);
+                ctx.lineTo(24, 56);
+                ctx.lineTo(-24, 56);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 2. Alien Pilot Inside the Cockpit Dome
+            // Alien shoulders/torso
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.ellipse(0, -3.5, 5.5, 3.2, 0, Math.PI, Math.PI * 2);
+            ctx.fill();
+
+            // Alien head
+            ctx.fillStyle = ufo.alienColor;
+            ctx.beginPath();
+            ctx.ellipse(0, -8.5, 4.3, 5.0, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Little antennae
+            ctx.strokeStyle = ufo.alienColor;
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(-2, -12.5);
+            ctx.lineTo(-3.5, -15.5);
+            ctx.moveTo(2, -12.5);
+            ctx.lineTo(3.5, -15.5);
+            ctx.stroke();
+
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(-3.5, -15.8, 1.1, 0, Math.PI * 2);
+            ctx.arc(3.5, -15.8, 1.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Big glossy alien eyes
+            ctx.fillStyle = '#090d16';
+            ctx.beginPath();
+            ctx.ellipse(-1.7, -8.5, 1.3, 1.9, -0.25, 0, Math.PI * 2);
+            ctx.ellipse(1.7, -8.5, 1.3, 1.9, 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-2.0, -9.1, 0.45, 0, Math.PI * 2);
+            ctx.arc(1.4, -9.1, 0.45, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Translucent Glass Cockpit Dome
+            const domeGrad = ctx.createRadialGradient(-3, -12, 1, 0, -6, 13);
+            domeGrad.addColorStop(0, 'rgba(224, 242, 254, 0.52)');
+            domeGrad.addColorStop(0.7, 'rgba(125, 211, 252, 0.24)');
+            domeGrad.addColorStop(1, 'rgba(56, 189, 248, 0.38)');
+            ctx.fillStyle = domeGrad;
+            ctx.beginPath();
+            ctx.arc(0, -4, 11.5, Math.PI, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(186, 230, 253, 0.65)';
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+
+            // 4. Metallic Saucer Hull
+            const saucerGrad = ctx.createLinearGradient(-22, -4, 22, 6);
+            saucerGrad.addColorStop(0, '#64748b');
+            saucerGrad.addColorStop(0.5, '#e2e8f0');
+            saucerGrad.addColorStop(1, '#475569');
+
+            ctx.fillStyle = saucerGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 22, 6.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Lower emitter pod
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.ellipse(0, 4.5, 9, 2.6, 0, 0, Math.PI);
+            ctx.fill();
+
+            // 5. Animated Rotating Rim Lights
+            const lightCount = 5;
+            for (let i = 0; i < lightCount; i++) {
+                const lx = -14 + (i * 28) / (lightCount - 1);
+                const pulse = Math.sin(galaxyTime * 7 + i * 1.3);
+                ctx.fillStyle = pulse > 0 ? ufo.lightHue : '#fef08a';
+                ctx.beginPath();
+                ctx.arc(lx, 0.6, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        /**
+         * Draws a cute zero-gravity space alien floating in a clear bubble helmet
+         */
+        function drawSpaceAlien(alien) {
+            ctx.save();
+            ctx.translate(alien.x, alien.y);
+            ctx.rotate(alien.tilt);
+            ctx.scale(alien.scale, alien.scale);
+
+            // Jetpack puff
+            const puffAlpha = 0.25 + Math.sin(alien.phase * 4) * 0.15;
+            ctx.fillStyle = `rgba(186, 230, 253, ${puffAlpha.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(-8, 6, 3.5, 0, Math.PI * 2);
+            ctx.arc(-11, 9, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mini jetpack
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(-7.5, -1, 4, 8);
+
+            // Space suit torso & waving arms
+            ctx.fillStyle = alien.suitColor;
+            ctx.beginPath();
+            ctx.roundRect(-4.5, 0, 9, 9.5, 3);
+            ctx.fill();
+
+            // Waving arm
+            const waveAngle = Math.sin(alien.phase * 3.2) * 0.45 - 0.6;
+            ctx.save();
+            ctx.translate(4.5, 2);
+            ctx.rotate(waveAngle);
+            ctx.strokeStyle = alien.suitColor;
+            ctx.lineWidth = 2.4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(5.5, -3);
+            ctx.stroke();
+            ctx.fillStyle = alien.bodyColor;
+            ctx.beginPath();
+            ctx.arc(6, -3.3, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Little legs
+            ctx.strokeStyle = alien.suitColor;
+            ctx.lineWidth = 2.4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-2, 9.5);
+            ctx.lineTo(-3, 14);
+            ctx.moveTo(2, 9.5);
+            ctx.lineTo(3, 14);
+            ctx.stroke();
+
+            // Alien head
+            ctx.fillStyle = alien.bodyColor;
+            ctx.beginPath();
+            ctx.ellipse(0, -5.5, 4.8, 5.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Antenna
+            ctx.strokeStyle = alien.bodyColor;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(0, -10.5);
+            ctx.lineTo(0, -13.5);
+            ctx.stroke();
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(0, -14, 1.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Big cute eyes
+            ctx.fillStyle = '#090d16';
+            ctx.beginPath();
+            ctx.ellipse(-1.9, -5.5, 1.3, 1.8, -0.2, 0, Math.PI * 2);
+            ctx.ellipse(1.9, -5.5, 1.3, 1.8, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-2.2, -6.1, 0.45, 0, Math.PI * 2);
+            ctx.arc(1.6, -6.1, 0.45, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Transparent glass bubble space helmet
+            const helmetGrad = ctx.createRadialGradient(-2.5, -8.5, 1, 0, -6, 9);
+            helmetGrad.addColorStop(0, 'rgba(255, 255, 255, 0.42)');
+            helmetGrad.addColorStop(0.75, 'rgba(186, 230, 253, 0.14)');
+            helmetGrad.addColorStop(1, 'rgba(125, 211, 252, 0.45)');
+            ctx.fillStyle = helmetGrad;
+            ctx.beginPath();
+            ctx.arc(0, -6, 8.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(224, 242, 254, 0.72)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        /**
+         * Renders the pre-baked galaxy canvas plus dynamic twinkling stars, shooting stars, spaceships, and aliens
+         */
+        function drawGalaxyBackground() {
+            ctx.drawImage(bgCanvas, 0, 0);
+
+            // Twinkling foreground stars
+            for (const star of twinklingStars) {
+                const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(galaxyTime * 60 * star.speed + star.phase));
+                ctx.fillStyle = star.color;
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            // Shooting stars
+            for (const s of shootingStars) {
+                const grad = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * 6, s.y - s.vy * 6);
+                grad.addColorStop(0, `rgba(255, 255, 255, ${s.life.toFixed(2)})`);
+                grad.addColorStop(1, 'rgba(125, 211, 252, 0)');
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 1.6;
+                ctx.beginPath();
+                ctx.moveTo(s.x, s.y);
+                ctx.lineTo(s.x - s.vx * 6, s.y - s.vy * 6);
+                ctx.stroke();
+            }
+
+            // Cruising spaceships
+            for (const ship of spaceships) {
+                drawSpaceship(ship);
+            }
+
+            // Alien UFOs
+            for (const ufo of ufos) {
+                drawUFO(ufo);
+            }
+
+            // Floating space aliens
+            for (const alien of spaceAliens) {
+                drawSpaceAlien(alien);
+            }
+        }
 
         /**
          * Selects the next distinct planet type, prioritizing planets not currently active on screen
@@ -449,7 +1233,7 @@
         }
 
         /**
-         * Dynamically resizes the canvas to fit its fluid container and centers the black hole
+         * Dynamically resizes the canvas to fit its fluid container, rebuilds the galaxy backdrop, and centers the black hole
          */
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -458,10 +1242,13 @@
             
             blackHole.x = canvas.width / 2;
             blackHole.y = canvas.height / 2;
+
+            buildGalaxyBackground();
         }
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+        initCosmicEntities();
         initAccretionParticles();
 
         // Canvas Click Handler: Launch a new distinct planet at click position
@@ -1028,11 +1815,11 @@
         }
 
         /**
-         * Renders the accretion disk, suction zone, planet trails, black hole singularity, and planets
+         * Renders the galaxy background, aliens, spaceships, accretion disk, suction zone, planet trails, black hole singularity, and planets
          */
         function draw() {
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // 0. Draw Galaxy, Nebulae, Starfield, Spaceships, and Aliens
+            drawGalaxyBackground();
 
             const cx = blackHole.x;
             const cy = blackHole.y;
@@ -1156,6 +1943,7 @@
         function animate() {
             updatePhysics();
             updateBlackHoleEffects();
+            updateCosmicEntities();
             draw();
             requestAnimationFrame(animate);
         }
