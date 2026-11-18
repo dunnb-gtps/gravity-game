@@ -135,8 +135,20 @@
         const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
         const MAX_BALLS = 50;              // Maximum simultaneous balls on screen
 
+        // Natural sky rainbow spectrum in ROYGBIV order
+        const RAINBOW_COLORS = [
+            '#FF0000', // Red
+            '#FF7F00', // Orange
+            '#FFFF00', // Yellow
+            '#00E640', // Green
+            '#1E90FF', // Blue
+            '#5D3FD3', // Indigo
+            '#BF00FF'  // Violet
+        ];
+
         // STATE VARIABLES
         let balls = [];
+        let rainbowIndex = 0;
 
         // Central Gravity Node Definition (radius matches duck visual size)
         const centralNode = {
@@ -182,6 +194,10 @@
                 balls.shift();
             }
 
+            // Pick the next color in the ROYGBIV rainbow sequence
+            const color = RAINBOW_COLORS[rainbowIndex];
+            rainbowIndex = (rainbowIndex + 1) % RAINBOW_COLORS.length;
+
             // Append new ball so multiple balls can be thrown and orbited at once
             balls.push({
                 x: x,
@@ -189,6 +205,7 @@
                 vx: vx,
                 vy: vy,
                 radius: 4,
+                color: color,
                 trail: [] // Stores history of past {x, y} coordinates
             });
 
@@ -197,6 +214,7 @@
 
         function resetSimulation() {
             balls = [];
+            rainbowIndex = 0;
             updateBallCounter();
         }
 
@@ -327,7 +345,7 @@
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#ffffff';
+                    ctx.strokeStyle = b.color;
                     ctx.lineWidth = 1.2;
                     ctx.stroke();
                 }
@@ -335,7 +353,7 @@
                 // Draw ball object
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = b.color;
                 ctx.fill();
             }
         }
