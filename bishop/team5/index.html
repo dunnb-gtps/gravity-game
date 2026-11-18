@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Simulation - Black Hole</title>
+    <title>Gravity Simulation - Earth & Black Hole</title>
     <style>
         * {
             box-sizing: border-box;
@@ -152,7 +152,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball. Avoid the black hole's event horizon!
+        Click anywhere on the canvas to launch Earth. Avoid the black hole's event horizon!
     </div>
 
     <script>
@@ -161,16 +161,81 @@
         const statusEl = document.getElementById('status-indicator');
 
         // SIMULATION CONSTANTS (Tuned for stronger black hole gravity)
-        const GRAVITY_CONSTANT = 2350;     // Increased strength of gravitational pull (G)
+        const GRAVITY_CONSTANT = 2350;     // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;          // Number of historic trail points stored
         const SOFTENING_FACTOR = 180;      // Lowered softening for steeper pull near singularity
 
+        // EARTH CONSTANTS
+        const EARTH_RADIUS = 10;           // Radius of Earth in pixels
+        const EARTH_AXIAL_TILT = -0.36;    // ~23.5° axial tilt in radians
+
+        // Stylized spherical continent polygons (lon, lat in radians)
+        const EARTH_CONTINENTS = [
+            // North America
+            {
+                centerLon: -1.75,
+                color: '#3ca35a',
+                points: [
+                    [-2.35, -0.95], [-1.75, -1.05], [-1.20, -0.82],
+                    [-1.30, -0.45], [-1.58, -0.20], [-1.85, -0.25],
+                    [-2.12, -0.58]
+                ]
+            },
+            // South America
+            {
+                centerLon: -1.05,
+                color: '#46b566',
+                points: [
+                    [-1.32, -0.05], [-0.88, 0.08], [-0.72, 0.42],
+                    [-0.95, 0.88], [-1.18, 0.95], [-1.25, 0.42]
+                ]
+            },
+            // Europe & Africa
+            {
+                centerLon: 0.35,
+                color: '#43ad60',
+                points: [
+                    [-0.08, -0.88], [0.48, -0.92], [0.72, -0.60],
+                    [0.45, -0.42], [0.78, -0.18], [0.75, 0.32],
+                    [0.42, 0.72], [0.18, 0.65], [0.12, 0.18],
+                    [-0.18, -0.05], [-0.15, -0.45]
+                ]
+            },
+            // Asia
+            {
+                centerLon: 1.55,
+                color: '#389c54',
+                points: [
+                    [0.78, -0.88], [1.65, -0.95], [2.35, -0.75],
+                    [2.20, -0.28], [1.75, -0.08], [1.32, -0.12],
+                    [0.95, -0.35]
+                ]
+            },
+            // Australia
+            {
+                centerLon: 2.25,
+                color: '#57b863',
+                points: [
+                    [1.95, 0.25], [2.48, 0.22], [2.55, 0.55],
+                    [2.05, 0.60]
+                ]
+            }
+        ];
+
+        // Stylized drifting cloud bands (lon, lat in radians)
+        const EARTH_CLOUDS = [
+            { centerLon: -1.4, points: [[-1.9, -0.65], [-1.1, -0.70], [-0.95, -0.52], [-1.75, -0.48]] },
+            { centerLon: -0.4, points: [[-0.85, 0.15], [-0.10, 0.10], [0.05, 0.26], [-0.75, 0.30]] },
+            { centerLon: 0.9,  points: [[0.45, -0.30], [1.35, -0.36], [1.45, -0.18], [0.55, -0.14]] },
+            { centerLon: 2.1,  points: [[1.65, 0.42], [2.45, 0.36], [2.52, 0.52], [1.72, 0.56]] }
+        ];
+
         // BLACK HOLE CONSTANTS
         const EVENT_HORIZON_RADIUS = 16;   // Radius of the pitch-black singularity core
         const SUCTION_RADIUS = 56;         // Outer radius of the accretion suction danger zone
-        const CAPTURE_DURATION = 18;       // Frames over which a captured ball spirals into nothing
+        const CAPTURE_DURATION = 18;       // Frames over which a captured Earth spirals into nothing
         const ACCRETION_PARTICLE_COUNT = 34;
 
         // STATE VARIABLES
@@ -244,32 +309,34 @@
         resizeCanvas();
         initAccretionParticles();
 
-        // Canvas Click Handler: Directly launch ball at click position
+        // Canvas Click Handler: Directly launch Earth at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchBall(clickX, clickY);
+            launchEarth(clickX, clickY);
         });
 
         /**
-         * Launches a single gravity ball at the specified coordinates
+         * Launches Earth at the specified coordinates
          */
-        function launchBall(x, y) {
+        function launchEarth(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
+            // Overwrite existing array to strictly maintain a single Earth on screen
             balls = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4,
-                initialRadius: 4,
+                radius: EARTH_RADIUS,
+                initialRadius: EARTH_RADIUS,
+                rotation: 0.4,
+                cloudRotation: 0.8,
                 trail: [],
                 captured: false,
                 captureFrame: 0,
@@ -283,7 +350,7 @@
         }
 
         /**
-         * Clears active balls and resets simulation state
+         * Clears active Earth and resets simulation state
          */
         function resetSimulation() {
             balls = [];
@@ -296,7 +363,7 @@
          * Updates ambient black hole rotation, accretion particles, and gravitational ripples
          */
         function updateBlackHoleEffects() {
-            // Rotate accretion disk rings (slightly faster when a ball is inside the suction zone)
+            // Rotate accretion disk rings (slightly faster when Earth is inside the suction zone)
             diskRotation += inSuctionZone ? 0.032 : 0.016;
 
             // Update swirling accretion particles
@@ -323,7 +390,7 @@
         }
 
         /**
-         * Updates ball trajectory, suction zone pull, and event horizon capture spiral
+         * Updates Earth's trajectory, axial spin, suction zone pull, and event horizon capture spiral
          */
         function updatePhysics() {
             inSuctionZone = false;
@@ -343,6 +410,8 @@
                     b.x = blackHole.x + Math.cos(b.captureAngle) * currentDist;
                     b.y = blackHole.y + Math.sin(b.captureAngle) * currentDist;
                     b.radius = Math.max(0, b.initialRadius * (1 - t));
+                    b.rotation += 0.18;
+                    b.cloudRotation += 0.22;
 
                     // Record spiral trail points into the singularity
                     b.trail.push({ x: b.x, y: b.y });
@@ -350,7 +419,7 @@
                         b.trail.shift();
                     }
 
-                    // Remove ball once fully collapsed into the singularity
+                    // Remove Earth once fully collapsed into the singularity
                     if (b.captureFrame >= CAPTURE_DURATION) {
                         spawnRipple(EVENT_HORIZON_RADIUS, 72, 1.2);
                         balls.splice(i, 1);
@@ -359,7 +428,7 @@
                     continue;
                 }
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove Earth if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
                 if (b.x < -margin || b.x > canvas.width + margin || 
                     b.y < -margin || b.y > canvas.height + margin) {
@@ -368,7 +437,7 @@
                     continue;
                 }
 
-                // Distance vector from ball to black hole center
+                // Distance vector from Earth to black hole center
                 const dx = blackHole.x - b.x;
                 const dy = blackHole.y - b.y;
                 const distSq = dx * dx + dy * dy;
@@ -406,6 +475,10 @@
                     // Smooth intensity factor from 0 at outer edge (56) to ~0.71 near event horizon (16)
                     const suctionFactor = 1 - (dist / blackHole.suctionRadius);
 
+                    // Spin faster as tidal forces intensify inside the suction zone
+                    b.rotation += 0.024 + 0.05 * suctionFactor;
+                    b.cloudRotation += 0.032 + 0.06 * suctionFactor;
+
                     // Extra inward radial suction pull
                     acceleration += 0.16 * suctionFactor + 0.48 * (suctionFactor * suctionFactor);
 
@@ -418,6 +491,8 @@
                     b.vx -= tx * tangentialDrag;
                     b.vy -= ty * tangentialDrag;
                 } else {
+                    b.rotation += 0.024;
+                    b.cloudRotation += 0.032;
                     setStatus('Orbiting', 'active');
                 }
 
@@ -436,7 +511,126 @@
         }
 
         /**
-         * Renders the accretion disk, suction zone, ball trail, and black hole singularity
+         * Wraps an angle in radians to the range [-PI, PI]
+         */
+        function wrapLongitude(angle) {
+            return ((((angle + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) - Math.PI;
+        }
+
+        /**
+         * Projects a spherical polygon onto the front hemisphere of Earth
+         */
+        function drawSphericalPolygon(points, centerLon, rotation, r, fillStyle) {
+            const relCenter = wrapLongitude(centerLon + rotation);
+            if (Math.cos(relCenter) <= -0.25) return;
+
+            ctx.beginPath();
+            for (let i = 0; i < points.length; i++) {
+                const [lon, lat] = points[i];
+                let relLon = wrapLongitude(lon + rotation);
+
+                // Clamp vertices slightly past the horizon to the limb edge so the sphere clips cleanly
+                if (relLon > Math.PI / 2) relLon = Math.PI / 2;
+                if (relLon < -Math.PI / 2) relLon = -Math.PI / 2;
+
+                const px = r * Math.cos(lat) * Math.sin(relLon);
+                const py = r * Math.sin(lat);
+
+                if (i === 0) {
+                    ctx.moveTo(px, py);
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            }
+            ctx.closePath();
+            ctx.fillStyle = fillStyle;
+            ctx.fill();
+        }
+
+        /**
+         * Renders Earth with oceans, rotating continents, polar ice caps, clouds, and atmospheric glow
+         */
+        function drawEarth(b) {
+            const r = b.radius;
+            if (r <= 0.1) return;
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+
+            // 1. Soft Outer Atmospheric Glow
+            const atmoGrad = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r * 1.35);
+            atmoGrad.addColorStop(0, 'rgba(90, 175, 255, 0.45)');
+            atmoGrad.addColorStop(0.55, 'rgba(56, 142, 235, 0.18)');
+            atmoGrad.addColorStop(1, 'rgba(56, 142, 235, 0)');
+
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 1.35, 0, Math.PI * 2);
+            ctx.fillStyle = atmoGrad;
+            ctx.fill();
+
+            // 2. Clip to Planetary Sphere and Apply Axial Tilt
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.clip();
+
+            ctx.rotate(EARTH_AXIAL_TILT);
+
+            // 3. Ocean Sphere Base Gradient
+            const oceanGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+            oceanGrad.addColorStop(0, '#38a3eb');
+            oceanGrad.addColorStop(0.55, '#196ec2');
+            oceanGrad.addColorStop(1, '#092c5c');
+
+            ctx.fillStyle = oceanGrad;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+
+            // 4. Rotating Continents
+            for (const continent of EARTH_CONTINENTS) {
+                drawSphericalPolygon(continent.points, continent.centerLon, b.rotation, r, continent.color);
+            }
+
+            // 5. Polar Ice Caps (North & South)
+            ctx.fillStyle = 'rgba(240, 248, 255, 0.9)';
+            ctx.beginPath();
+            ctx.ellipse(0, -r * 0.92, r * 0.45, r * 0.16, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.ellipse(0, r * 0.93, r * 0.42, r * 0.15, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 6. Drifting Cloud Layer
+            for (const cloud of EARTH_CLOUDS) {
+                drawSphericalPolygon(cloud.points, cloud.centerLon, b.cloudRotation, r, 'rgba(255, 255, 255, 0.42)');
+            }
+
+            // Unrotate tilt before applying camera-relative 3D shading
+            ctx.rotate(-EARTH_AXIAL_TILT);
+
+            // 7. 3D Spherical Shadow Terminator & Atmospheric Limb Highlight
+            const shadowGrad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.25, 0, 0, r);
+            shadowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+            shadowGrad.addColorStop(0.65, 'rgba(0, 10, 28, 0.15)');
+            shadowGrad.addColorStop(1, 'rgba(0, 5, 18, 0.72)');
+
+            ctx.fillStyle = shadowGrad;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+
+            ctx.restore(); // End sphere clip
+
+            // 8. Crisp Blue Atmospheric Rim Border
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(130, 205, 255, 0.7)';
+            ctx.lineWidth = Math.max(0.5, r * 0.08);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        /**
+         * Renders the accretion disk, suction zone, Earth trail, and black hole singularity
          */
         function draw() {
             // Clear canvas background
@@ -517,7 +711,7 @@
                 ctx.fill();
             }
 
-            // 5. Draw Ball Motion Trail (drawn underneath singularity core so trails vanish into the void)
+            // 5. Draw Earth Motion Trail (drawn underneath singularity core so trails vanish into the void)
             for (const b of balls) {
                 if (b.trail.length > 1) {
                     ctx.beginPath();
@@ -525,7 +719,7 @@
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#ffffff';
+                    ctx.strokeStyle = 'rgba(180, 224, 255, 0.85)';
                     ctx.lineWidth = 1.2;
                     ctx.stroke();
                 }
@@ -533,7 +727,6 @@
 
             // 6. Draw Pitch-Black Singularity Core & Bright Glowing Photon Ring
             ctx.save();
-            // Subtle outer corona gradient around the photon ring
             const coronaGrad = ctx.createRadialGradient(
                 cx, cy, EVENT_HORIZON_RADIUS - 1,
                 cx, cy, EVENT_HORIZON_RADIUS + 14
@@ -561,14 +754,9 @@
             ctx.stroke();
             ctx.restore();
 
-            // 7. Draw Active Gravity Ball (including during its spiral collapse into the singularity)
+            // 7. Draw Active Earth (including during its spiral collapse into the singularity)
             for (const b of balls) {
-                if (b.radius > 0.05) {
-                    ctx.beginPath();
-                    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fill();
-                }
+                drawEarth(b);
             }
         }
 
