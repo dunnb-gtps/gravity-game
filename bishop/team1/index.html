@@ -115,7 +115,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere in the winter sky to launch a Christmas ornament into orbit.
+        Click anywhere in the winter sky to launch a Christmas elf into orbit.
     </div>
 
     <script>
@@ -129,16 +129,16 @@
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
-        // FESTIVE PALETTE FOR ORNAMENTS & FAIRY LIGHTS
-        const ORNAMENT_THEMES = [
-            { main: '#e63946', highlight: '#ff8fa3', trail: 'rgba(230, 57, 70, 0.7)' },   // Holly Red
-            { main: '#2ec4b6', highlight: '#cbf3f0', trail: 'rgba(46, 196, 182, 0.7)' },  // Frosted Pine
-            { main: '#ffd166', highlight: '#fff3b0', trail: 'rgba(255, 209, 102, 0.75)' } // Warm Gold
+        // FESTIVE PALETTE FOR ELVES & FAIRY LIGHTS
+        const ELF_THEMES = [
+            { main: '#2ec4b6', hat: '#2d6a4f', tunic: '#2d6a4f', trim: '#e63946', boots: '#c1121f', trail: 'rgba(46, 196, 182, 0.7)' },  // Classic Evergreen Elf
+            { main: '#e63946', hat: '#c1121f', tunic: '#c1121f', trim: '#ffd166', boots: '#2d6a4f', trail: 'rgba(230, 57, 70, 0.7)' },   // Holly Red Elf
+            { main: '#ffd166', hat: '#1b9aaa', tunic: '#2d6a4f', trim: '#ffd166', boots: '#e63946', trail: 'rgba(255, 209, 102, 0.75)' } // North Pole Frosted Elf
         ];
         const FAIRY_LIGHT_COLORS = ['#ff3b30', '#ffd166', '#34c759', '#5ac8fa', '#ffffff'];
 
         // STATE VARIABLES
-        let balls = [];
+        let elves = [];
         let stars = [];
         let snowflakes = [];
         let festiveObjects = [];
@@ -271,13 +271,13 @@
         resizeCanvas();
         initBackground();
 
-        // Canvas Click Handler: Launch festive ornament at click position
+        // Canvas Click Handler: Launch festive Christmas elf at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchBall(clickX, clickY);
+            launchElf(clickX, clickY);
         });
 
         function spawnSparkles(x, y, color, count = 14) {
@@ -297,31 +297,31 @@
             }
         }
 
-        function launchBall(x, y) {
+        function launchElf(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            const theme = ORNAMENT_THEMES[launchCount % ORNAMENT_THEMES.length];
+            const theme = ELF_THEMES[launchCount % ELF_THEMES.length];
             launchCount++;
 
             spawnSparkles(x, y, theme.main, 10);
 
-            // Overwrite existing array to strictly maintain a single ornament on screen
-            balls = [{
+            // Overwrite existing array to strictly maintain a single elf on screen
+            elves = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4.5,
+                radius: 6,
                 theme: theme,
                 trail: [] // Stores history of past {x, y} coordinates
             }];
         }
 
         function resetSimulation() {
-            balls = [];
+            elves = [];
             sparkles = [];
         }
 
@@ -390,27 +390,27 @@
         }
 
         function updatePhysics() {
-            for (let i = balls.length - 1; i >= 0; i--) {
-                const b = balls[i];
+            for (let i = elves.length - 1; i >= 0; i--) {
+                const elf = elves[i];
 
-                // Remove ornament if it travels too far off-screen
+                // Remove elf if it travels too far off-screen
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin ||
-                    b.y < -margin || b.y > canvas.height + margin) {
-                    balls.splice(i, 1);
+                if (elf.x < -margin || elf.x > canvas.width + margin ||
+                    elf.y < -margin || elf.y > canvas.height + margin) {
+                    elves.splice(i, 1);
                     continue;
                 }
 
                 // Distance vector to central gravity node
-                const dx = centralNode.x - b.x;
-                const dy = centralNode.y - b.y;
+                const dx = centralNode.x - elf.x;
+                const dy = centralNode.y - elf.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ornament collides with central star-ornament
-                if (dist < centralNode.radius + b.radius) {
-                    spawnSparkles(b.x, b.y, b.theme.main, 18);
-                    balls.splice(i, 1);
+                // Absorption check: elf reaches central star-ornament
+                if (dist < centralNode.radius + elf.radius) {
+                    spawnSparkles(elf.x, elf.y, elf.theme.main, 18);
+                    elves.splice(i, 1);
                     continue;
                 }
 
@@ -422,15 +422,15 @@
                 const ay = acceleration * (dy / dist);
 
                 // Update velocity and position
-                b.vx += ax;
-                b.vy += ay;
-                b.x += b.vx;
-                b.y += b.vy;
+                elf.vx += ax;
+                elf.vy += ay;
+                elf.x += elf.vx;
+                elf.y += elf.vy;
 
                 // Record position history for fairy-light trail
-                b.trail.push({ x: b.x, y: b.y });
-                if (b.trail.length > TRAIL_LENGTH) {
-                    b.trail.shift();
+                elf.trail.push({ x: elf.x, y: elf.y });
+                if (elf.trail.length > TRAIL_LENGTH) {
+                    elf.trail.shift();
                 }
             }
         }
@@ -841,6 +841,152 @@
             ctx.fill();
         }
 
+        function drawChristmasElf(elf) {
+            const tilt = Math.max(-0.35, Math.min(0.35, elf.vx * 0.05));
+            const kick = Math.sin(frameCount * 0.25) * 1.4;
+            const tipSway = Math.sin(frameCount * 0.15) * 1.5;
+
+            ctx.save();
+            ctx.translate(elf.x, elf.y);
+            ctx.rotate(tilt);
+
+            // Soft festive aura around the flying elf
+            const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 14);
+            glow.addColorStop(0, 'rgba(255, 243, 176, 0.28)');
+            glow.addColorStop(1, 'rgba(255, 243, 176, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(0, 0, 14, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Little striped elf legs
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 2.1;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-2.2, 5.5);
+            ctx.lineTo(-2.6, 9 + kick);
+            ctx.moveTo(2.2, 5.5);
+            ctx.lineTo(2.6, 9 - kick);
+            ctx.stroke();
+
+            // Curled pointy elf boots with tiny gold toe bells
+            ctx.fillStyle = elf.theme.boots;
+            ctx.beginPath();
+            ctx.ellipse(-3.6, 9.5 + kick, 2.5, 1.4, -0.25, 0, Math.PI * 2);
+            ctx.ellipse(3.6, 9.5 - kick, 2.5, 1.4, 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffd166';
+            ctx.beginPath();
+            ctx.arc(-5.6, 9.0 + kick, 0.9, 0, Math.PI * 2);
+            ctx.arc(5.6, 9.0 - kick, 0.9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Festive elf tunic
+            ctx.fillStyle = elf.theme.tunic;
+            ctx.beginPath();
+            ctx.moveTo(-3.6, 0.5);
+            ctx.lineTo(3.6, 0.5);
+            ctx.lineTo(5.0, 6.2);
+            ctx.lineTo(-5.0, 6.2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+
+            // Jagged festive collar
+            ctx.fillStyle = elf.theme.trim;
+            ctx.beginPath();
+            ctx.moveTo(-3.8, 0.5);
+            ctx.lineTo(-2.0, 2.5);
+            ctx.lineTo(0, 1.1);
+            ctx.lineTo(2.0, 2.5);
+            ctx.lineTo(3.8, 0.5);
+            ctx.closePath();
+            ctx.fill();
+
+            // Tiny black belt & golden buckle
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(-4.5, 3.6, 9.0, 1.4);
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(-1.4, 3.3, 2.8, 2.0);
+
+            // Pointed elf ears
+            ctx.fillStyle = '#ffcdb2';
+            ctx.beginPath();
+            ctx.moveTo(-4.2, -4.5);
+            ctx.lineTo(-8.4, -6.2);
+            ctx.lineTo(-4.4, -2.0);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(4.2, -4.5);
+            ctx.lineTo(8.4, -6.2);
+            ctx.lineTo(4.4, -2.0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Elf head
+            ctx.beginPath();
+            ctx.arc(0, -3.5, 4.7, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffcdb2';
+            ctx.fill();
+            ctx.strokeStyle = '#e5989b';
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+
+            // Rosy cheeks
+            ctx.fillStyle = 'rgba(230, 57, 70, 0.45)';
+            ctx.beginPath();
+            ctx.arc(-2.6, -2.3, 1.1, 0, Math.PI * 2);
+            ctx.arc(2.6, -2.3, 1.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cheerful eyes
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.arc(-1.6, -3.7, 0.85, 0, Math.PI * 2);
+            ctx.arc(1.6, -3.7, 0.85, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Happy little smile
+            ctx.strokeStyle = '#7f1d1d';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.arc(0, -2.5, 1.5, 0.15 * Math.PI, 0.85 * Math.PI);
+            ctx.stroke();
+
+            // Tall pointy elf hat
+            ctx.fillStyle = elf.theme.hat;
+            ctx.beginPath();
+            ctx.moveTo(-5.2, -6.4);
+            ctx.quadraticCurveTo(-1.5, -12.5, 3.6 + tipSway, -16.5);
+            ctx.quadraticCurveTo(3.5, -11.0, 5.2, -6.4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+
+            // Hat brim trim
+            ctx.fillStyle = elf.theme.trim;
+            ctx.beginPath();
+            ctx.roundRect(-5.5, -7.4, 11.0, 2.2, 1.1);
+            ctx.fill();
+
+            // Golden jingle bell at tip of the elf's hat
+            ctx.fillStyle = '#ffd166';
+            ctx.beginPath();
+            ctx.arc(3.6 + tipSway, -16.5, 1.9, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
         function draw() {
             // Clear canvas with deep winter forest gradient
             const bgGrad = ctx.createRadialGradient(
@@ -862,24 +1008,24 @@
             // 1. Draw Central Gravity Ornament Node
             drawCentralOrnament();
 
-            // 2. Draw Launched Ornament & Glowing Fairy-Light Trail
-            for (const b of balls) {
+            // 2. Draw Launched Christmas Elf & Glowing Fairy-Light Trail
+            for (const elf of elves) {
                 // Draw smooth golden-tinted ribbon trail
-                if (b.trail.length > 1) {
+                if (elf.trail.length > 1) {
                     ctx.beginPath();
-                    ctx.moveTo(b.trail[0].x, b.trail[0].y);
-                    for (let t = 1; t < b.trail.length; t++) {
-                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                    ctx.moveTo(elf.trail[0].x, elf.trail[0].y);
+                    for (let t = 1; t < elf.trail.length; t++) {
+                        ctx.lineTo(elf.trail[t].x, elf.trail[t].y);
                     }
-                    ctx.strokeStyle = b.theme.trail;
+                    ctx.strokeStyle = elf.theme.trail;
                     ctx.lineWidth = 1.4;
                     ctx.stroke();
 
                     // Draw twinkling Christmas fairy-light bulbs along the orbit path
-                    for (let t = 6; t < b.trail.length; t += 14) {
-                        const pt = b.trail[t];
+                    for (let t = 6; t < elf.trail.length; t += 14) {
+                        const pt = elf.trail[t];
                         const bulbColor = FAIRY_LIGHT_COLORS[(t / 14 | 0) % FAIRY_LIGHT_COLORS.length];
-                        const fade = t / b.trail.length;
+                        const fade = t / elf.trail.length;
                         ctx.save();
                         ctx.globalAlpha = 0.35 + fade * 0.65;
                         ctx.beginPath();
@@ -890,24 +1036,8 @@
                     }
                 }
 
-                // Draw golden ornament cap on the launched ball
-                ctx.fillStyle = '#ffd166';
-                ctx.fillRect(b.x - 1.8, b.y - b.radius - 1.8, 3.6, 2);
-
-                // Draw launched Christmas ornament sphere
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = b.theme.main;
-                ctx.fill();
-                ctx.strokeStyle = '#ffd166';
-                ctx.lineWidth = 0.9;
-                ctx.stroke();
-
-                // Glossy ornament highlight
-                ctx.beginPath();
-                ctx.arc(b.x - 1.4, b.y - 1.4, 1.3, 0, Math.PI * 2);
-                ctx.fillStyle = b.theme.highlight;
-                ctx.fill();
+                // Draw the orbiting Christmas elf
+                drawChristmasElf(elf);
             }
 
             // 3. Draw Festive Sparkle Bursts
