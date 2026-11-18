@@ -118,6 +118,7 @@
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
         const EARTH_RADIUS = 9;           // Visual and collision radius of planet Earth
+        const ASTRONAUT_HEIGHT_CM = 8;    // Physical target height of background astronaut (8 cm)
 
         // STATE VARIABLES
         let bodies = [];
@@ -130,8 +131,36 @@
             phase: 0
         };
 
+        // Background Floating Astronaut State
+        const astronaut = {
+            x: 0,
+            y: 0,
+            vx: 0.24,
+            vy: 0.12,
+            heightPx: 302.36, // Calibrated dynamically to exact 8 cm in CSS pixels
+            phase: 0,
+            initialized: false
+        };
+
         /**
-         * Resizes the canvas to match its responsive container and centers the Sun.
+         * Measures exact CSS pixels corresponding to a physical centimeter value.
+         */
+        function getCentimetersInPixels(cm) {
+            const probe = document.createElement('div');
+            probe.style.position = 'absolute';
+            probe.style.visibility = 'hidden';
+            probe.style.height = cm + 'cm';
+            probe.style.width = '0';
+            probe.style.pointerEvents = 'none';
+            document.body.appendChild(probe);
+            const measuredPx = probe.getBoundingClientRect().height;
+            document.body.removeChild(probe);
+            return measuredPx > 0 ? measuredPx : (cm * 96) / 2.54;
+        }
+
+        /**
+         * Resizes the canvas to match its responsive container, centers the Sun,
+         * and calibrates the 8 cm background astronaut dimensions.
          */
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
@@ -141,6 +170,20 @@
             // Recenter Sun dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            // Calibrate exact 8 cm height in screen pixels
+            astronaut.heightPx = getCentimetersInPixels(ASTRONAUT_HEIGHT_CM);
+
+            if (!astronaut.initialized) {
+                astronaut.x = canvas.width * 0.25;
+                astronaut.y = canvas.height * 0.5;
+                astronaut.initialized = true;
+            } else {
+                const padX = astronaut.heightPx * 0.35;
+                const padY = astronaut.heightPx * 0.52;
+                astronaut.x = Math.max(padX, Math.min(canvas.width - padX, astronaut.x));
+                astronaut.y = Math.max(padY, Math.min(canvas.height - padY, astronaut.y));
+            }
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -184,12 +227,36 @@
         }
 
         /**
-         * Updates solar animation, orbital kinematics, inverse-square gravitational
-         * acceleration, collision absorption, boundary cleanup, and Earth's axial spin.
+         * Updates background astronaut zero-gravity drift, solar animation,
+         * orbital kinematics, gravity acceleration, and Earth's axial spin.
          */
         function updatePhysics() {
             // Advance solar corona & surface animation phase
             centralNode.phase += 0.03;
+
+            // Update background astronaut zero-gravity drift
+            astronaut.phase += 0.018;
+            astronaut.x += astronaut.vx;
+            astronaut.y += astronaut.vy;
+
+            const marginX = Math.min(canvas.width * 0.22, astronaut.heightPx * 0.36);
+            const marginY = Math.min(canvas.height * 0.45, astronaut.heightPx * 0.52);
+
+            if (astronaut.x < marginX) {
+                astronaut.x = marginX;
+                astronaut.vx = Math.abs(astronaut.vx);
+            } else if (astronaut.x > canvas.width - marginX) {
+                astronaut.x = canvas.width - marginX;
+                astronaut.vx = -Math.abs(astronaut.vx);
+            }
+
+            if (astronaut.y < marginY) {
+                astronaut.y = marginY;
+                astronaut.vy = Math.abs(astronaut.vy);
+            } else if (astronaut.y > canvas.height - marginY) {
+                astronaut.y = canvas.height - marginY;
+                astronaut.vy = -Math.abs(astronaut.vy);
+            }
 
             for (let i = bodies.length - 1; i >= 0; i--) {
                 const earth = bodies[i];
@@ -236,6 +303,323 @@
                     earth.trail.shift();
                 }
             }
+        }
+
+        /**
+         * Helper to draw a rounded rectangle in normalized astronaut space.
+         */
+        function drawRoundedRect(x, y, w, h, r) {
+            const radius = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + w - radius, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+            ctx.lineTo(x + w, y + h - radius);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+            ctx.lineTo(x + radius, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        /**
+         * Helper to draw an articulated spacesuit limb segment with rounded caps,
+         * 3D shading, and joint ring accents.
+         */
+        function drawSuitLimb(x1, y1, x2, y2, thickness, baseColor, shadowColor) {
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const nx = -Math.sin(angle) * (thickness * 0.5);
+            const ny = Math.cos(angle) * (thickness * 0.5);
+
+            const grad = ctx.createLinearGradient(x1 - nx, y1 - ny, x1 + nx, y1 + ny);
+            grad.addColorStop(0, baseColor);
+            grad.addColorStop(0.65, '#cfd8dc');
+            grad.addColorStop(1, shadowColor);
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Subtle dark outline for clean separation
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = 'rgba(38, 50, 56, 0.35)';
+            ctx.lineWidth = thickness + 0.006;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Re-stroke core highlight pass so outline stays on outer edge
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = thickness - 0.003;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        /**
+         * Renders the 8 cm floating EVA astronaut in the background with zero-gravity
+         * motion, articulated spacesuit details, undulating tether, and sun-lit visor.
+         */
+        function drawAstronaut() {
+            const h = astronaut.heightPx;
+            const t = astronaut.phase;
+            const bobY = Math.sin(t) * 6;
+            const bobX = Math.cos(t * 0.7) * 4;
+            const tilt = Math.sin(t * 0.85) * 0.13 - 0.06;
+            const armSway = Math.sin(t * 1.25) * 0.025;
+            const legSway = Math.cos(t * 1.1) * 0.02;
+
+            // Direction from astronaut toward the central Sun for subtle rim lighting
+            const toSunX = centralNode.x - (astronaut.x + bobX);
+            const toSunY = centralNode.y - (astronaut.y + bobY);
+            const sunDist = Math.hypot(toSunX, toSunY) || 1;
+            const sunDirX = toSunX / sunDist;
+            const sunDirY = toSunY / sunDist;
+
+            ctx.save();
+            // Position and scale so local [-0.5, +0.5] vertical span equals exact 8 cm
+            ctx.translate(astronaut.x + bobX, astronaut.y + bobY);
+            ctx.rotate(tilt);
+            ctx.scale(h, h);
+
+            // Subtle background depth opacity so Sun, Earth, and trails stand out clearly
+            ctx.globalAlpha = 0.62;
+
+            // 1. Undulating Zero-Gravity Safety Tether trailing from waist
+            ctx.beginPath();
+            ctx.moveTo(-0.08, 0.04);
+            ctx.bezierCurveTo(
+                -0.24, 0.10 + Math.sin(t * 1.6) * 0.04,
+                -0.32, -0.06 + Math.cos(t * 1.4) * 0.05,
+                -0.44, 0.02 + Math.sin(t * 1.9) * 0.06
+            );
+            ctx.strokeStyle = 'rgba(176, 190, 197, 0.55)';
+            ctx.lineWidth = 0.007;
+            ctx.stroke();
+
+            // 2. Back Arm (Left Arm behind torso)
+            const backElbowX = -0.15 - armSway * 0.6;
+            const backElbowY = -0.05 + armSway * 0.5;
+            const backHandX = -0.09 - armSway * 0.4;
+            const backHandY = 0.05 + armSway;
+            drawSuitLimb(-0.04, -0.16, backElbowX, backElbowY, 0.068, '#cfd8dc', '#607d8b');
+            drawSuitLimb(backElbowX, backElbowY, backHandX, backHandY, 0.060, '#b0bec5', '#546e7a');
+            // Back Glove
+            ctx.beginPath();
+            ctx.arc(backHandX, backHandY, 0.032, 0, Math.PI * 2);
+            ctx.fillStyle = '#90a4ae';
+            ctx.fill();
+
+            // 3. Back Leg (Left Leg)
+            const backKneeX = -0.11 - legSway;
+            const backKneeY = 0.24;
+            const backAnkleX = -0.17 - legSway * 1.3;
+            const backAnkleY = 0.41;
+            drawSuitLimb(-0.03, 0.05, backKneeX, backKneeY, 0.086, '#cfd8dc', '#607d8b');
+            drawSuitLimb(backKneeX, backKneeY, backAnkleX, backAnkleY, 0.074, '#b0bec5', '#546e7a');
+            // Back Boot
+            ctx.save();
+            ctx.translate(backAnkleX, backAnkleY);
+            ctx.rotate(0.18);
+            drawRoundedRect(-0.038, -0.01, 0.095, 0.052, 0.018);
+            ctx.fillStyle = '#78909c';
+            ctx.fill();
+            ctx.fillStyle = '#37474f';
+            ctx.fillRect(-0.036, 0.032, 0.091, 0.012);
+            ctx.restore();
+
+            // 4. PLSS Life-Support Backpack
+            const packGrad = ctx.createLinearGradient(-0.17, -0.22, -0.03, 0.06);
+            packGrad.addColorStop(0, '#eceff1');
+            packGrad.addColorStop(0.5, '#b0bec5');
+            packGrad.addColorStop(1, '#546e7a');
+            drawRoundedRect(-0.165, -0.23, 0.135, 0.285, 0.028);
+            ctx.fillStyle = packGrad;
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(38, 50, 56, 0.45)';
+            ctx.lineWidth = 0.005;
+            ctx.stroke();
+
+            // Backpack Panel Seams & Status Indicator LEDs
+            ctx.strokeStyle = 'rgba(55, 71, 79, 0.4)';
+            ctx.lineWidth = 0.004;
+            ctx.beginPath();
+            ctx.moveTo(-0.16, -0.11);
+            ctx.lineTo(-0.04, -0.11);
+            ctx.moveTo(-0.16, -0.01);
+            ctx.lineTo(-0.04, -0.01);
+            ctx.stroke();
+
+            // Pulsing Telemetry LED on backpack
+            const ledAlpha = 0.55 + 0.45 * Math.sin(t * 3.2);
+            ctx.beginPath();
+            ctx.arc(-0.135, -0.19, 0.008, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(105, 240, 174, ${ledAlpha})`;
+            ctx.fill();
+
+            // 5. Front Leg (Right Leg - bottom sole reaches exact +0.50)
+            const frontKneeX = 0.11 + legSway;
+            const frontKneeY = 0.24;
+            const frontAnkleX = 0.06 + legSway * 0.8;
+            const frontAnkleY = 0.445;
+            drawSuitLimb(0.03, 0.05, frontKneeX, frontKneeY, 0.090, '#ffffff', '#78909c');
+            drawSuitLimb(frontKneeX, frontKneeY, frontAnkleX, frontAnkleY, 0.078, '#eceff1', '#607d8b');
+
+            // Knee Joint Ribbing
+            ctx.strokeStyle = 'rgba(69, 90, 100, 0.45)';
+            ctx.lineWidth = 0.004;
+            ctx.beginPath();
+            ctx.arc(frontKneeX, frontKneeY, 0.036, -0.6, 0.9);
+            ctx.stroke();
+
+            // Front Boot (lowest point sits at y = +0.50)
+            ctx.save();
+            ctx.translate(frontAnkleX, frontAnkleY);
+            drawRoundedRect(-0.04, -0.01, 0.105, 0.065, 0.02);
+            ctx.fillStyle = '#cfd8dc';
+            ctx.fill();
+            // Dark rubber boot sole ending at y = +0.50
+            ctx.fillStyle = '#37474f';
+            ctx.fillRect(-0.038, 0.041, 0.101, 0.014);
+            ctx.restore();
+
+            // 6. Torso (Hard Upper Torso & Pressurized Waist)
+            const torsoGrad = ctx.createLinearGradient(-0.09, -0.20, 0.12, 0.06);
+            torsoGrad.addColorStop(0, '#ffffff');
+            torsoGrad.addColorStop(0.55, '#e0e6e9');
+            torsoGrad.addColorStop(1, '#78909c');
+            drawRoundedRect(-0.095, -0.215, 0.205, 0.285, 0.065);
+            ctx.fillStyle = torsoGrad;
+            ctx.fill();
+
+            // Subtle warm solar rim highlight along Sun-facing edge of torso
+            if (sunDirX > 0) {
+                ctx.strokeStyle = `rgba(255, 224, 130, ${0.35 * sunDirX})`;
+                ctx.lineWidth = 0.007;
+                ctx.stroke();
+            }
+
+            // Waist Bearing Ring
+            ctx.fillStyle = '#90a4ae';
+            drawRoundedRect(-0.092, 0.02, 0.198, 0.024, 0.01);
+            ctx.fill();
+
+            // Chest Display & Control Module (DCM)
+            drawRoundedRect(0.03, -0.16, 0.092, 0.115, 0.015);
+            ctx.fillStyle = '#eceff1';
+            ctx.fill();
+            ctx.strokeStyle = '#607d8b';
+            ctx.lineWidth = 0.004;
+            ctx.stroke();
+
+            // DCM Switches & Color Stripes
+            ctx.fillStyle = '#1e88e5';
+            ctx.fillRect(0.045, -0.142, 0.028, 0.014);
+            ctx.fillStyle = '#e53935';
+            ctx.fillRect(0.080, -0.142, 0.028, 0.014);
+            ctx.fillStyle = '#455a64';
+            ctx.fillRect(0.045, -0.115, 0.063, 0.012);
+            ctx.fillRect(0.045, -0.092, 0.042, 0.012);
+
+            // 7. Helmet & Gold-Tinted Reflective Visor (top edge sits at exact -0.50)
+            const helmetCX = 0.005;
+            const helmetCY = -0.36;
+            const helmetR = 0.14;
+
+            // Neck Ring Collar
+            drawRoundedRect(-0.09, -0.238, 0.19, 0.032, 0.014);
+            ctx.fillStyle = '#90a4ae';
+            ctx.fill();
+
+            // Helmet Shell
+            const helmetGrad = ctx.createRadialGradient(
+                helmetCX - 0.04, helmetCY - 0.04, 0.02,
+                helmetCX, helmetCY, helmetR
+            );
+            helmetGrad.addColorStop(0, '#ffffff');
+            helmetGrad.addColorStop(0.68, '#eceff1');
+            helmetGrad.addColorStop(1, '#78909c');
+
+            ctx.beginPath();
+            ctx.arc(helmetCX, helmetCY, helmetR, 0, Math.PI * 2);
+            ctx.fillStyle = helmetGrad;
+            ctx.fill();
+
+            // Gold-Tinted EVA Visor
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(helmetCX, helmetCY, helmetR * 0.94, 0, Math.PI * 2);
+            ctx.clip();
+
+            const visorCX = helmetCX + 0.038;
+            const visorCY = helmetCY + 0.004;
+            const visorGrad = ctx.createRadialGradient(
+                visorCX + 0.02, visorCY - 0.03, 0.01,
+                visorCX, visorCY, 0.115
+            );
+            visorGrad.addColorStop(0, '#ffe082');
+            visorGrad.addColorStop(0.32, '#ffb300');
+            visorGrad.addColorStop(0.72, '#e65100');
+            visorGrad.addColorStop(1, '#263238');
+
+            ctx.beginPath();
+            ctx.ellipse(visorCX, visorCY, 0.105, 0.108, -0.08, 0, Math.PI * 2);
+            ctx.fillStyle = visorGrad;
+            ctx.fill();
+
+            // Visor Specular Highlight & Subtle Reflected Sun Glint
+            ctx.beginPath();
+            ctx.ellipse(visorCX - 0.015, visorCY - 0.042, 0.048, 0.018, -0.35, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(visorCX + sunDirX * 0.035, visorCY + sunDirY * 0.035, 0.014, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 249, 196, 0.55)';
+            ctx.fill();
+
+            ctx.restore();
+
+            // Side Helmet Headset / Light Pod
+            drawRoundedRect(-0.045, -0.385, 0.042, 0.052, 0.012);
+            ctx.fillStyle = '#b0bec5';
+            ctx.fill();
+
+            // 8. Front Arm (Right Arm reaching gently outward in zero-G)
+            const frontElbowX = 0.165 + armSway * 0.5;
+            const frontElbowY = -0.095 - armSway * 0.4;
+            const frontHandX = 0.235 + armSway;
+            const frontHandY = -0.195 - armSway * 0.8;
+            drawSuitLimb(0.04, -0.16, frontElbowX, frontElbowY, 0.072, '#ffffff', '#78909c');
+            drawSuitLimb(frontElbowX, frontElbowY, frontHandX, frontHandY, 0.062, '#eceff1', '#607d8b');
+
+            // Mission Patch on Upper Arm
+            ctx.beginPath();
+            ctx.arc(0.095, -0.132, 0.016, 0, Math.PI * 2);
+            ctx.fillStyle = '#1565c0';
+            ctx.fill();
+            ctx.strokeStyle = '#ffd54f';
+            ctx.lineWidth = 0.003;
+            ctx.stroke();
+
+            // Front Glove
+            ctx.beginPath();
+            ctx.arc(frontHandX, frontHandY, 0.033, 0, Math.PI * 2);
+            ctx.fillStyle = '#cfd8dc';
+            ctx.fill();
+            ctx.strokeStyle = '#546e7a';
+            ctx.lineWidth = 0.004;
+            ctx.stroke();
+
+            ctx.restore();
         }
 
         /**
@@ -512,17 +896,20 @@
         }
 
         /**
-         * Renders the central Sun, orbital motion trail, and planet Earth.
+         * Renders the background 8 cm astronaut, central Sun, orbital motion trail, and planet Earth.
          */
         function draw() {
             // Clear canvas background
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Central Sun
+            // 1. Draw Background 8 cm Floating Astronaut
+            drawAstronaut();
+
+            // 2. Draw Central Sun
             drawSun();
 
-            // 2. Draw Orbital Trail & Planet Earth
+            // 3. Draw Orbital Trail & Planet Earth
             for (const earth of bodies) {
                 // Draw path line
                 if (earth.trail.length > 1) {
@@ -551,6 +938,7 @@
         }
 
         window.onload = function() {
+            resizeCanvas();
             animate();
         };
     </script>
