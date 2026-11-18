@@ -237,7 +237,7 @@
 
     <!-- Usage Guidance -->
     <div class="instructions">
-        Adjust the speed bar above, pick a pastel ball color (or Cycle), and click anywhere on the canvas to launch balls.
+        Adjust the speed bar above, pick a pastel ball color (or Cycle), and click anywhere on the canvas to orbit the dancing pup.
     </div>
 
     <script>
@@ -266,11 +266,11 @@
         let colorMode = 'cycle'; // 'cycle' or palette index (0, 1, 2)
         let colorIndex = 0;
 
-        // Central Gravity Node Definition
+        // Central Gravity Node Definition (Sized to match the dancing pastel pink dog)
         const centralNode = {
             x: 0,
             y: 0,
-            radius: 12
+            radius: 25
         };
 
         /**
@@ -369,7 +369,7 @@
 
         /**
          * Advances projectile kinematics using softened inverse-square gravity
-         * and removes projectiles that collide with the central mass or leave bounds.
+         * and removes projectiles that collide with the central dog or leave bounds.
          */
         function updatePhysics() {
             for (let i = balls.length - 1; i >= 0; i--) {
@@ -389,7 +389,7 @@
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
+                // Absorption check: ball collides with central dancing dog
                 if (dist < centralNode.radius + b.radius) {
                     balls.splice(i, 1);
                     continue;
@@ -417,10 +417,221 @@
         }
 
         /**
-         * Renders the pastel gradient backdrop, central gravity node,
+         * Renders the dancing pastel pink puppy at the center of the gravity field.
+         */
+        function drawDancingDog(x, y, timestamp) {
+            const t = timestamp * 0.0055;
+            const beat = Math.abs(Math.sin(t * 2));      // Rhythmic two-step bounce
+            const sway = Math.sin(t * 2);                // Side-to-side hip & body groove
+            const bounceY = -beat * 6;
+            const squashX = 1 + (0.5 - beat) * 0.14;
+            const squashY = 1 - (0.5 - beat) * 0.14;
+            const bodyTilt = sway * 0.15;
+
+            const furMain = '#ffadc6';     // Pastel pink coat
+            const furAccent = '#ff85ab';   // Deeper pastel pink ears, paws, tail
+            const furCream = '#fff0f5';    // Soft blush cream belly & muzzle
+            const ink = '#1e293b';         // Crisp slate outline matching UI
+
+            // Ground shadow that scales inversely with hop height
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(x, y + 25, 16 - beat * 3.5, 4.5 - beat * 1, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(30, 41, 59, 0.18)';
+            ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(x + sway * 3, y + bounceY);
+            ctx.rotate(bodyTilt);
+            ctx.scale(squashX, squashY);
+
+            // 1. Wagging Tail
+            const tailWag = Math.sin(t * 9) * 0.65;
+            ctx.save();
+            ctx.translate(10, 9);
+            ctx.rotate(tailWag);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(12, -8, 10, -15);
+            ctx.quadraticCurveTo(4, -14, 0, -4);
+            ctx.closePath();
+            ctx.fillStyle = furAccent;
+            ctx.fill();
+            ctx.lineWidth = 1.6;
+            ctx.strokeStyle = ink;
+            ctx.stroke();
+            ctx.restore();
+
+            // 2. Back Dancing Feet (alternating tippy-taps)
+            const leftFootLift = Math.max(0, Math.sin(t * 4)) * -4;
+            const rightFootLift = Math.max(0, -Math.sin(t * 4)) * -4;
+
+            ctx.fillStyle = furAccent;
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = 1.6;
+
+            // Left foot
+            ctx.beginPath();
+            ctx.ellipse(-7, 18 + leftFootLift, 5, 3.5, -0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Right foot
+            ctx.beginPath();
+            ctx.ellipse(7, 18 + rightFootLift, 5, 3.5, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Torso
+            ctx.beginPath();
+            ctx.ellipse(0, 6, 12.5, 13.5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = furMain;
+            ctx.fill();
+            ctx.lineWidth = 1.8;
+            ctx.strokeStyle = ink;
+            ctx.stroke();
+
+            // Cream Belly Patch
+            ctx.beginPath();
+            ctx.ellipse(0, 8, 7.5, 9, 0, 0, Math.PI * 2);
+            ctx.fillStyle = furCream;
+            ctx.fill();
+
+            // 4. Head Group (tilts & bounces with floppy ears)
+            ctx.save();
+            ctx.translate(0, -11);
+            ctx.rotate(Math.sin(t * 2 + 0.5) * 0.14);
+
+            // Floppy Left Ear
+            const leftEarFlap = Math.sin(t * 4 - 0.4) * 0.32 + beat * 0.25;
+            ctx.save();
+            ctx.translate(-12, -5);
+            ctx.rotate(leftEarFlap);
+            ctx.beginPath();
+            ctx.ellipse(-3, 8, 5, 10, 0.25, 0, Math.PI * 2);
+            ctx.fillStyle = furAccent;
+            ctx.fill();
+            ctx.lineWidth = 1.6;
+            ctx.strokeStyle = ink;
+            ctx.stroke();
+            ctx.restore();
+
+            // Floppy Right Ear
+            const rightEarFlap = -Math.sin(t * 4 - 0.4) * 0.32 - beat * 0.25;
+            ctx.save();
+            ctx.translate(12, -5);
+            ctx.rotate(rightEarFlap);
+            ctx.beginPath();
+            ctx.ellipse(3, 8, 5, 10, -0.25, 0, Math.PI * 2);
+            ctx.fillStyle = furAccent;
+            ctx.fill();
+            ctx.lineWidth = 1.6;
+            ctx.strokeStyle = ink;
+            ctx.stroke();
+            ctx.restore();
+
+            // Puppy Head Base
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 14.5, 12.5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = furMain;
+            ctx.fill();
+            ctx.lineWidth = 1.8;
+            ctx.strokeStyle = ink;
+            ctx.stroke();
+
+            // Muzzle Patch
+            ctx.beginPath();
+            ctx.ellipse(0, 4, 7.5, 5.5, 0, 0, Math.PI * 2);
+            ctx.fillStyle = furCream;
+            ctx.fill();
+
+            // Rosy Cheeks
+            ctx.fillStyle = 'rgba(255, 107, 157, 0.55)';
+            ctx.beginPath();
+            ctx.arc(-8.5, 3, 2.6, 0, Math.PI * 2);
+            ctx.arc(8.5, 3, 2.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Happy Dancing Eyes (^ ^)
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = 1.8;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(-5.5, -1.5, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(5.5, -1.5, 2.4, Math.PI * 1.1, Math.PI * 1.9);
+            ctx.stroke();
+
+            // Little Pink Tongue
+            const tongueBob = Math.max(0, Math.sin(t * 4)) * 1.4;
+            ctx.beginPath();
+            ctx.arc(0, 6.2 + tongueBob * 0.4, 2.3, 0, Math.PI);
+            ctx.fillStyle = '#ff6b9d';
+            ctx.fill();
+            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = ink;
+            ctx.stroke();
+
+            // Cute Muzzle Smile & Button Nose
+            ctx.beginPath();
+            ctx.arc(-2, 4.8, 2, 0, Math.PI * 0.85);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(2, 4.8, 2, Math.PI * 0.15, Math.PI);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.ellipse(0, 2.4, 2.6, 1.9, 0, 0, Math.PI * 2);
+            ctx.fillStyle = ink;
+            ctx.fill();
+
+            ctx.restore(); // End Head Group
+
+            // 5. Front Dancing Paws (alternating disco/boogie wave)
+            const leftPawY = Math.sin(t * 4) * 4.5;
+            const rightPawY = -Math.sin(t * 4) * 4.5;
+
+            ctx.fillStyle = furAccent;
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = 1.6;
+
+            // Left front paw
+            ctx.beginPath();
+            ctx.ellipse(-13.5, 3 + leftPawY, 4.2, 3.2, -0.45, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Right front paw
+            ctx.beginPath();
+            ctx.ellipse(13.5, 3 + rightPawY, 4.2, 3.2, 0.45, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore(); // End Dog Body Transform
+
+            // 6. Subtle Floating Music Notes around the dancing pup
+            ctx.save();
+            ctx.fillStyle = ink;
+            ctx.font = 'bold 12px "Courier New", monospace';
+            const note1Y = -28 - ((t * 10) % 14);
+            const note1Alpha = 1 - (((t * 10) % 14) / 14);
+            ctx.globalAlpha = note1Alpha * 0.75;
+            ctx.fillText('♪', x - 24 + Math.sin(t * 3) * 3, y + note1Y);
+
+            const note2Y = -26 - (((t * 10) + 7) % 14);
+            const note2Alpha = 1 - ((((t * 10) + 7) % 14) / 14);
+            ctx.globalAlpha = note2Alpha * 0.75;
+            ctx.fillText('♫', x + 18 + Math.cos(t * 3) * 3, y + note2Y);
+            ctx.restore();
+        }
+
+        /**
+         * Renders the pastel gradient backdrop, central dancing pink dog,
          * trajectory paths, and active pastel projectiles.
          */
-        function draw() {
+        function draw(timestamp = 0) {
             // Paint diagonal pastel gradient across the canvas
             const bgGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
             bgGradient.addColorStop(0, '#ffd1dc');   // Pastel Pink
@@ -429,17 +640,8 @@
             ctx.fillStyle = bgGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Central Mass Node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#1e293b';
-            ctx.fill();
-
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
+            // 1. Draw Central Dancing Pastel Pink Dog
+            drawDancingDog(centralNode.x, centralNode.y, timestamp);
 
             // 2. Draw Balls & Trails
             for (const b of balls) {
@@ -475,15 +677,15 @@
         /**
          * Main animation loop driven by requestAnimationFrame.
          */
-        function animate() {
+        function animate(timestamp) {
             updatePhysics();
-            draw();
+            draw(timestamp);
             requestAnimationFrame(animate);
         }
 
         window.onload = function() {
             resizeCanvas();
-            animate();
+            requestAnimationFrame(animate);
         };
     </script>
 </body>
