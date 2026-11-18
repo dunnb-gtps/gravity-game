@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Christmas Gravity Simulation</title>
     <style>
         * {
             box-sizing: border-box;
@@ -14,8 +14,8 @@
         }
 
         body {
-            background-color: #000000;
-            color: #ffffff;
+            background: radial-gradient(circle at top, #0c241c 0%, #06130f 65%, #030907 100%);
+            color: #f8fafc;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -34,7 +34,7 @@
             max-width: 1100px;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #ffffff;
+            border-bottom: 1px solid #d4af37;
         }
 
         h1 {
@@ -42,24 +42,33 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             font-weight: bold;
+            color: #ffd166;
+            text-shadow: 0 0 10px rgba(255, 209, 102, 0.35);
+        }
+
+        h1 .holly-accent {
+            color: #e63946;
         }
 
         .btn-reset {
-            background: transparent;
-            color: #ffffff;
-            border: 1px solid #ffffff;
+            background: rgba(185, 28, 28, 0.25);
+            color: #ffd166;
+            border: 1px solid #d4af37;
             padding: 6px 16px;
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 1px;
+            border-radius: 3px;
             transition: all 0.15s ease-in-out;
         }
 
         .btn-reset:hover {
-            background: #ffffff;
-            color: #000000;
+            background: #c1121f;
+            color: #ffffff;
+            border-color: #ffd166;
+            box-shadow: 0 0 12px rgba(212, 175, 55, 0.45);
         }
 
         /* Main Canvas Container */
@@ -74,8 +83,9 @@
         }
 
         canvas {
-            background-color: #000000;
-            border: 1px solid #ffffff;
+            background: radial-gradient(circle at 50% 45%, #0c2620 0%, #071714 55%, #040c0b 100%);
+            border: 1px solid #d4af37;
+            box-shadow: 0 0 24px rgba(12, 46, 36, 0.8), inset 0 0 40px rgba(0, 0, 0, 0.65);
             display: block;
             cursor: crosshair;
             width: 100%;
@@ -85,8 +95,9 @@
         .instructions {
             margin-top: 8px;
             font-size: 11px;
-            color: #888888;
+            color: #cbd5e1;
             text-align: center;
+            letter-spacing: 0.5px;
         }
     </style>
 </head>
@@ -94,7 +105,7 @@
 
     <!-- Header Section -->
     <div id="header">
-        <h1>Gravity Simulation</h1>
+        <h1><span class="holly-accent">❄</span> Christmas Gravity Simulation <span class="holly-accent">❄</span></h1>
         <button class="btn-reset" onclick="resetSimulation()">Reset</button>
     </div>
 
@@ -104,7 +115,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball.
+        Click anywhere in the winter sky to launch a Christmas ornament into orbit.
     </div>
 
     <script>
@@ -118,14 +129,25 @@
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
+        // FESTIVE PALETTE FOR ORNAMENTS & FAIRY LIGHTS
+        const ORNAMENT_THEMES = [
+            { main: '#e63946', highlight: '#ff8fa3', trail: 'rgba(230, 57, 70, 0.7)' },   // Holly Red
+            { main: '#2ec4b6', highlight: '#cbf3f0', trail: 'rgba(46, 196, 182, 0.7)' },  // Frosted Pine
+            { main: '#ffd166', highlight: '#fff3b0', trail: 'rgba(255, 209, 102, 0.75)' } // Warm Gold
+        ];
+        const FAIRY_LIGHT_COLORS = ['#ff3b30', '#ffd166', '#34c759', '#5ac8fa', '#ffffff'];
+
         // STATE VARIABLES
         let balls = [];
         let stars = [];
-        let planets = [];
-        let spaceships = [];
+        let snowflakes = [];
+        let festiveObjects = [];
+        let holidayFlyers = [];
+        let sparkles = [];
         let frameCount = 0;
+        let launchCount = 0;
 
-        // Central Gravity Node Definition
+        // Central Gravity Node Definition (Festive Star-Ornament Core)
         const centralNode = {
             x: 0,
             y: 0,
@@ -133,79 +155,91 @@
         };
 
         function initBackground() {
-            // Generate subtle twinkling stars using normalized coordinates
+            // Twinkling winter night stars
             stars = [];
-            const starCount = 90;
+            const starCount = 85;
+            const starColors = ['#ffffff', '#fff3b0', '#caf0f8', '#ffd166'];
             for (let i = 0; i < starCount; i++) {
                 stars.push({
                     rx: Math.random(),
-                    ry: Math.random(),
-                    size: Math.random() < 0.2 ? 1.5 : 1,
-                    baseAlpha: 0.15 + Math.random() * 0.35,
+                    ry: Math.random() * 0.9,
+                    size: Math.random() < 0.22 ? 2 : 1.2,
+                    isFourPoint: Math.random() < 0.14,
+                    color: starColors[Math.floor(Math.random() * starColors.length)],
+                    baseAlpha: 0.25 + Math.random() * 0.45,
                     twinkleSpeed: 0.02 + Math.random() * 0.04,
                     phase: Math.random() * Math.PI * 2
                 });
             }
 
-            // Define background planets using relative positions so they scale cleanly
-            planets = [
+            // Gently drifting snowfall
+            snowflakes = [];
+            const snowCount = 75;
+            for (let i = 0; i < snowCount; i++) {
+                snowflakes.push({
+                    x: Math.random() * (canvas.width || 1000),
+                    y: Math.random() * (canvas.height || 600),
+                    radius: 1 + Math.random() * 2.2,
+                    vy: 0.35 + Math.random() * 0.65,
+                    vx: (Math.random() - 0.5) * 0.25,
+                    swayPhase: Math.random() * Math.PI * 2,
+                    swaySpeed: 0.015 + Math.random() * 0.02,
+                    alpha: 0.3 + Math.random() * 0.5
+                });
+            }
+
+            // Background festive celestial landmarks
+            festiveObjects = [
                 {
-                    type: 'ringed',
-                    rx: 0.17,
-                    ry: 0.24,
-                    radius: 34,
-                    tilt: -0.38
+                    type: 'santa_moon',
+                    rx: 0.16,
+                    ry: 0.23,
+                    radius: 32
                 },
                 {
-                    type: 'cratered',
-                    rx: 0.82,
-                    ry: 0.74,
-                    radius: 44,
-                    craters: [
-                        { dx: -0.32, dy: -0.22, r: 0.22 },
-                        { dx: 0.25, dy: 0.18, r: 0.28 },
-                        { dx: -0.1, dy: 0.36, r: 0.14 },
-                        { dx: 0.34, dy: -0.32, r: 0.13 }
-                    ]
+                    type: 'wreath',
+                    rx: 0.83,
+                    ry: 0.72,
+                    radius: 38
                 },
                 {
-                    type: 'banded',
-                    rx: 0.78,
+                    type: 'north_star',
+                    rx: 0.79,
                     ry: 0.20,
-                    radius: 22,
-                    moonAngle: 0.5
+                    radius: 20,
+                    bellAngle: 0.4
                 }
             ];
 
-            // Initialize background spaceships
-            spaceships = [
-                createSpaceship('fighter', true),
-                createSpaceship('saucer', true),
-                createSpaceship('cruiser', true),
-                createSpaceship('fighter', true)
+            // Flying holiday silhouettes in the background sky
+            holidayFlyers = [
+                createHolidayFlyer('sleigh', true),
+                createHolidayFlyer('comet_star', true),
+                createHolidayFlyer('gift_paraglider', true),
+                createHolidayFlyer('comet_star', true)
             ];
         }
 
-        function createSpaceship(type, randomX = false) {
-            const goingRight = Math.random() > 0.35;
+        function createHolidayFlyer(type, randomX = false) {
+            const goingRight = type === 'sleigh' ? true : Math.random() > 0.35;
             const dir = goingRight ? 1 : -1;
             const w = canvas.width || 1000;
             const h = canvas.height || 600;
 
-            let speed = 0.45;
+            let speed = 0.5;
             let scale = 1;
-            if (type === 'fighter') {
-                speed = (0.7 + Math.random() * 0.45) * dir;
+            if (type === 'sleigh') {
+                speed = (0.55 + Math.random() * 0.2) * dir;
+                scale = 1.05;
+            } else if (type === 'comet_star') {
+                speed = (0.8 + Math.random() * 0.45) * dir;
                 scale = 0.85 + Math.random() * 0.25;
-            } else if (type === 'saucer') {
-                speed = (0.45 + Math.random() * 0.3) * dir;
-                scale = 0.9;
-            } else if (type === 'cruiser') {
-                speed = (0.22 + Math.random() * 0.15) * dir;
-                scale = 1.15;
+            } else if (type === 'gift_paraglider') {
+                speed = (0.3 + Math.random() * 0.2) * dir;
+                scale = 0.95;
             }
 
-            const margin = 80;
+            const margin = 110;
             const startX = randomX
                 ? Math.random() * w
                 : (dir === 1 ? -margin : w + margin);
@@ -213,9 +247,9 @@
             return {
                 type: type,
                 x: startX,
-                y: 45 + Math.random() * Math.max(100, h - 90),
+                y: 45 + Math.random() * Math.max(100, h - 130),
                 vx: speed,
-                vy: (Math.random() - 0.5) * 0.14,
+                vy: (Math.random() - 0.5) * 0.12,
                 dir: dir,
                 scale: scale,
                 bobPhase: Math.random() * Math.PI * 2,
@@ -227,7 +261,7 @@
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
+
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
@@ -237,7 +271,7 @@
         resizeCanvas();
         initBackground();
 
-        // Canvas Click Handler: Directly launch ball at click position
+        // Canvas Click Handler: Launch festive ornament at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -246,60 +280,111 @@
             launchBall(clickX, clickY);
         });
 
+        function spawnSparkles(x, y, color, count = 14) {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+                const speed = 0.8 + Math.random() * 2.2;
+                sparkles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: 0.025 + Math.random() * 0.02,
+                    color: i % 2 === 0 ? color : '#ffd166',
+                    size: 1.5 + Math.random() * 1.5
+                });
+            }
+        }
+
         function launchBall(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
+            const theme = ORNAMENT_THEMES[launchCount % ORNAMENT_THEMES.length];
+            launchCount++;
+
+            spawnSparkles(x, y, theme.main, 10);
+
+            // Overwrite existing array to strictly maintain a single ornament on screen
             balls = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4,
+                radius: 4.5,
+                theme: theme,
                 trail: [] // Stores history of past {x, y} coordinates
             }];
         }
 
         function resetSimulation() {
             balls = [];
+            sparkles = [];
         }
 
         function updateBackground() {
             frameCount++;
 
-            // Slowly orbit the distant moon on the banded planet
-            for (const p of planets) {
-                if (p.type === 'banded') {
-                    p.moonAngle += 0.006;
+            // Update falling snow
+            for (const flake of snowflakes) {
+                flake.y += flake.vy;
+                flake.x += flake.vx + Math.sin(frameCount * flake.swaySpeed + flake.swayPhase) * 0.25;
+
+                if (flake.y > canvas.height + 5) {
+                    flake.y = -5;
+                    flake.x = Math.random() * canvas.width;
+                }
+                if (flake.x > canvas.width + 5) flake.x = -5;
+                if (flake.x < -5) flake.x = canvas.width + 5;
+            }
+
+            // Orbit tiny jingle bell around the Guiding North Star
+            for (const obj of festiveObjects) {
+                if (obj.type === 'north_star') {
+                    obj.bellAngle += 0.008;
                 }
             }
 
-            // Update spaceships
-            const margin = 90;
-            for (let i = 0; i < spaceships.length; i++) {
-                const ship = spaceships[i];
-                ship.x += ship.vx;
-                ship.y += ship.vy + Math.sin(frameCount * 0.02 + ship.bobPhase) * 0.08;
+            // Update flying holiday elements
+            const margin = 120;
+            for (let i = 0; i < holidayFlyers.length; i++) {
+                const flyer = holidayFlyers[i];
+                flyer.x += flyer.vx;
+                flyer.y += flyer.vy + Math.sin(frameCount * 0.025 + flyer.bobPhase) * 0.12;
 
-                // Record thruster exhaust trail
+                // Record golden stardust trail
                 if (frameCount % 2 === 0) {
-                    ship.trail.push({
-                        x: ship.x - ship.dir * 12 * ship.scale,
-                        y: ship.y
+                    const offset = flyer.type === 'sleigh' ? -24 : -10;
+                    flyer.trail.push({
+                        x: flyer.x + flyer.dir * offset * flyer.scale,
+                        y: flyer.y
                     });
-                    if (ship.trail.length > 22) {
-                        ship.trail.shift();
+                    if (flyer.trail.length > 26) {
+                        flyer.trail.shift();
                     }
                 }
 
-                // Respawn ship when it drifts off-screen
-                if ((ship.dir === 1 && ship.x > canvas.width + margin) ||
-                    (ship.dir === -1 && ship.x < -margin) ||
-                    ship.y < -margin || ship.y > canvas.height + margin) {
-                    spaceships[i] = createSpaceship(ship.type, false);
+                // Respawn flyer when it drifts off-screen
+                if ((flyer.dir === 1 && flyer.x > canvas.width + margin) ||
+                    (flyer.dir === -1 && flyer.x < -margin) ||
+                    flyer.y < -margin || flyer.y > canvas.height + margin) {
+                    holidayFlyers[i] = createHolidayFlyer(flyer.type, false);
+                }
+            }
+
+            // Update festive sparkle particles
+            for (let i = sparkles.length - 1; i >= 0; i--) {
+                const sp = sparkles[i];
+                sp.x += sp.vx;
+                sp.y += sp.vy;
+                sp.vx *= 0.96;
+                sp.vy *= 0.96;
+                sp.life -= sp.decay;
+                if (sp.life <= 0) {
+                    sparkles.splice(i, 1);
                 }
             }
         }
@@ -308,9 +393,9 @@
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove ornament if it travels too far off-screen
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
+                if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
                     balls.splice(i, 1);
                     continue;
@@ -322,8 +407,9 @@
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
+                // Absorption check: ornament collides with central star-ornament
                 if (dist < centralNode.radius + b.radius) {
+                    spawnSparkles(b.x, b.y, b.theme.main, 18);
                     balls.splice(i, 1);
                     continue;
                 }
@@ -341,7 +427,7 @@
                 b.x += b.vx;
                 b.y += b.vy;
 
-                // Record position history for line trail
+                // Record position history for fairy-light trail
                 b.trail.push({ x: b.x, y: b.y });
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
@@ -349,305 +435,490 @@
             }
         }
 
-        function drawStars() {
+        function drawStarsAndSnow() {
+            // Twinkling stars
             for (const s of stars) {
-                const alpha = s.baseAlpha + Math.sin(frameCount * s.twinkleSpeed + s.phase) * 0.12;
-                ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0.05, alpha)})`;
-                ctx.fillRect(s.rx * canvas.width, s.ry * canvas.height, s.size, s.size);
+                const alpha = Math.max(0.08, s.baseAlpha + Math.sin(frameCount * s.twinkleSpeed + s.phase) * 0.18);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = s.color;
+                const sx = s.rx * canvas.width;
+                const sy = s.ry * canvas.height;
+
+                if (s.isFourPoint) {
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy - 4);
+                    ctx.lineTo(sx + 1.2, sy - 1.2);
+                    ctx.lineTo(sx + 4, sy);
+                    ctx.lineTo(sx + 1.2, sy + 1.2);
+                    ctx.lineTo(sx, sy + 4);
+                    ctx.lineTo(sx - 1.2, sy + 1.2);
+                    ctx.lineTo(sx - 4, sy);
+                    ctx.lineTo(sx - 1.2, sy - 1.2);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(sx, sy, s.size, s.size);
+                }
+                ctx.restore();
+            }
+
+            // Drifting snowflakes
+            for (const flake of snowflakes) {
+                ctx.beginPath();
+                ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(240, 249, 255, ${flake.alpha})`;
+                ctx.fill();
             }
         }
 
-        function drawPlanets() {
-            for (const p of planets) {
-                const px = p.rx * canvas.width;
-                const py = p.ry * canvas.height;
+        function drawWinterHorizon() {
+            // Subtle snowy pine horizon silhouette at the bottom edge
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(0, h);
+            ctx.lineTo(0, h - 18);
+            ctx.quadraticCurveTo(w * 0.25, h - 34, w * 0.5, h - 16);
+            ctx.quadraticCurveTo(w * 0.78, h - 2, w, h - 22);
+            ctx.lineTo(w, h);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(226, 241, 248, 0.12)';
+            ctx.fill();
+
+            // Tiny evergreen pine tree silhouettes along the snowbank
+            const treePositions = [0.06, 0.11, 0.22, 0.76, 0.88, 0.94];
+            for (let i = 0; i < treePositions.length; i++) {
+                const tx = treePositions[i] * w;
+                const ty = h - 14;
+                const th = 16 + (i % 3) * 5;
+                ctx.beginPath();
+                ctx.moveTo(tx, ty - th);
+                ctx.lineTo(tx - th * 0.42, ty);
+                ctx.lineTo(tx + th * 0.42, ty);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(20, 65, 50, 0.45)';
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function drawFestiveObjects() {
+            for (const obj of festiveObjects) {
+                const px = obj.rx * canvas.width;
+                const py = obj.ry * canvas.height;
 
                 ctx.save();
                 ctx.translate(px, py);
 
-                if (p.type === 'ringed') {
-                    // Back half of ring
-                    ctx.save();
-                    ctx.rotate(p.tilt);
+                if (obj.type === 'santa_moon') {
+                    // Warm lunar halo
+                    const grad = ctx.createRadialGradient(0, 0, obj.radius * 0.4, 0, 0, obj.radius * 1.9);
+                    grad.addColorStop(0, 'rgba(255, 243, 176, 0.16)');
+                    grad.addColorStop(1, 'rgba(255, 243, 176, 0)');
+                    ctx.fillStyle = grad;
                     ctx.beginPath();
-                    ctx.ellipse(0, 0, p.radius * 2.1, p.radius * 0.55, 0, Math.PI, Math.PI * 2);
-                    ctx.strokeStyle = '#3b3b3b';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, p.radius * 1.75, p.radius * 0.42, 0, Math.PI, Math.PI * 2);
-                    ctx.strokeStyle = '#292929';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                    ctx.restore();
-
-                    // Planet sphere
-                    ctx.beginPath();
-                    ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0d0d0d';
+                    ctx.arc(0, 0, obj.radius * 1.9, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.strokeStyle = '#444444';
-                    ctx.lineWidth = 1.2;
-                    ctx.stroke();
 
-                    // Subtle atmospheric bands clipped to planet
-                    ctx.save();
+                    // Golden Moon Sphere
                     ctx.beginPath();
-                    ctx.arc(0, 0, p.radius - 1, 0, Math.PI * 2);
-                    ctx.clip();
-                    ctx.rotate(p.tilt);
-                    ctx.strokeStyle = '#262626';
-                    ctx.lineWidth = 1;
-                    for (let band = -16; band <= 16; band += 8) {
-                        ctx.beginPath();
-                        ctx.moveTo(-p.radius, band);
-                        ctx.lineTo(p.radius, band);
-                        ctx.stroke();
-                    }
-                    ctx.restore();
-
-                    // Front half of ring
-                    ctx.save();
-                    ctx.rotate(p.tilt);
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, p.radius * 2.1, p.radius * 0.55, 0, 0, Math.PI);
-                    ctx.strokeStyle = '#4a4a4a';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, p.radius * 1.75, p.radius * 0.42, 0, 0, Math.PI);
-                    ctx.strokeStyle = '#2e2e2e';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                    ctx.restore();
-
-                } else if (p.type === 'cratered') {
-                    // Planet body
-                    ctx.beginPath();
-                    ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0b0b0b';
+                    ctx.arc(0, 0, obj.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#292518';
                     ctx.fill();
-                    ctx.strokeStyle = '#3f3f3f';
-                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = 'rgba(255, 209, 102, 0.55)';
+                    ctx.lineWidth = 1.4;
                     ctx.stroke();
 
-                    // Crescent terminator line
+                    // Subtle moon craters
+                    ctx.strokeStyle = 'rgba(255, 209, 102, 0.2)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(-9, 6, 6, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(10, 9, 4.5, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Cozy Santa Hat perched on top of the moon
                     ctx.save();
+                    ctx.rotate(-0.22);
+                    // Red cone
                     ctx.beginPath();
-                    ctx.arc(0, 0, p.radius - 1, 0, Math.PI * 2);
-                    ctx.clip();
-                    ctx.beginPath();
-                    ctx.arc(-p.radius * 0.35, -p.radius * 0.15, p.radius * 0.95, 0, Math.PI * 2);
-                    ctx.strokeStyle = '#242424';
+                    ctx.moveTo(-obj.radius * 0.78, -obj.radius * 0.62);
+                    ctx.quadraticCurveTo(-2, -obj.radius * 1.85, obj.radius * 0.95, -obj.radius * 1.15);
+                    ctx.lineTo(obj.radius * 0.78, -obj.radius * 0.62);
+                    ctx.closePath();
+                    ctx.fillStyle = '#9e1b24';
+                    ctx.fill();
+                    ctx.strokeStyle = '#e63946';
                     ctx.lineWidth = 1;
                     ctx.stroke();
 
-                    // Surface craters
-                    for (const c of p.craters) {
-                        ctx.beginPath();
-                        ctx.arc(c.dx * p.radius, c.dy * p.radius, c.r * p.radius, 0, Math.PI * 2);
-                        ctx.strokeStyle = '#303030';
-                        ctx.lineWidth = 1;
-                        ctx.stroke();
-                    }
+                    // White fluffy brim
+                    ctx.beginPath();
+                    ctx.roundRect(-obj.radius * 0.85, -obj.radius * 0.72, obj.radius * 1.7, 7, 3.5);
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.fill();
+
+                    // White pom-pom
+                    ctx.beginPath();
+                    ctx.arc(obj.radius * 0.98, -obj.radius * 1.12, 4.5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fill();
                     ctx.restore();
 
-                } else if (p.type === 'banded') {
-                    // Orbit path for tiny moon
-                    const orbitRx = p.radius * 1.9;
-                    const orbitRy = p.radius * 0.65;
+                } else if (obj.type === 'wreath') {
+                    // Evergreen Christmas Wreath
+                    ctx.beginPath();
+                    ctx.arc(0, 0, obj.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(45, 106, 79, 0.65)';
+                    ctx.lineWidth = 10;
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, obj.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(82, 183, 136, 0.45)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Holly berries around the wreath
+                    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+                        const bx = Math.cos(a) * obj.radius;
+                        const by = Math.sin(a) * obj.radius;
+                        ctx.beginPath();
+                        ctx.arc(bx, by, 2.3, 0, Math.PI * 2);
+                        ctx.fillStyle = '#e63946';
+                        ctx.fill();
+                    }
+
+                    // Festive Red Ribbon Bow at top
+                    ctx.fillStyle = '#d62828';
+                    ctx.beginPath();
+                    ctx.ellipse(-6, -obj.radius, 6, 3.5, -0.35, 0, Math.PI * 2);
+                    ctx.ellipse(6, -obj.radius, 6, 3.5, 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(0, -obj.radius, 2.8, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffd166';
+                    ctx.fill();
+
+                } else if (obj.type === 'north_star') {
+                    // Orbit path for tiny golden jingle bell
+                    const orbitRx = obj.radius * 2.0;
+                    const orbitRy = obj.radius * 0.7;
                     ctx.beginPath();
                     ctx.ellipse(0, 0, orbitRx, orbitRy, 0.25, 0, Math.PI * 2);
-                    ctx.strokeStyle = '#1f1f1f';
+                    ctx.strokeStyle = 'rgba(255, 209, 102, 0.18)';
                     ctx.lineWidth = 1;
                     ctx.stroke();
 
-                    // Planet body
+                    // Glowing 8-point Guiding North Star
+                    ctx.fillStyle = 'rgba(255, 209, 102, 0.65)';
                     ctx.beginPath();
-                    ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0c0c0c';
+                    for (let i = 0; i < 8; i++) {
+                        const r = i % 2 === 0 ? obj.radius * 0.85 : obj.radius * 0.24;
+                        const ang = (i * Math.PI) / 4;
+                        const sx = Math.cos(ang) * r;
+                        const sy = Math.sin(ang) * r;
+                        if (i === 0) ctx.moveTo(sx, sy);
+                        else ctx.lineTo(sx, sy);
+                    }
+                    ctx.closePath();
                     ctx.fill();
-                    ctx.strokeStyle = '#3d3d3d';
-                    ctx.lineWidth = 1.2;
-                    ctx.stroke();
 
-                    // Equator line
-                    ctx.beginPath();
-                    ctx.moveTo(-p.radius + 2, 0);
-                    ctx.lineTo(p.radius - 2, 0);
-                    ctx.strokeStyle = '#282828';
-                    ctx.stroke();
-
-                    // Orbiting moon
-                    const mx = Math.cos(p.moonAngle) * orbitRx;
-                    const my = Math.sin(p.moonAngle) * orbitRy;
+                    // Orbiting Golden Jingle Bell
+                    const mx = Math.cos(obj.bellAngle) * orbitRx;
+                    const my = Math.sin(obj.bellAngle) * orbitRy;
                     const rot = 0.25;
                     const rmx = mx * Math.cos(rot) - my * Math.sin(rot);
                     const rmy = mx * Math.sin(rot) + my * Math.cos(rot);
 
                     ctx.beginPath();
-                    ctx.arc(rmx, rmy, 3.2, 0, Math.PI * 2);
-                    ctx.fillStyle = '#141414';
+                    ctx.arc(rmx, rmy, 3.4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffd166';
                     ctx.fill();
-                    ctx.strokeStyle = '#4d4d4d';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
                 }
 
                 ctx.restore();
             }
         }
 
-        function drawSpaceships() {
-            for (const ship of spaceships) {
-                // Draw subtle thruster trail
-                if (ship.trail.length > 1) {
-                    for (let t = 1; t < ship.trail.length; t++) {
-                        const alpha = (t / ship.trail.length) * 0.25;
+        function drawHolidayFlyers() {
+            for (const flyer of holidayFlyers) {
+                // Draw warm golden stardust trail
+                if (flyer.trail.length > 1) {
+                    for (let t = 1; t < flyer.trail.length; t++) {
+                        const alpha = (t / flyer.trail.length) * 0.35;
                         ctx.beginPath();
-                        ctx.moveTo(ship.trail[t - 1].x, ship.trail[t - 1].y);
-                        ctx.lineTo(ship.trail[t].x, ship.trail[t].y);
-                        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-                        ctx.lineWidth = 1;
+                        ctx.moveTo(flyer.trail[t - 1].x, flyer.trail[t - 1].y);
+                        ctx.lineTo(flyer.trail[t].x, flyer.trail[t].y);
+                        ctx.strokeStyle = `rgba(255, 209, 102, ${alpha})`;
+                        ctx.lineWidth = 1.2;
                         ctx.stroke();
                     }
                 }
 
                 ctx.save();
-                ctx.translate(ship.x, ship.y);
-                ctx.scale(ship.dir * ship.scale, ship.scale);
+                ctx.translate(flyer.x, flyer.y);
+                ctx.scale(flyer.dir * flyer.scale, flyer.scale);
 
-                if (ship.type === 'fighter') {
-                    // Delta-wing starfighter wireframe
+                if (flyer.type === 'sleigh') {
+                    // Golden runners
                     ctx.beginPath();
-                    ctx.moveTo(14, 0);
-                    ctx.lineTo(-10, -8);
-                    ctx.lineTo(-6, 0);
-                    ctx.lineTo(-10, 8);
+                    ctx.moveTo(-24, 6);
+                    ctx.lineTo(-4, 6);
+                    ctx.quadraticCurveTo(2, 6, 3, 1);
+                    ctx.strokeStyle = '#ffd166';
+                    ctx.lineWidth = 1.3;
+                    ctx.stroke();
+
+                    // Red sleigh body
+                    ctx.beginPath();
+                    ctx.moveTo(-22, 4);
+                    ctx.lineTo(-24, -4);
+                    ctx.lineTo(-16, -4);
+                    ctx.quadraticCurveTo(-12, 1, -6, -2);
+                    ctx.lineTo(-2, -2);
+                    ctx.lineTo(-4, 4);
                     ctx.closePath();
-                    ctx.fillStyle = '#0a0a0a';
+                    ctx.fillStyle = '#c1121f';
                     ctx.fill();
-                    ctx.strokeStyle = '#5c5c5c';
-                    ctx.lineWidth = 1.1;
+                    ctx.strokeStyle = '#ffd166';
+                    ctx.lineWidth = 1;
                     ctx.stroke();
 
-                    // Cockpit detail
+                    // Santa silhouette & hat
                     ctx.beginPath();
-                    ctx.moveTo(4, 0);
-                    ctx.lineTo(-3, -2);
-                    ctx.lineTo(-3, 2);
+                    ctx.arc(-13, -5, 3.2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#e63946';
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(-15, -7.5, 1.5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+
+                    // Reins line
+                    ctx.beginPath();
+                    ctx.moveTo(-2, -1);
+                    ctx.lineTo(24, -1);
+                    ctx.strokeStyle = 'rgba(255, 209, 102, 0.45)';
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+
+                    // Two reindeer silhouettes + Rudolph's glowing red nose!
+                    const gallop = Math.sin(frameCount * 0.18 + flyer.bobPhase) * 1.5;
+                    for (let r = 0; r < 2; r++) {
+                        const rx = 11 + r * 12;
+                        const ry = -1 + (r === 0 ? gallop : -gallop);
+                        ctx.fillStyle = '#8d6e63';
+                        ctx.beginPath();
+                        ctx.ellipse(rx, ry, 4.2, 2.1, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        // Head & antlers
+                        ctx.beginPath();
+                        ctx.arc(rx + 4, ry - 2.5, 1.8, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = '#bcaaa4';
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath();
+                        ctx.moveTo(rx + 3.5, ry - 4);
+                        ctx.lineTo(rx + 2.5, ry - 7);
+                        ctx.moveTo(rx + 4.5, ry - 4);
+                        ctx.lineTo(rx + 5.5, ry - 7);
+                        ctx.stroke();
+
+                        // Lead reindeer (Rudolph) glowing red nose
+                        if (r === 1) {
+                            ctx.beginPath();
+                            ctx.arc(rx + 6, ry - 2.3, 1.6, 0, Math.PI * 2);
+                            ctx.fillStyle = '#ff2a2a';
+                            ctx.fill();
+                        }
+                    }
+
+                } else if (flyer.type === 'comet_star') {
+                    // Glowing Christmas Shooting Star
+                    ctx.rotate(frameCount * 0.03);
+                    ctx.beginPath();
+                    for (let i = 0; i < 10; i++) {
+                        const rad = i % 2 === 0 ? 7.5 : 3.2;
+                        const ang = (i * Math.PI) / 5;
+                        const sx = Math.cos(ang) * rad;
+                        const sy = Math.sin(ang) * rad;
+                        if (i === 0) ctx.moveTo(sx, sy);
+                        else ctx.lineTo(sx, sy);
+                    }
                     ctx.closePath();
-                    ctx.strokeStyle = '#3d3d3d';
-                    ctx.stroke();
-
-                    // Flickering thruster flame
-                    const flicker = 3 + Math.sin(frameCount * 0.6 + ship.bobPhase) * 2.5;
-                    ctx.beginPath();
-                    ctx.moveTo(-7, -2);
-                    ctx.lineTo(-7 - flicker, 0);
-                    ctx.lineTo(-7, 2);
-                    ctx.strokeStyle = '#777777';
-                    ctx.stroke();
-
-                } else if (ship.type === 'saucer') {
-                    // Top dome
-                    ctx.beginPath();
-                    ctx.arc(0, -2, 6, Math.PI, 0);
-                    ctx.strokeStyle = '#555555';
-                    ctx.lineWidth = 1.1;
-                    ctx.stroke();
-
-                    // Saucer hull
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, 15, 4.5, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0a0a0a';
+                    ctx.fillStyle = '#ffd166';
                     ctx.fill();
-                    ctx.strokeStyle = '#606060';
-                    ctx.lineWidth = 1.1;
-                    ctx.stroke();
 
-                    // Blinking hull lights
-                    const blink = Math.floor(frameCount / 18) % 2 === 0;
-                    ctx.fillStyle = blink ? '#7a7a7a' : '#2e2e2e';
-                    ctx.fillRect(-7, -0.5, 1.5, 1.5);
-                    ctx.fillRect(-0.75, -0.5, 1.5, 1.5);
-                    ctx.fillRect(5.5, -0.5, 1.5, 1.5);
-
-                } else if (ship.type === 'cruiser') {
-                    // Heavy sci-fi freighter / capital ship silhouette
+                } else if (flyer.type === 'gift_paraglider') {
+                    // Candy-striped parachute canopy
                     ctx.beginPath();
-                    ctx.moveTo(22, 0);
-                    ctx.lineTo(14, -5);
-                    ctx.lineTo(-16, -6);
-                    ctx.lineTo(-20, -3);
-                    ctx.lineTo(-20, 3);
-                    ctx.lineTo(-16, 6);
-                    ctx.lineTo(14, 5);
-                    ctx.closePath();
-                    ctx.fillStyle = '#080808';
-                    ctx.fill();
-                    ctx.strokeStyle = '#484848';
-                    ctx.lineWidth = 1.1;
+                    ctx.arc(0, -10, 10, Math.PI, 0);
+                    ctx.strokeStyle = '#e63946';
+                    ctx.lineWidth = 2;
                     ctx.stroke();
 
-                    // Bridge tower & panel lines
-                    ctx.strokeRect(-8, -9, 6, 3);
+                    // Parachute strings
                     ctx.beginPath();
-                    ctx.moveTo(-4, -5);
-                    ctx.lineTo(-4, 5);
-                    ctx.moveTo(6, -5);
-                    ctx.lineTo(6, 5);
-                    ctx.strokeStyle = '#2d2d2d';
+                    ctx.moveTo(-9, -10);
+                    ctx.lineTo(-4, -1);
+                    ctx.moveTo(9, -10);
+                    ctx.lineTo(4, -1);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+                    ctx.lineWidth = 0.8;
                     ctx.stroke();
+
+                    // Wrapped Christmas Gift Box
+                    ctx.fillStyle = '#2d6a4f';
+                    ctx.fillRect(-5, -1, 10, 9);
+                    ctx.fillStyle = '#ffd166';
+                    ctx.fillRect(-1, -1, 2, 9);
+                    ctx.fillRect(-5, 2.5, 10, 2);
                 }
 
                 ctx.restore();
             }
         }
 
+        function drawCentralOrnament() {
+            const cx = centralNode.x;
+            const cy = centralNode.y;
+            const r = centralNode.radius;
+            const pulse = 1 + Math.sin(frameCount * 0.06) * 0.08;
+
+            // Warm golden-crimson holiday glow aura
+            const aura = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r * 3.4 * pulse);
+            aura.addColorStop(0, 'rgba(255, 209, 102, 0.45)');
+            aura.addColorStop(0.5, 'rgba(230, 57, 70, 0.16)');
+            aura.addColorStop(1, 'rgba(230, 57, 70, 0)');
+            ctx.fillStyle = aura;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 3.4 * pulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Metallic gold ornament cap & hanging loop at top
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.arc(cx, cy - r - 4.5, 2.5, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#d4af37';
+            ctx.fillRect(cx - 3.5, cy - r - 2.5, 7, 3.5);
+
+            // Main Crimson & Gold Bauble Body
+            const ballGrad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, 1, cx, cy, r);
+            ballGrad.addColorStop(0, '#ff758f');
+            ballGrad.addColorStop(0.45, '#d62828');
+            ballGrad.addColorStop(1, '#780000');
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = ballGrad;
+            ctx.fill();
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // Center 4-point Golden North Star emblem
+            ctx.fillStyle = '#fff3b0';
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 5.5);
+            ctx.lineTo(cx + 1.6, cy - 1.6);
+            ctx.lineTo(cx + 5.5, cy);
+            ctx.lineTo(cx + 1.6, cy + 1.6);
+            ctx.lineTo(cx, cy + 5.5);
+            ctx.lineTo(cx - 1.6, cy + 1.6);
+            ctx.lineTo(cx - 5.5, cy);
+            ctx.lineTo(cx - 1.6, cy - 1.6);
+            ctx.closePath();
+            ctx.fill();
+        }
+
         function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
+            // Clear canvas with deep winter forest gradient
+            const bgGrad = ctx.createRadialGradient(
+                canvas.width * 0.5, canvas.height * 0.45, 20,
+                canvas.width * 0.5, canvas.height * 0.5, Math.max(canvas.width, canvas.height) * 0.75
+            );
+            bgGrad.addColorStop(0, '#0d2b24');
+            bgGrad.addColorStop(0.6, '#071714');
+            bgGrad.addColorStop(1, '#030b0a');
+            ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 0. Draw Background Layer (Stars, Planets, Spaceships)
-            drawStars();
-            drawPlanets();
-            drawSpaceships();
+            // 0. Draw Festive Background Layer (Stars, Snow, Horizon, Landmarks, Flyers)
+            drawStarsAndSnow();
+            drawWinterHorizon();
+            drawFestiveObjects();
+            drawHolidayFlyers();
 
-            // 1. Draw Central Mass Node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
+            // 1. Draw Central Gravity Ornament Node
+            drawCentralOrnament();
 
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
-            ctx.fill();
-
-            // 2. Draw Ball & Trail
+            // 2. Draw Launched Ornament & Glowing Fairy-Light Trail
             for (const b of balls) {
-                // Draw path line
+                // Draw smooth golden-tinted ribbon trail
                 if (b.trail.length > 1) {
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = b.theme.trail;
+                    ctx.lineWidth = 1.4;
                     ctx.stroke();
+
+                    // Draw twinkling Christmas fairy-light bulbs along the orbit path
+                    for (let t = 6; t < b.trail.length; t += 14) {
+                        const pt = b.trail[t];
+                        const bulbColor = FAIRY_LIGHT_COLORS[(t / 14 | 0) % FAIRY_LIGHT_COLORS.length];
+                        const fade = t / b.trail.length;
+                        ctx.save();
+                        ctx.globalAlpha = 0.35 + fade * 0.65;
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 2.1, 0, Math.PI * 2);
+                        ctx.fillStyle = bulbColor;
+                        ctx.fill();
+                        ctx.restore();
+                    }
                 }
 
-                // Draw ball object
+                // Draw golden ornament cap on the launched ball
+                ctx.fillStyle = '#ffd166';
+                ctx.fillRect(b.x - 1.8, b.y - b.radius - 1.8, 3.6, 2);
+
+                // Draw launched Christmas ornament sphere
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = b.theme.main;
                 ctx.fill();
+                ctx.strokeStyle = '#ffd166';
+                ctx.lineWidth = 0.9;
+                ctx.stroke();
+
+                // Glossy ornament highlight
+                ctx.beginPath();
+                ctx.arc(b.x - 1.4, b.y - 1.4, 1.3, 0, Math.PI * 2);
+                ctx.fillStyle = b.theme.highlight;
+                ctx.fill();
+            }
+
+            // 3. Draw Festive Sparkle Bursts
+            for (const sp of sparkles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, sp.life);
+                ctx.fillStyle = sp.color;
+                ctx.beginPath();
+                ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
             }
         }
 
