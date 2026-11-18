@@ -44,6 +44,7 @@
             border: 2.5px solid #ffb3cf;
             border-radius: 999px;
             box-shadow: 0 6px 18px rgba(255, 118, 168, 0.16), 0 2px 6px rgba(90, 169, 230, 0.12);
+            gap: 12px;
         }
 
         .title-group {
@@ -85,7 +86,41 @@
             letter-spacing: 0.4px;
         }
 
-        @media (max-width: 600px) {
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Collected Flowers Score Pill */
+        .score-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: linear-gradient(180deg, #fff9fc 0%, #ffe8f2 100%);
+            border: 2px solid #ff9ec2;
+            border-radius: 999px;
+            padding: 6px 15px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #c92a67;
+            box-shadow: 0 3px 8px rgba(255, 118, 168, 0.16);
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .score-pill.pop {
+            transform: scale(1.14);
+        }
+
+        .score-value {
+            display: inline-block;
+            min-width: 18px;
+            text-align: center;
+            color: #d93870;
+            font-weight: 700;
+        }
+
+        @media (max-width: 680px) {
             h1 {
                 font-size: 15px;
             }
@@ -94,6 +129,10 @@
             }
             #header {
                 padding: 8px 14px;
+            }
+            .score-pill {
+                padding: 5px 11px;
+                font-size: 13px;
             }
         }
 
@@ -182,13 +221,29 @@
             <h1>Gravity Simulation</h1>
             <span class="subtitle-tag">Hello Kitty &amp; Cinnamoroll</span>
         </div>
-        <button class="btn-reset" onclick="resetSimulation()">
-            <!-- Mini Star Sparkle Icon -->
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z"/>
-            </svg>
-            Reset
-        </button>
+
+        <div class="header-controls">
+            <!-- Collected Flowers Counter -->
+            <div class="score-pill" id="scorePill" title="Collected Flowers">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="5.5" r="3.4" fill="#ff7aa8" stroke="#591936" stroke-width="1.6"/>
+                    <circle cx="18.2" cy="10" r="3.4" fill="#ff7aa8" stroke="#591936" stroke-width="1.6"/>
+                    <circle cx="15.8" cy="17.2" r="3.4" fill="#ff7aa8" stroke="#591936" stroke-width="1.6"/>
+                    <circle cx="8.2" cy="17.2" r="3.4" fill="#ff7aa8" stroke="#591936" stroke-width="1.6"/>
+                    <circle cx="5.8" cy="10" r="3.4" fill="#ff7aa8" stroke="#591936" stroke-width="1.6"/>
+                    <circle cx="12" cy="12" r="3.2" fill="#ffd43b" stroke="#591936" stroke-width="1.6"/>
+                </svg>
+                <span>Flowers: <span class="score-value" id="scoreCount">0</span></span>
+            </div>
+
+            <button class="btn-reset" onclick="resetSimulation()">
+                <!-- Mini Star Sparkle Icon -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z"/>
+                </svg>
+                Reset
+            </button>
+        </div>
     </div>
 
     <!-- Canvas Container -->
@@ -197,12 +252,14 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a flower.
+        Click anywhere on the canvas to launch a flower and collect the floating blossoms!
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const scoreCountEl = document.getElementById('scoreCount');
+        const scorePillEl = document.getElementById('scorePill');
 
         // =========================================================================
         // SIMULATION CONSTANTS (Preserved verbatim from baseline)
@@ -212,14 +269,73 @@
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;          // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
+        const COLLECTIBLE_COUNT = 5;       // Number of collectible blossoms active per wave
+
+        // Kawaii Pastel Palettes for Collectible Flowers
+        const COLLECTIBLE_PALETTES = [
+            {
+                name: 'cinnamoroll',
+                inner: '#339af0',
+                mid: '#74c0fc',
+                outer: '#e7f5ff',
+                stroke: '#2b6cb0',
+                centerInner: '#fff9db',
+                centerOuter: '#fcc419',
+                aura: 'rgba(116, 192, 252, 0.34)'
+            },
+            {
+                name: 'buttercup',
+                inner: '#f59f00',
+                mid: '#ffd43b',
+                outer: '#fff9db',
+                stroke: '#9c6300',
+                centerInner: '#ffe3ec',
+                centerOuter: '#ff6b98',
+                aura: 'rgba(255, 212, 59, 0.34)'
+            },
+            {
+                name: 'lavender',
+                inner: '#845ef7',
+                mid: '#b197fc',
+                outer: '#f3f0ff',
+                stroke: '#5234a8',
+                centerInner: '#fff9db',
+                centerOuter: '#ffd43b',
+                aura: 'rgba(177, 151, 252, 0.34)'
+            },
+            {
+                name: 'peach',
+                inner: '#f76707',
+                mid: '#ffa94d',
+                outer: '#fff4e6',
+                stroke: '#9c4208',
+                centerInner: '#fff9db',
+                centerOuter: '#fcc419',
+                aura: 'rgba(255, 169, 77, 0.34)'
+            },
+            {
+                name: 'mint',
+                inner: '#12b886',
+                mid: '#63e6be',
+                outer: '#e6fcf5',
+                stroke: '#0b7254',
+                centerInner: '#fff9db',
+                centerOuter: '#ffd43b',
+                aura: 'rgba(99, 230, 190, 0.34)'
+            }
+        ];
 
         // =========================================================================
         // STATE VARIABLES
         // =========================================================================
         let balls = [];
+        let collectibleFlowers = [];
         let petalParticles = [];
         let launchBursts = [];
+        let floatingTexts = [];
+        let collectedCount = 0;
         let animTime = 0;
+        let scorePopTimeout = null;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -231,6 +347,92 @@
         // Decorative Background Clouds & Sparkles
         let clouds = [];
         let sparkles = [];
+
+        /**
+         * Updates the collected flowers HUD counter with a gentle kawaii pop animation.
+         */
+        function updateScoreDisplay(animate = false) {
+            scoreCountEl.textContent = collectedCount;
+            if (animate) {
+                scorePillEl.classList.remove('pop');
+                void scorePillEl.offsetWidth;
+                scorePillEl.classList.add('pop');
+                clearTimeout(scorePopTimeout);
+                scorePopTimeout = setTimeout(() => {
+                    scorePillEl.classList.remove('pop');
+                }, 220);
+            }
+        }
+
+        /**
+         * Spawns a wave of kawaii collectible flowers positioned across reachable orbital zones
+         * around the central gravity node.
+         */
+        function spawnCollectibleWave() {
+            collectibleFlowers = [];
+            const w = Math.max(canvas.width, 320);
+            const h = Math.max(canvas.height, 320);
+            const cx = centralNode.x;
+            const cy = centralNode.y;
+
+            const minOrbitR = 62;
+            const maxOrbitR = Math.max(minOrbitR + 40, Math.min(w * 0.40, h * 0.38));
+            const edgeMargin = 46;
+            const minFlowerSpacing = 54;
+
+            for (let i = 0; i < COLLECTIBLE_COUNT; i++) {
+                let placed = false;
+                const baseAngle = ((i / COLLECTIBLE_COUNT) * Math.PI * 2) + (Math.random() * 0.65);
+
+                for (let attempt = 0; attempt < 30; attempt++) {
+                    const angle = baseAngle + attempt * 0.27;
+                    const t = (i + Math.random() * 0.85) / COLLECTIBLE_COUNT;
+                    const dist = minOrbitR + t * (maxOrbitR - minOrbitR);
+
+                    const fx = Math.max(edgeMargin, Math.min(w - edgeMargin, cx + Math.cos(angle) * dist));
+                    const fy = Math.max(edgeMargin, Math.min(h - edgeMargin, cy + Math.sin(angle) * dist));
+
+                    // Keep clear of central gravity node
+                    const distToCenter = Math.hypot(fx - cx, fy - cy);
+                    if (distToCenter < minOrbitR) continue;
+
+                    // Keep clear of other collectible flowers
+                    const overlaps = collectibleFlowers.some(
+                        other => Math.hypot(fx - other.x, fy - other.y) < minFlowerSpacing
+                    );
+                    if (overlaps) continue;
+
+                    const palette = COLLECTIBLE_PALETTES[(i + Math.floor(Math.random() * 2)) % COLLECTIBLE_PALETTES.length];
+                    collectibleFlowers.push({
+                        x: fx,
+                        y: fy,
+                        radius: 13,
+                        palette: palette,
+                        phase: Math.random() * Math.PI * 2,
+                        spinOffset: Math.random() * Math.PI * 2,
+                        spawnScale: 0.05
+                    });
+                    placed = true;
+                    break;
+                }
+
+                // Fallback placement if canvas is very small
+                if (!placed) {
+                    const angle = (i / COLLECTIBLE_COUNT) * Math.PI * 2;
+                    const dist = Math.min(85, maxOrbitR);
+                    const palette = COLLECTIBLE_PALETTES[i % COLLECTIBLE_PALETTES.length];
+                    collectibleFlowers.push({
+                        x: Math.max(edgeMargin, Math.min(w - edgeMargin, cx + Math.cos(angle) * dist)),
+                        y: Math.max(edgeMargin, Math.min(h - edgeMargin, cy + Math.sin(angle) * dist)),
+                        radius: 13,
+                        palette: palette,
+                        phase: Math.random() * Math.PI * 2,
+                        spinOffset: Math.random() * Math.PI * 2,
+                        spawnScale: 0.05
+                    });
+                }
+            }
+        }
 
         /**
          * Initializes fluffy kawaii clouds and floating pastel stars/hearts
@@ -266,12 +468,23 @@
          */
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
+            const prevW = canvas.width || wrapper.clientWidth;
+            const prevH = canvas.height || wrapper.clientHeight;
+
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
 
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            // Keep existing collectible flowers scaled within bounds on resize
+            if (collectibleFlowers.length > 0 && prevW > 0 && prevH > 0) {
+                for (const f of collectibleFlowers) {
+                    f.x = Math.max(40, Math.min(canvas.width - 40, (f.x / prevW) * canvas.width));
+                    f.y = Math.max(40, Math.min(canvas.height - 40, (f.y / prevH) * canvas.height));
+                }
+            }
 
             initDecorations();
         }
@@ -297,7 +510,8 @@
                 y: y,
                 radius: 4,
                 maxRadius: 28,
-                alpha: 0.95
+                alpha: 0.95,
+                color: '255, 92, 147'
             });
 
             const petalColors = ['#ff5c93', '#ff8ab4', '#ffd43b', '#ffffff'];
@@ -318,6 +532,56 @@
                     isSparkle: i % 3 === 2
                 });
             }
+        }
+
+        /**
+         * Spawns a celebratory sparkle & petal burst when a collectible flower is gathered.
+         */
+        function spawnCollectBurst(flower) {
+            launchBursts.push({
+                x: flower.x,
+                y: flower.y,
+                radius: 6,
+                maxRadius: 38,
+                alpha: 0.98,
+                color: '255, 196, 25'
+            });
+
+            const burstColors = [
+                flower.palette.mid,
+                flower.palette.outer,
+                '#ffd43b',
+                '#ff7aa8',
+                '#ffffff'
+            ];
+
+            for (let i = 0; i < 14; i++) {
+                const spreadAngle = ((i / 14) * Math.PI * 2) + (Math.random() * 0.25);
+                const speed = 1.6 + Math.random() * 2.6;
+                petalParticles.push({
+                    x: flower.x,
+                    y: flower.y,
+                    vx: Math.cos(spreadAngle) * speed,
+                    vy: Math.sin(spreadAngle) * speed - 0.4,
+                    rotation: Math.random() * Math.PI * 2,
+                    vRot: (Math.random() - 0.5) * 0.22,
+                    size: 3.8 + Math.random() * 2.4,
+                    alpha: 1,
+                    decay: 0.026 + Math.random() * 0.012,
+                    color: burstColors[i % burstColors.length],
+                    isSparkle: i % 2 === 0
+                });
+            }
+
+            floatingTexts.push({
+                x: flower.x,
+                y: flower.y - 10,
+                vy: -1.15,
+                text: '+1 🌸',
+                color: '#d93870',
+                alpha: 1,
+                scale: 1
+            });
         }
 
         /**
@@ -345,19 +609,30 @@
         }
 
         /**
-         * Clears active flower projectile and decorative petal particles from the simulation.
+         * Clears active flower projectile, resets collected flower count, and spawns fresh flowers.
          */
         function resetSimulation() {
             balls = [];
             petalParticles = [];
             launchBursts = [];
+            floatingTexts = [];
+            collectedCount = 0;
+            updateScoreDisplay(false);
+            spawnCollectibleWave();
         }
 
         /**
-         * Updates orbital physics (inverse square law gravity, absorption, and trail history)
-         * as well as trailing petals shooting out from the flying flower.
+         * Updates orbital physics (inverse square law gravity, absorption, and trail history),
+         * checks collectible flower pickups, and animates decorative particles.
          */
         function updatePhysics() {
+            // Smooth pop-in animation for collectible flowers
+            for (const f of collectibleFlowers) {
+                if (f.spawnScale < 1) {
+                    f.spawnScale = Math.min(1, f.spawnScale + 0.07);
+                }
+            }
+
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
@@ -397,8 +672,36 @@
                 b.rotation += 0.09;
                 b.frameCount++;
 
+                // Check collection against floating collectible flowers
+                for (let j = collectibleFlowers.length - 1; j >= 0; j--) {
+                    const target = collectibleFlowers[j];
+                    const bobY = target.y + Math.sin(animTime * 0.0032 + target.phase) * 3.5;
+                    const collectDist = Math.hypot(b.x - target.x, b.y - bobY);
+
+                    if (collectDist <= b.radius + target.radius + 7) {
+                        collectedCount++;
+                        updateScoreDisplay(true);
+                        spawnCollectBurst({ ...target, y: bobY });
+                        collectibleFlowers.splice(j, 1);
+
+                        // Spawn a fresh bouquet wave once all flowers on screen are collected
+                        if (collectibleFlowers.length === 0) {
+                            floatingTexts.push({
+                                x: centralNode.x,
+                                y: centralNode.y - 36,
+                                vy: -0.75,
+                                text: 'Bouquet Complete! ✨',
+                                color: '#3d8ac7',
+                                alpha: 1,
+                                scale: 1.15
+                            });
+                            spawnCollectibleWave();
+                        }
+                    }
+                }
+
                 // Shoot tiny petals and sparkles outward from the flying flower
-                if (b.frameCount % 4 === 0 && petalParticles.length < 70) {
+                if (b.frameCount % 4 === 0 && petalParticles.length < 85) {
                     const ejectAngle = Math.atan2(-b.vy, -b.vx) + (Math.random() - 0.5) * 1.6;
                     const ejectSpeed = 0.7 + Math.random() * 1.1;
                     const colors = ['#ff7aa8', '#ffb3cf', '#ffe066', '#ffffff'];
@@ -424,7 +727,7 @@
                 }
             }
 
-            // Update launch ring bursts
+            // Update launch & collection ring bursts
             for (let i = launchBursts.length - 1; i >= 0; i--) {
                 const burst = launchBursts[i];
                 burst.radius += 1.6;
@@ -445,6 +748,16 @@
                 p.alpha -= p.decay;
                 if (p.alpha <= 0) {
                     petalParticles.splice(i, 1);
+                }
+            }
+
+            // Update floating score & celebration text
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy;
+                ft.alpha -= 0.022;
+                if (ft.alpha <= 0) {
+                    floatingTexts.splice(i, 1);
                 }
             }
         }
@@ -575,7 +888,6 @@
             ctx.globalAlpha = 0.88; // Soft harmony so orbit paths remain super clear
 
             // 1. Blue Overalls & Yellow Shirt Peek (Bottom torso)
-            // Yellow puff sleeves
             ctx.fillStyle = '#ffe375';
             ctx.strokeStyle = outlineColor;
             ctx.lineWidth = 2.4;
@@ -854,6 +1166,102 @@
         }
 
         /**
+         * Draws a floating pastel kawaii collectible flower with mint leaves,
+         * soft pulsing aura ring, and glossy petal highlights.
+         */
+        function drawCollectibleFlower(flower, time) {
+            const bobY = flower.y + Math.sin(time * 0.0032 + flower.phase) * 3.5;
+            const gentleRot = flower.spinOffset + Math.sin(time * 0.0018 + flower.phase) * 0.25;
+            const auraPulse = 17 + Math.sin(time * 0.0045 + flower.phase) * 2.5;
+            const p = flower.palette;
+
+            ctx.save();
+            ctx.translate(flower.x, bobY);
+            ctx.scale(flower.spawnScale, flower.spawnScale);
+
+            // Soft pastel glow aura behind collectible flower
+            ctx.beginPath();
+            ctx.arc(0, 0, auraPulse, 0, Math.PI * 2);
+            ctx.fillStyle = p.aura;
+            ctx.fill();
+
+            // Crisp white backing circle so flower pops over sky and clouds
+            ctx.beginPath();
+            ctx.arc(0, 0, 14.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.fill();
+            ctx.lineWidth = 1.4;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
+            ctx.stroke();
+
+            // Two cute mint-green leaves at bottom-left and bottom-right
+            const leafAngles = [Math.PI * 0.72, Math.PI * 0.28];
+            for (const la of leafAngles) {
+                ctx.save();
+                ctx.rotate(la);
+                ctx.beginPath();
+                ctx.ellipse(12, 0, 5.2, 2.8, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#69db7c';
+                ctx.fill();
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = '#2b8a3e';
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Rotate flower petals gently
+            ctx.rotate(gentleRot);
+
+            const petalCount = 5;
+            const petalDist = 6.6;
+            const petalRadiusX = 5.6;
+            const petalRadiusY = 4.5;
+
+            for (let i = 0; i < petalCount; i++) {
+                const angle = (i * Math.PI * 2) / petalCount;
+                ctx.save();
+                ctx.rotate(angle);
+
+                const petalGrad = ctx.createRadialGradient(2, 0, 1, petalDist, 0, petalRadiusX + 1);
+                petalGrad.addColorStop(0, p.inner);
+                petalGrad.addColorStop(0.65, p.mid);
+                petalGrad.addColorStop(1, p.outer);
+
+                ctx.beginPath();
+                ctx.ellipse(petalDist, 0, petalRadiusX, petalRadiusY, 0, 0, Math.PI * 2);
+                ctx.fillStyle = petalGrad;
+                ctx.fill();
+                ctx.lineWidth = 1.4;
+                ctx.strokeStyle = p.stroke;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // Flower center button
+            const centerGrad = ctx.createRadialGradient(-1, -1, 0.5, 0, 0, 4.4);
+            centerGrad.addColorStop(0, p.centerInner);
+            centerGrad.addColorStop(0.65, p.centerOuter);
+            centerGrad.addColorStop(1, p.stroke);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, 4.3, 0, Math.PI * 2);
+            ctx.fillStyle = centerGrad;
+            ctx.fill();
+            ctx.lineWidth = 1.3;
+            ctx.strokeStyle = p.stroke;
+            ctx.stroke();
+
+            // Glossy catchlight dot on center
+            ctx.beginPath();
+            ctx.arc(-1.3, -1.3, 1.15, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        /**
          * Draws a spinning 5-petal kawaii flower projectile at (b.x, b.y)
          * with a soft white aura, strawberry-blush petals, and sunny yellow center.
          */
@@ -928,15 +1336,15 @@
         }
 
         /**
-         * Draws launch burst rings and tiny shooting petals/sparkles.
+         * Draws launch burst rings, tiny shooting petals/sparkles, and floating score popups.
          */
         function drawPetalEffects() {
-            // Expanding blossom burst rings at launch point
+            // Expanding blossom burst rings at launch & collection points
             for (const burst of launchBursts) {
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(burst.x, burst.y, burst.radius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(255, 92, 147, ${burst.alpha})`;
+                ctx.strokeStyle = `rgba(${burst.color || '255, 92, 147'}, ${burst.alpha})`;
                 ctx.lineWidth = 2.4;
                 ctx.stroke();
                 ctx.restore();
@@ -970,6 +1378,20 @@
 
                 ctx.restore();
             }
+
+            // Floating "+1 🌸" & wave celebration text
+            for (const ft of floatingTexts) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, ft.alpha);
+                ctx.font = `700 ${Math.round(16 * ft.scale)}px 'Fredoka', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.strokeText(ft.text, ft.x, ft.y);
+                ctx.fillStyle = ft.color;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            }
         }
 
         // =========================================================================
@@ -1000,7 +1422,12 @@
             drawHelloKitty();
             drawCinnamoroll(animTime);
 
-            // 5. Central Mass Node (radius = 12) - High-Contrast Strawberry & Gold Planet
+            // 5. Collectible Floating Flowers
+            for (const flower of collectibleFlowers) {
+                drawCollectibleFlower(flower, animTime);
+            }
+
+            // 6. Central Mass Node (radius = 12) - High-Contrast Strawberry & Gold Planet
             const pulseAura = 18 + Math.sin(animTime * 0.004) * 2.5;
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, pulseAura, 0, Math.PI * 2);
@@ -1035,10 +1462,10 @@
             ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x, centralNode.y - sr);
             ctx.fill();
 
-            // 6. Launch Burst & Shooting Mini-Petals
+            // 7. Launch & Collection Bursts, Shooting Mini-Petals & Popups
             drawPetalEffects();
 
-            // 7. Flower Projectile & High-Contrast Magenta-Pink Orbit Trail
+            // 8. Flower Projectile & High-Contrast Magenta-Pink Orbit Trail
             for (const b of balls) {
                 if (b.trail.length > 1) {
                     ctx.save();
@@ -1081,6 +1508,7 @@
 
         window.onload = function() {
             resizeCanvas();
+            spawnCollectibleWave();
             animate();
         };
     </script>
