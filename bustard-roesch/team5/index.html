@@ -160,6 +160,7 @@
             border: 1px solid #ffffff;
             display: block;
             cursor: crosshair;
+            touch-action: none;
             width: 100%;
             height: 100%;
         }
@@ -216,6 +217,14 @@
                 </select>
             </div>
 
+            <div class="control-group" title="Choose Multi-Ball Visual Style">
+                <label for="ballStyle" class="control-label">Balls:</label>
+                <select id="ballStyle" class="control-select" aria-label="Ball Color Style">
+                    <option value="prism">Prism Glow</option>
+                    <option value="classic">Classic White</option>
+                </select>
+            </div>
+
             <div class="control-group" title="Adjust Core and Edge Colors for Custom Gradient">
                 <label for="coreColor" class="control-label">Core</label>
                 <input type="color" id="coreColor" class="color-picker" value="#16213e" aria-label="Core Background Color">
@@ -226,6 +235,7 @@
             <button type="button" class="btn-control" id="uploadBgBtn" title="Upload a Custom Background Image">Upload BG</button>
             <input type="file" id="bgImageInput" accept="image/*" hidden>
 
+            <button type="button" class="btn-control" onclick="launchSwarm()" title="Launch a Harmonic Multi-Ball Formation">Swarm</button>
             <button type="button" class="btn-reset" onclick="resetSimulation()">Reset</button>
         </div>
     </div>
@@ -236,35 +246,60 @@
     </div>
 
     <div class="instructions" id="statusBar">
-        Click anywhere on the canvas to launch a ball.
+        Click or drag anywhere on the canvas to launch multiple orbiting balls.
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // UI Elements for Custom Backgrounds
+        // UI Elements
         const bgPresetSelect = document.getElementById('bgPreset');
+        const ballStyleSelect = document.getElementById('ballStyle');
         const coreColorInput = document.getElementById('coreColor');
         const edgeColorInput = document.getElementById('edgeColor');
         const uploadBgBtn = document.getElementById('uploadBgBtn');
         const bgImageInput = document.getElementById('bgImageInput');
         const statusBar = document.getElementById('statusBar');
 
-        // SIMULATION CONSTANTS (Preserved Exact Values)
+        // SIMULATION CONSTANTS (Preserved Exact Physics Values)
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;        // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;    // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const MAX_BALLS = 60;             // Maximum simultaneous orbiting balls
+
+        // Harmonious luminous palette for multi-ball trails
+        const PRISM_PALETTE = [
+            '#ffffff',
+            '#5ce1e6',
+            '#c084fc',
+            '#ff7eb3',
+            '#64ffda',
+            '#ffd166',
+            '#60a5fa',
+            '#fb923c',
+            '#a3e635',
+            '#f472b6'
+        ];
 
         // STATE VARIABLES
         let balls = [];
+        let ripples = [];
+        let launchCounter = 0;
+        let ballColorMode = 'prism';      // 'prism' | 'classic'
         let bgMode = 'void';              // 'void' | 'spacetime' | 'starfield' | 'nebula' | 'cyber' | 'blueprint' | 'custom-gradient' | 'custom-image'
         let customCoreColor = coreColorInput.value;
         let customEdgeColor = edgeColorInput.value;
         let customBgImage = null;
         let animTime = 0;
+
+        // Pointer drag-launch tracking
+        let isPointerDown = false;
+        let lastSpawnTime = 0;
+        let lastSpawnX = 0;
+        let lastSpawnY = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -275,7 +310,7 @@
 
         // Pre-generated procedural stars for Deep Starfield preset (normalized coordinates)
         const starfieldData = Array.from({ length: 190 }, (_, idx) => {
-            const layer = idx % 3; // 0: distant fine, 1: medium, 2: bright foreground
+            const layer = idx % 3;
             const hues = ['#ffffff', '#cfe4ff', '#ffe9cc', '#b8f2ff'];
             return {
                 nx: ((idx * 73.137) % 100) / 100,
@@ -289,13 +324,24 @@
             };
         });
 
-        // Helper for transient status feedback (replaces alert/confirm)
+        // Helper for transient status feedback
         let statusTimeout = null;
+        function updateDefaultStatus() {
+            if (statusTimeout) return;
+            if (balls.length === 0) {
+                statusBar.textContent = 'Click or drag anywhere on the canvas to launch multiple orbiting balls.';
+            } else {
+                const label = balls.length === 1 ? '1 ball in orbit' : `${balls.length} balls in orbit`;
+                statusBar.textContent = `${label} — Click or drag anywhere to add more.`;
+            }
+        }
+
         function showStatusMessage(message, durationMs = 3200) {
             statusBar.textContent = message;
             if (statusTimeout) clearTimeout(statusTimeout);
             statusTimeout = setTimeout(() => {
-                statusBar.textContent = 'Click anywhere on the canvas to launch a ball.';
+                statusTimeout = null;
+                updateDefaultStatus();
             }, durationMs);
         }
 
@@ -303,7 +349,7 @@
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
+
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
@@ -312,9 +358,13 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Background Control Event Listeners
+        // Background & Visual Style Event Listeners
         bgPresetSelect.addEventListener('change', (e) => {
             bgMode = e.target.value;
+        });
+
+        ballStyleSelect.addEventListener('change', (e) => {
+            ballColorMode = e.target.value;
         });
 
         function applyCustomGradient() {
@@ -362,13 +412,45 @@
             bgImageInput.value = '';
         });
 
-        // Canvas Click Handler: Directly launch ball at click position
-        canvas.addEventListener('click', (e) => {
+        // Pointer Handlers: Click for single launch, click-and-drag for multi-ball stream
+        function getCanvasCoords(e) {
             const rect = canvas.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickY = e.clientY - rect.top;
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
 
-            launchBall(clickX, clickY);
+        canvas.addEventListener('pointerdown', (e) => {
+            if (e.button !== undefined && e.button !== 0) return;
+            const { x, y } = getCanvasCoords(e);
+            isPointerDown = true;
+            lastSpawnTime = performance.now();
+            lastSpawnX = x;
+            lastSpawnY = y;
+            launchBall(x, y);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isPointerDown) return;
+            const { x, y } = getCanvasCoords(e);
+            const now = performance.now();
+            const movedDist = Math.hypot(x - lastSpawnX, y - lastSpawnY);
+
+            if (now - lastSpawnTime >= 85 && movedDist >= 16) {
+                lastSpawnTime = now;
+                lastSpawnX = x;
+                lastSpawnY = y;
+                launchBall(x, y);
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            isPointerDown = false;
+        });
+
+        canvas.addEventListener('pointercancel', () => {
+            isPointerDown = false;
         });
 
         function launchBall(x, y) {
@@ -377,30 +459,59 @@
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
-            balls = [{
+            const color = PRISM_PALETTE[launchCounter % PRISM_PALETTE.length];
+            launchCounter++;
+
+            if (balls.length >= MAX_BALLS) {
+                balls.shift();
+            }
+
+            balls.push({
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
                 radius: 4,
-                trail: [] // Stores history of past {x, y} coordinates
-            }];
+                color: color,
+                trail: [{ x: x, y: y }]
+            });
+
+            updateDefaultStatus();
+        }
+
+        function launchSwarm() {
+            const count = 8;
+            const maxSpan = Math.min(canvas.height * 0.36, 210);
+            const minSpan = 55;
+
+            for (let i = 0; i < count; i++) {
+                const t = i / (count - 1);
+                const offset = minSpan + t * (maxSpan - minSpan);
+                const side = i % 2 === 0 ? -1 : 1;
+                const xOffset = (i - (count - 1) / 2) * 14;
+                launchBall(centralNode.x + xOffset, centralNode.y + side * offset);
+            }
         }
 
         function resetSimulation() {
             balls = [];
+            ripples = [];
+            launchCounter = 0;
+            updateDefaultStatus();
         }
 
         function updatePhysics() {
+            let countChanged = false;
+
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove ball if it travels too far off-screen
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
+                if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
                     balls.splice(i, 1);
+                    countChanged = true;
                     continue;
                 }
 
@@ -412,7 +523,13 @@
 
                 // Absorption check: ball collides with central mass
                 if (dist < centralNode.radius + b.radius) {
+                    ripples.push({
+                        radius: centralNode.radius,
+                        alpha: 0.75,
+                        color: ballColorMode === 'prism' ? b.color : '#ffffff'
+                    });
                     balls.splice(i, 1);
+                    countChanged = true;
                     continue;
                 }
 
@@ -435,6 +552,19 @@
                     b.trail.shift();
                 }
             }
+
+            // Update central mass absorption ripples
+            for (let r = ripples.length - 1; r >= 0; r--) {
+                ripples[r].radius += 1.4;
+                ripples[r].alpha -= 0.025;
+                if (ripples[r].alpha <= 0) {
+                    ripples.splice(r, 1);
+                }
+            }
+
+            if (countChanged) {
+                updateDefaultStatus();
+            }
         }
 
         /* =========================================================
@@ -450,7 +580,6 @@
             ctx.fillStyle = '#030509';
             ctx.fillRect(0, 0, w, h);
 
-            // Subtle gravitational well aura
             const wellGlow = ctx.createRadialGradient(
                 centralNode.x, centralNode.y, 8,
                 centralNode.x, centralNode.y, Math.min(w, h) * 0.45
@@ -467,7 +596,6 @@
             const offsetX = (w % spacing) / 2 - spacing;
             const offsetY = (h % spacing) / 2 - spacing;
 
-            // Compute warped grid vertices pulled toward central gravity node
             const grid = [];
             for (let r = 0; r < rows; r++) {
                 const rowPts = [];
@@ -493,7 +621,6 @@
 
             ctx.lineWidth = 1;
 
-            // Horizontal mesh lines
             for (let r = 0; r < rows; r++) {
                 ctx.beginPath();
                 for (let c = 0; c < cols; c++) {
@@ -505,7 +632,6 @@
                 ctx.stroke();
             }
 
-            // Vertical mesh lines
             for (let c = 0; c < cols; c++) {
                 ctx.beginPath();
                 for (let r = 0; r < rows; r++) {
@@ -517,7 +643,6 @@
                 ctx.stroke();
             }
 
-            // Concentric orbital range rings around the central gravity node
             ctx.save();
             ctx.setLineDash([4, 6]);
             for (let radius = 85; radius <= 340; radius += 85) {
@@ -534,7 +659,6 @@
             ctx.fillStyle = '#020308';
             ctx.fillRect(0, 0, w, h);
 
-            // Subtle diagonal galactic dust band
             const dust = ctx.createLinearGradient(0, h, w, 0);
             dust.addColorStop(0, 'rgba(15, 25, 55, 0.05)');
             dust.addColorStop(0.5, 'rgba(38, 56, 105, 0.16)');
@@ -542,7 +666,6 @@
             ctx.fillStyle = dust;
             ctx.fillRect(0, 0, w, h);
 
-            // Render multi-layered twinkling stars
             for (let i = 0; i < starfieldData.length; i++) {
                 const s = starfieldData[i];
                 const sx = s.nx * w;
@@ -612,7 +735,6 @@
             }
             ctx.restore();
 
-            // Subtle faint starlight specks through nebula
             for (let i = 0; i < 65; i++) {
                 const s = starfieldData[i];
                 ctx.fillStyle = `rgba(255, 255, 255, ${0.25 + 0.2 * Math.sin(t * 1.8 + s.phase)})`;
@@ -624,7 +746,6 @@
             ctx.fillStyle = '#05020e';
             ctx.fillRect(0, 0, w, h);
 
-            // Subtle magenta/cyan ambient corner glow
             const cyberGlow = ctx.createRadialGradient(
                 centralNode.x, centralNode.y, 20,
                 centralNode.x, centralNode.y, Math.max(w, h) * 0.65
@@ -635,7 +756,6 @@
             ctx.fillStyle = cyberGlow;
             ctx.fillRect(0, 0, w, h);
 
-            // Fine magenta sub-grid
             const subStep = 22;
             ctx.strokeStyle = 'rgba(255, 0, 170, 0.08)';
             ctx.lineWidth = 1;
@@ -650,7 +770,6 @@
             }
             ctx.stroke();
 
-            // Major neon cyan grid
             const majorStep = 66;
             ctx.strokeStyle = 'rgba(0, 243, 255, 0.22)';
             ctx.lineWidth = 1;
@@ -665,7 +784,6 @@
             }
             ctx.stroke();
 
-            // Expanding sonar pulse from gravity well
             const maxPulseR = Math.min(w, h) * 0.48;
             const pulseR = ((t * 55) % maxPulseR);
             const pulseAlpha = (1 - pulseR / maxPulseR) * 0.28;
@@ -677,11 +795,9 @@
         }
 
         function drawPhysicsBlueprint(w, h) {
-            // Deep navy schematic base
             ctx.fillStyle = '#071324';
             ctx.fillRect(0, 0, w, h);
 
-            // Minor schematic grid (20px)
             const minor = 20;
             ctx.strokeStyle = 'rgba(120, 190, 255, 0.08)';
             ctx.lineWidth = 1;
@@ -696,7 +812,6 @@
             }
             ctx.stroke();
 
-            // Major schematic grid (100px)
             const major = 100;
             ctx.strokeStyle = 'rgba(135, 205, 255, 0.2)';
             ctx.lineWidth = 1;
@@ -711,7 +826,6 @@
             }
             ctx.stroke();
 
-            // Principal Crosshair Axes through Gravity Node
             ctx.strokeStyle = 'rgba(170, 225, 255, 0.34)';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -721,7 +835,6 @@
             ctx.lineTo(centralNode.x, h);
             ctx.stroke();
 
-            // Radial measurement rings & schematic labels
             ctx.font = '10px "Courier New", monospace';
             ctx.fillStyle = 'rgba(175, 225, 255, 0.55)';
             const ringRadii = [80, 160, 240, 320];
@@ -734,7 +847,6 @@
                 ctx.fillText(`R=${r}`, centralNode.x + r + 4, centralNode.y - 4);
             }
 
-            // Degree ticks around outer reference ring
             const outerR = 240;
             ctx.strokeStyle = 'rgba(175, 225, 255, 0.35)';
             for (let deg = 0; deg < 360; deg += 15) {
@@ -772,7 +884,6 @@
                 return;
             }
 
-            // Scale image cleanly to cover canvas while preserving aspect ratio
             const imgW = customBgImage.naturalWidth || customBgImage.width;
             const imgH = customBgImage.naturalHeight || customBgImage.height;
             const scale = Math.max(w / imgW, h / imgH);
@@ -783,7 +894,6 @@
 
             ctx.drawImage(customBgImage, drawX, drawY, drawW, drawH);
 
-            // Subtle dark dimming + radial vignette so white ball and trail stay crisp
             ctx.fillStyle = 'rgba(0, 0, 0, 0.36)';
             ctx.fillRect(0, 0, w, h);
 
@@ -831,15 +941,27 @@
         }
 
         function draw() {
-            // Render active custom or preset background
             drawBackground();
 
-            // Subtle contrast shadow so foreground elements pop against any background
             ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-            ctx.shadowBlur = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
 
-            // 1. Draw Central Mass Node
+            // 1. Draw Absorption Ripples around Central Mass
+            for (const rip of ripples) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, rip.alpha);
+                ctx.beginPath();
+                ctx.arc(centralNode.x, centralNode.y, rip.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = rip.color;
+                ctx.lineWidth = 1.4;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 2. Draw Central Mass Node
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.35)';
+            ctx.shadowBlur = 10;
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
@@ -852,27 +974,51 @@
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            // 2. Draw Ball & Trail
+            // 3. Draw All Active Balls & Tapered Ribbon Trails
+            const trailSegments = 6;
             for (const b of balls) {
-                // Draw path line
-                if (b.trail.length > 1) {
-                    ctx.beginPath();
-                    ctx.moveTo(b.trail[0].x, b.trail[0].y);
-                    for (let t = 1; t < b.trail.length; t++) {
-                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                const activeColor = ballColorMode === 'prism' ? b.color : '#ffffff';
+                const len = b.trail.length;
+
+                if (len > 1) {
+                    const chunkSize = Math.max(1, Math.floor((len - 1) / trailSegments));
+                    for (let s = 0; s < trailSegments; s++) {
+                        const startIdx = s * chunkSize;
+                        if (startIdx >= len - 1) break;
+                        const endIdx = s === trailSegments - 1 ? len - 1 : Math.min(len - 1, (s + 1) * chunkSize);
+                        const progress = (s + 1) / trailSegments;
+
+                        ctx.beginPath();
+                        ctx.moveTo(b.trail[startIdx].x, b.trail[startIdx].y);
+                        for (let t = startIdx + 1; t <= endIdx; t++) {
+                            ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                        }
+                        ctx.globalAlpha = 0.08 + 0.84 * (progress * progress);
+                        ctx.strokeStyle = activeColor;
+                        ctx.lineWidth = 0.75 + 0.85 * progress;
+                        ctx.stroke();
                     }
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
-                    ctx.stroke();
+                    ctx.globalAlpha = 1;
                 }
 
-                // Draw ball object
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-                ctx.shadowBlur = 4;
+                // Draw ball object with luminous aura
+                ctx.shadowColor = activeColor;
+                ctx.shadowBlur = ballColorMode === 'prism' ? 8 : 4;
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = activeColor;
                 ctx.fill();
+
+                // Crisp bright core on colored balls
+                if (ballColorMode === 'prism' && activeColor !== '#ffffff') {
+                    ctx.shadowBlur = 0;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, b.radius * 0.48, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                }
+
+                ctx.shadowBlur = 0;
             }
 
             ctx.restore();
