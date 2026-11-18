@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gravity Physics Baseline</title>
     <style>
+        /* Global Reset & Typography */
         * {
             box-sizing: border-box;
             user-select: none;
@@ -13,9 +14,10 @@
             font-family: 'Courier New', Courier, monospace, sans-serif;
         }
 
+        /* Main Viewport Layout with Pastel Gradient Background */
         body {
-            background-color: #000000;
-            color: #ffffff;
+            background: linear-gradient(135deg, #ffd1dc 0%, #bae1ff 50%, #b2f0e8 100%);
+            color: #1e293b;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -36,7 +38,7 @@
             max-width: 1100px;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #ffffff;
+            border-bottom: 1px solid #1e293b;
         }
 
         h1 {
@@ -62,8 +64,8 @@
             appearance: none;
             width: 180px;
             height: 6px;
-            background: #000000;
-            border: 1px solid #ffffff;
+            background: rgba(255, 255, 255, 0.55);
+            border: 1px solid #1e293b;
             outline: none;
             cursor: pointer;
         }
@@ -74,9 +76,9 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #ffffff;
-            border: 2px solid #000000;
-            box-shadow: 0 0 0 1px #ffffff;
+            background: #1e293b;
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 0 1px #1e293b;
             cursor: grab;
             transition: transform 0.1s ease-in-out;
         }
@@ -90,9 +92,9 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #ffffff;
-            border: 2px solid #000000;
-            box-shadow: 0 0 0 1px #ffffff;
+            background: #1e293b;
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 0 1px #1e293b;
             cursor: grab;
             transition: transform 0.1s ease-in-out;
         }
@@ -107,10 +109,11 @@
             text-align: right;
         }
 
+        /* Reset Button Styling */
         .btn-reset {
-            background: transparent;
-            color: #ffffff;
-            border: 1px solid #ffffff;
+            background: rgba(255, 255, 255, 0.35);
+            color: #1e293b;
+            border: 1px solid #1e293b;
             padding: 6px 16px;
             font-size: 14px;
             font-weight: bold;
@@ -121,8 +124,8 @@
         }
 
         .btn-reset:hover {
-            background: #ffffff;
-            color: #000000;
+            background: #1e293b;
+            color: #ffffff;
         }
 
         /* Main Canvas Container */
@@ -137,18 +140,19 @@
         }
 
         canvas {
-            background-color: #000000;
-            border: 1px solid #ffffff;
+            background: linear-gradient(135deg, #ffd1dc 0%, #bae1ff 50%, #b2f0e8 100%);
+            border: 1px solid #1e293b;
             display: block;
             cursor: crosshair;
             width: 100%;
             height: 100%;
         }
 
+        /* Footer Instructions */
         .instructions {
             margin-top: 8px;
             font-size: 11px;
-            color: #888888;
+            color: #334155;
             text-align: center;
         }
     </style>
@@ -159,12 +163,14 @@
     <div id="header">
         <h1>Gravity Simulation</h1>
 
+        <!-- Velocity Control Bar -->
         <div class="speed-control">
             <label for="speedSlider">Speed:</label>
             <input type="range" id="speedSlider" min="0" max="15" step="0.1" value="5">
             <span id="speedValue">5.0</span>
         </div>
 
+        <!-- Simulation Reset Trigger -->
         <button class="btn-reset" onclick="resetSimulation()">Reset</button>
     </div>
 
@@ -173,11 +179,13 @@
         <canvas id="simCanvas"></canvas>
     </div>
 
+    <!-- Usage Guidance -->
     <div class="instructions">
         Adjust the speed bar above and click anywhere on the canvas to launch a ball.
     </div>
 
     <script>
+        // DOM Element References
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
         const speedSlider = document.getElementById('speedSlider');
@@ -200,6 +208,10 @@
             radius: 12
         };
 
+        /**
+         * Updates the displayed velocity value and fills the slider track
+         * with deep slate up to the current thumb position.
+         */
         function updateSpeedUI() {
             launchVelocity = parseFloat(speedSlider.value);
             speedValue.textContent = launchVelocity.toFixed(1);
@@ -207,17 +219,21 @@
             const min = parseFloat(speedSlider.min);
             const max = parseFloat(speedSlider.max);
             const percent = ((launchVelocity - min) / (max - min)) * 100;
-            speedSlider.style.background = `linear-gradient(to right, #ffffff 0%, #ffffff ${percent}%, #000000 ${percent}%, #000000 100%)`;
+            speedSlider.style.background = `linear-gradient(to right, #1e293b 0%, #1e293b ${percent}%, rgba(255, 255, 255, 0.55) ${percent}%, rgba(255, 255, 255, 0.55) 100%)`;
         }
 
         speedSlider.addEventListener('input', updateSpeedUI);
         updateSpeedUI();
 
+        /**
+         * Resizes the HTML5 canvas to match its responsive container
+         * and recenters the central gravity node.
+         */
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
+
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
@@ -226,7 +242,9 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch ball at click position
+        /**
+         * Canvas Click Handler: Launches a ball directly at the clicked coordinates.
+         */
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -235,6 +253,10 @@
             launchBall(clickX, clickY);
         });
 
+        /**
+         * Initializes a single orbiting projectile at (x, y) using the
+         * current launchVelocity and FIXED_LAUNCH_ANGLE.
+         */
         function launchBall(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
@@ -252,17 +274,24 @@
             }];
         }
 
+        /**
+         * Clears active projectiles from the simulation canvas.
+         */
         function resetSimulation() {
             balls = [];
         }
 
+        /**
+         * Advances projectile kinematics using softened inverse-square gravity
+         * and removes projectiles that collide with the central mass or leave bounds.
+         */
         function updatePhysics() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
                 // Remove ball if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
+                if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
                     balls.splice(i, 1);
                     continue;
@@ -301,21 +330,29 @@
             }
         }
 
+        /**
+         * Renders the pastel gradient backdrop, central gravity node,
+         * trajectory path, and active projectile.
+         */
         function draw() {
-            // Clear canvas background
-            ctx.fillStyle = '#000000';
+            // Paint diagonal pastel gradient across the canvas
+            const bgGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            bgGradient.addColorStop(0, '#ffd1dc');   // Pastel Pink
+            bgGradient.addColorStop(0.5, '#bae1ff'); // Pastel Blue
+            bgGradient.addColorStop(1, '#b2f0e8');   // Pastel Teal
+            ctx.fillStyle = bgGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // 1. Draw Central Mass Node
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = '#1e293b';
             ctx.fill();
 
             // Center mark on node
             ctx.beginPath();
             ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = '#ffffff';
             ctx.fill();
 
             // 2. Draw Ball & Trail
@@ -327,19 +364,22 @@
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 1.4;
                     ctx.stroke();
                 }
 
                 // Draw ball object
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = '#1e293b';
                 ctx.fill();
             }
         }
 
+        /**
+         * Main animation loop driven by requestAnimationFrame.
+         */
         function animate() {
             updatePhysics();
             draw();
@@ -347,6 +387,7 @@
         }
 
         window.onload = function() {
+            resizeCanvas();
             animate();
         };
     </script>
