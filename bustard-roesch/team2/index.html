@@ -137,6 +137,8 @@
         // STATE VARIABLES
         let balls = [];
         let fireflies = [];
+        let vines = [];
+        let monkeys = [];
         let animTime = 0;
 
         // Central Gravity Node Definition
@@ -154,6 +156,97 @@
                 t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
                 return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
             };
+        }
+
+        // Evaluate exact point (x, y) along a stored cubic Bezier vine at parameter t in [0, 1]
+        function getPointOnVine(vine, t) {
+            const u = 1 - t;
+            const x = u * u * u * vine.p0.x +
+                      3 * u * u * t * vine.p1.x +
+                      3 * u * t * t * vine.p2.x +
+                      t * t * t * vine.p3.x;
+            const y = u * u * u * vine.p0.y +
+                      3 * u * u * t * vine.p1.y +
+                      3 * u * t * t * vine.p2.y +
+                      t * t * t * vine.p3.y;
+            return { x, y };
+        }
+
+        // Initialize 4 expressive monkeys attached to well-spaced left & right canopy vines
+        function initMonkeys(width, height) {
+            if (vines.length === 0) {
+                monkeys = [];
+                return;
+            }
+
+            const rand = createSeededRandom(73519);
+
+            // Target normalized horizontal positions on left & right sides (central orbital space stays clear)
+            const monkeySpecs = [
+                { targetNormX: 0.13, pose: 'one-arm',     facing: 1,  tAttach: 0.72, furMain: '#5c3820', furDark: '#3d2312', furLight: '#7a4d2e', skin: '#e8be96', skinShade: '#cfa074' },
+                { targetNormX: 0.26, pose: 'upside-down', facing: 1,  tAttach: 0.75, furMain: '#6b4226', furDark: '#472a16', furLight: '#8a5937', skin: '#edd0b0', skinShade: '#d4af87' },
+                { targetNormX: 0.74, pose: 'two-arm',     facing: -1, tAttach: 0.74, furMain: '#54321c', furDark: '#361e0f', furLight: '#734729', skin: '#e6ba91', skinShade: '#c9986b' },
+                { targetNormX: 0.87, pose: 'one-arm',     facing: -1, tAttach: 0.70, furMain: '#663e22', furDark: '#422613', furLight: '#855331', skin: '#ebc7a4', skinShade: '#cfa67e' }
+            ];
+
+            // Scale monkeys gently for smaller viewports so they never crowd orbital paths
+            const scale = Math.max(0.72, Math.min(1.0, Math.min(width, height) / 600));
+            const usedVineIndices = new Set();
+            const existingStates = monkeys;
+            monkeys = [];
+
+            monkeySpecs.forEach((spec, idx) => {
+                // Find the closest available vine that isn't hidden behind framing tree trunks
+                let bestVine = null;
+                let bestDist = Infinity;
+
+                for (const vine of vines) {
+                    if (usedVineIndices.has(vine.index)) continue;
+                    if (vine.normX < 0.08 || vine.normX > 0.92) continue;
+                    // Keep central orbital zone clear
+                    if (vine.normX > 0.34 && vine.normX < 0.66) continue;
+
+                    const d = Math.abs(vine.normX - spec.targetNormX);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestVine = vine;
+                    }
+                }
+
+                if (!bestVine) return;
+                usedVineIndices.add(bestVine.index);
+
+                const anchor = getPointOnVine(bestVine, spec.tAttach);
+                const prev = existingStates[idx];
+
+                monkeys.push({
+                    vineIndex: bestVine.index,
+                    anchorX: anchor.x,
+                    anchorY: anchor.y,
+                    pose: spec.pose,
+                    facing: spec.facing,
+                    scale: scale,
+                    furMain: spec.furMain,
+                    furDark: spec.furDark,
+                    furLight: spec.furLight,
+                    skin: spec.skin,
+                    skinShade: spec.skinShade,
+                    // Animation phase & pendulum dynamics
+                    phase: prev ? prev.phase : rand() * Math.PI * 2,
+                    swaySpeed: 0.028 + rand() * 0.01,
+                    swayAmp: 0.048 + rand() * 0.022,
+                    tailSpeed: 0.045 + rand() * 0.015,
+                    actionSpeed: 0.075 + rand() * 0.02,
+                    currentAngle: 0,
+                    // Blink state
+                    blinkTimer: prev ? prev.blinkTimer : Math.floor(60 + rand() * 180),
+                    blinkDuration: 10,
+                    blinkProgress: 0,
+                    // Smoothed pupil gaze offset in local head coordinates
+                    gazeX: prev ? prev.gazeX : 0,
+                    gazeY: prev ? prev.gazeY : 0
+                });
+            });
         }
 
         // Initialize drifting jungle fireflies / forest dust motes
@@ -285,7 +378,7 @@
             targetCtx.restore();
         }
 
-        // Helper: Draw a hanging liana vine with pairs of tropical leaves
+        // Helper: Draw a hanging liana vine with pairs of tropical leaves and return its exact cubic Bezier curve
         function drawHangingVine(targetCtx, anchorX, length, sway, leafDensity, vineColor, leafColor, leafHighlight) {
             targetCtx.save();
 
@@ -301,7 +394,7 @@
             targetCtx.moveTo(anchorX, -5);
             targetCtx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
             targetCtx.strokeStyle = vineColor;
-            targetCtx.lineWidth = 2;
+            targetCtx.lineWidth = 2.2;
             targetCtx.stroke();
 
             // Leaves along the cubic Bezier vine
@@ -338,6 +431,13 @@
             }
 
             targetCtx.restore();
+
+            return {
+                p0: { x: anchorX, y: -5 },
+                p1: { x: cp1X, y: cp1Y },
+                p2: { x: cp2X, y: cp2Y },
+                p3: { x: endX, y: endY }
+            };
         }
 
         // Helper: Draw a framing jungle tree trunk with bark texture & buttress roots
@@ -475,7 +575,6 @@
             bgCtx.fillRect(0, h * 0.45, w, h * 0.47);
 
             // 4. Mid-ground Palm Fronds & Broad Monstera Leaves in Corners
-            // Upper-left & upper-right canopy palm fronds
             drawPalmFrond(
                 bgCtx,
                 -10, h * 0.14,
@@ -505,7 +604,6 @@
             drawFramingTrunk(bgCtx, false, w, h, rand);
 
             // 6. Upper Canopy Foliage Border & Hanging Liana Vines
-            // Dense dark emerald canopy clusters along the very top edge
             bgCtx.save();
             const clusterStep = 44;
             for (let cx = -20; cx <= w + 40; cx += clusterStep) {
@@ -519,6 +617,7 @@
             bgCtx.restore();
 
             // Hanging vines (shorter in the middle so central orbital space remains clear)
+            vines = [];
             const vineCount = Math.max(9, Math.floor(w / 85));
             for (let v = 0; v < vineCount; v++) {
                 const normX = (v + 0.5) / vineCount;
@@ -530,7 +629,7 @@
                 const sway = (rand() - 0.5) * 34;
                 const leaves = Math.max(4, Math.floor(vineLen / 18));
 
-                drawHangingVine(
+                const bezierData = drawHangingVine(
                     bgCtx,
                     vx,
                     vineLen,
@@ -540,6 +639,19 @@
                     '#1e543f',
                     '#2f7a5c'
                 );
+
+                // Store exact cubic Bezier coordinates for monkey attachment
+                vines.push({
+                    index: v,
+                    normX: normX,
+                    anchorX: vx,
+                    length: vineLen,
+                    sway: sway,
+                    p0: bezierData.p0,
+                    p1: bezierData.p1,
+                    p2: bezierData.p2,
+                    p3: bezierData.p3
+                });
             }
 
             // 7. Lush Forest Floor Ferns & Undergrowth along the Bottom Edge
@@ -594,8 +706,9 @@
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
 
-            // Re-render cached jungle backdrop and re-seed fireflies to fit new bounds
+            // Re-render cached jungle backdrop, attach monkeys to vines, and re-seed fireflies
             renderJungleBackground();
+            initMonkeys(canvas.width, canvas.height);
             initFireflies(canvas.width, canvas.height);
         }
 
@@ -648,6 +761,68 @@
                 }
                 if (f.baseX < -20) f.baseX = canvas.width + 20;
                 if (f.baseX > canvas.width + 20) f.baseX = -20;
+            }
+        }
+
+        // Update pendulum sway, natural blinking, and subtle gaze tracking for all monkeys
+        function updateMonkeys() {
+            for (const m of monkeys) {
+                // Gentle pendulum sway anchored at grip point
+                m.currentAngle = Math.sin(animTime * m.swaySpeed + m.phase) * m.swayAmp;
+
+                // Natural periodic eye blinking
+                if (m.blinkProgress > 0) {
+                    m.blinkProgress += 1;
+                    if (m.blinkProgress >= m.blinkDuration) {
+                        m.blinkProgress = 0;
+                        m.blinkTimer = 150 + Math.floor(Math.random() * 210);
+                    }
+                } else {
+                    m.blinkTimer -= 1;
+                    if (m.blinkTimer <= 0) {
+                        m.blinkProgress = 1;
+                    }
+                }
+
+                // Estimate head position in world space for accurate gaze tracking
+                let localHeadX = 0;
+                let localHeadY = 16;
+                if (m.pose === 'one-arm') {
+                    localHeadX = m.facing * 2.5;
+                    localHeadY = 14.5;
+                } else if (m.pose === 'two-arm') {
+                    localHeadX = 0;
+                    localHeadY = 11.5;
+                } else if (m.pose === 'upside-down') {
+                    localHeadX = 0;
+                    localHeadY = 35.5;
+                }
+
+                const cosA = Math.cos(m.currentAngle);
+                const sinA = Math.sin(m.currentAngle);
+                const headWorldX = m.anchorX + (localHeadX * cosA - localHeadY * sinA) * m.scale;
+                const headWorldY = m.anchorY + (localHeadX * sinA + localHeadY * cosA) * m.scale;
+
+                let targetGazeX = m.facing * 0.35;
+                let targetGazeY = 0.25;
+
+                if (balls.length > 0) {
+                    const b = balls[0];
+                    const wx = b.x - headWorldX;
+                    const wy = b.y - headWorldY;
+                    const dist = Math.hypot(wx, wy) || 1;
+
+                    // Rotate world vector into the monkey's pendulum frame
+                    const lx = (wx * cosA + wy * sinA) / dist;
+                    const ly = (-wx * sinA + wy * cosA) / dist;
+
+                    targetGazeX = lx * 1.35;
+                    targetGazeY = ly * 1.25;
+                }
+
+                // Smoothly ease pupil offset
+                m.gazeX += (targetGazeX - m.gazeX) * 0.14;
+                m.gazeY += (targetGazeY - m.gazeY) * 0.14;
             }
         }
 
@@ -717,6 +892,500 @@
                 ctx.arc(f.x, f.y, glowRadius, 0, Math.PI * 2);
                 ctx.fillStyle = grad;
                 ctx.fill();
+            }
+        }
+
+        // Helper: Draw expressive monkey face (upright or inverted) with blinking & gaze tracking
+        function drawMonkeyHead(m, cx, cy, upsideDown) {
+            const dir = upsideDown ? -1 : 1;
+            const blinkFactor = m.blinkProgress > 0
+                ? Math.sin((m.blinkProgress / m.blinkDuration) * Math.PI)
+                : 0;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            // Side ears (outer fur + warm inner ear)
+            for (const side of [-1, 1]) {
+                const earX = side * 9.2;
+                const earY = -0.5 * dir;
+
+                ctx.beginPath();
+                ctx.arc(earX, earY, 3.8, 0, Math.PI * 2);
+                ctx.fillStyle = m.furMain;
+                ctx.fill();
+                ctx.strokeStyle = m.furDark;
+                ctx.lineWidth = 0.9;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(earX, earY, 2.2, 0, Math.PI * 2);
+                ctx.fillStyle = m.skin;
+                ctx.fill();
+            }
+
+            // Main fuzzy cranium
+            ctx.beginPath();
+            ctx.arc(0, 0, 8.2, 0, Math.PI * 2);
+            ctx.fillStyle = m.furMain;
+            ctx.fill();
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Cute hair tuft on crown (points upward if upright, downward if inverted)
+            ctx.fillStyle = m.furDark;
+            ctx.beginPath();
+            ctx.moveTo(-2.5, -7.6 * dir);
+            ctx.quadraticCurveTo(-1.5, -11.5 * dir, 0.2, -10.8 * dir);
+            ctx.quadraticCurveTo(1.5, -12.0 * dir, 2.8, -7.6 * dir);
+            ctx.closePath();
+            ctx.fill();
+
+            // Heart-shaped tan face mask around eyes
+            ctx.fillStyle = m.skin;
+            ctx.beginPath();
+            ctx.arc(-2.6, -1.6 * dir, 3.6, 0, Math.PI * 2);
+            ctx.arc(2.6, -1.6 * dir, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Lower rounded snout / muzzle
+            ctx.beginPath();
+            ctx.ellipse(0, 2.4 * dir, 5.5, 4.1, 0, 0, Math.PI * 2);
+            ctx.fillStyle = m.skin;
+            ctx.fill();
+            ctx.strokeStyle = m.skinShade;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+
+            // Eyes (either open with tracking pupils or closed happy blink arcs)
+            const eyeOffsetX = 2.6;
+            const eyeY = -1.6 * dir;
+
+            for (const side of [-1, 1]) {
+                const ex = side * eyeOffsetX;
+
+                if (blinkFactor > 0.55) {
+                    // Closed happy curved eyelid
+                    ctx.beginPath();
+                    ctx.arc(ex, eyeY + 0.3 * dir, 1.9, upsideDown ? 0.15 : Math.PI + 0.15, upsideDown ? Math.PI - 0.15 : Math.PI * 2 - 0.15);
+                    ctx.strokeStyle = m.furDark;
+                    ctx.lineWidth = 1.25;
+                    ctx.stroke();
+                } else {
+                    // Sclera (white of eye)
+                    ctx.beginPath();
+                    ctx.arc(ex, eyeY, 2.25, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fffdf7';
+                    ctx.fill();
+
+                    // Tracking dark pupil
+                    const px = ex + Math.max(-1.0, Math.min(1.0, m.gazeX * 0.75));
+                    const py = eyeY + Math.max(-1.0, Math.min(1.0, m.gazeY * 0.75));
+                    ctx.beginPath();
+                    ctx.arc(px, py, 1.35, 0, Math.PI * 2);
+                    ctx.fillStyle = '#1b110a';
+                    ctx.fill();
+
+                    // Specular eye catchlight
+                    ctx.beginPath();
+                    ctx.arc(px - 0.45, py - 0.45, 0.45, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                }
+            }
+
+            // Cute little nostrils
+            ctx.fillStyle = m.furDark;
+            ctx.beginPath();
+            ctx.ellipse(-1.1, 1.5 * dir, 0.65, 0.45, 0, 0, Math.PI * 2);
+            ctx.ellipse(1.1, 1.5 * dir, 0.65, 0.45, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cheerful monkey grin
+            ctx.beginPath();
+            if (!upsideDown) {
+                ctx.arc(0, 2.8, 2.8, 0.18 * Math.PI, 0.82 * Math.PI);
+            } else {
+                ctx.arc(0, -2.8, 2.8, 1.18 * Math.PI, 1.82 * Math.PI);
+            }
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 1.15;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Helper: Draw curled monkey fingers wrapping around the vine at (hx, hy)
+        function drawGrippingHand(m, hx, hy) {
+            ctx.save();
+            ctx.translate(hx, hy);
+
+            // Palm base
+            ctx.beginPath();
+            ctx.arc(0, 1.2, 2.8, 0, Math.PI * 2);
+            ctx.fillStyle = m.skin;
+            ctx.fill();
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+
+            // Curled knuckles gripping front of vine
+            ctx.fillStyle = m.skinShade;
+            for (let k = -1; k <= 1; k++) {
+                ctx.beginPath();
+                ctx.arc(k * 1.4, -0.4, 1.05, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // Pose 0: One-arm hanging monkey (free hand scratching head/waving + curly prehensile tail)
+        function drawOneArmMonkey(m) {
+            const f = m.facing; // 1 = body hangs slightly right of gripping arm, -1 = mirrored
+            const tailWag = Math.sin(animTime * m.tailSpeed + m.phase) * 3.8;
+            const scratchWave = Math.sin(animTime * m.actionSpeed + m.phase);
+
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 1. Prehensile Curly Tail (behind torso)
+            ctx.beginPath();
+            ctx.moveTo(f * 3.5, 31);
+            ctx.bezierCurveTo(
+                f * 15, 34 + tailWag * 0.4,
+                f * 20, 22 + tailWag,
+                f * 14, 16 + tailWag * 1.2
+            );
+            // Spiral tip curl
+            ctx.bezierCurveTo(
+                f * 10, 13 + tailWag * 1.2,
+                f * 11, 19 + tailWag * 1.1,
+                f * 14.5, 19.5 + tailWag * 1.1
+            );
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 3.2;
+            ctx.stroke();
+
+            ctx.strokeStyle = m.furMain;
+            ctx.lineWidth = 1.9;
+            ctx.stroke();
+
+            // 2. Dangling Legs & Grasping Feet
+            // Back leg
+            ctx.beginPath();
+            ctx.moveTo(f * 1.2, 32);
+            ctx.quadraticCurveTo(f * -1.5, 39, f * 0.8, 44.5);
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 4.2;
+            ctx.stroke();
+
+            // Back foot
+            ctx.fillStyle = m.skin;
+            ctx.beginPath();
+            ctx.ellipse(f * 1.5, 45.2, 2.7, 1.6, f * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Front leg (slightly bent playfully)
+            ctx.beginPath();
+            ctx.moveTo(f * 4.5, 31.5);
+            ctx.quadraticCurveTo(f * 8.5, 37.5, f * 5.8, 43.2);
+            ctx.strokeStyle = m.furMain;
+            ctx.lineWidth = 4.4;
+            ctx.stroke();
+
+            // Front foot
+            ctx.fillStyle = m.skin;
+            ctx.beginPath();
+            ctx.ellipse(f * 6.5, 44.0, 2.8, 1.6, f * -0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Torso & Tan Belly Patch
+            ctx.save();
+            ctx.translate(f * 2.8, 24.5);
+            ctx.rotate(f * -0.1);
+
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 6.8, 8.8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = m.furMain;
+            ctx.fill();
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.ellipse(f * 0.8, 0.5, 4.2, 6.2, 0, 0, Math.PI * 2);
+            ctx.fillStyle = m.skin;
+            ctx.fill();
+            ctx.restore();
+
+            // 4. Gripping Arm extending straight up to anchor (0, 0)
+            ctx.beginPath();
+            ctx.moveTo(0, 1.5);
+            ctx.quadraticCurveTo(f * -1.2, 9.5, f * 0.2, 18.5);
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 4.6;
+            ctx.stroke();
+
+            ctx.strokeStyle = m.furMain;
+            ctx.lineWidth = 3.2;
+            ctx.stroke();
+
+            // Gripping hand around vine at (0, 0)
+            drawGrippingHand(m, 0, 0);
+
+            // 5. Expressive Head
+            drawMonkeyHead(m, f * 3.2, 13.5, false);
+
+            // 6. Free Arm raised to scratch head / wave cheerfully
+            const elbowX = f * 9.5;
+            const elbowY = 17.5 + scratchWave * 1.4;
+            const handX = f * 7.8 + scratchWave * 1.1;
+            const handY = 7.2 + Math.abs(scratchWave) * 1.3;
+
+            ctx.beginPath();
+            ctx.moveTo(f * 6.5, 19.5);
+            ctx.quadraticCurveTo(elbowX, elbowY, handX, handY);
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 4.2;
+            ctx.stroke();
+
+            ctx.strokeStyle = m.furMain;
+            ctx.lineWidth = 2.8;
+            ctx.stroke();
+
+            // Free hand
+            ctx.beginPath();
+            ctx.arc(handX, handY, 2.3, 0, Math.PI * 2);
+            ctx.fillStyle = m.skin;
+            ctx.fill();
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 0.75;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Pose 1: Two-arm hanging monkey (peeking cheerfully between arms with dangling legs)
+        function drawTwoArmMonkey(m) {
+            const tailWag = Math.sin(animTime * m.tailSpeed + m.phase) * 4.2;
+            const legKick = Math.sin(animTime * (m.swaySpeed * 1.5) + m.phase) * 2.2;
+
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 1. Prehensile Curly Tail emerging from behind
+            const tailDir = m.facing;
+            ctx.beginPath();
+            ctx.moveTo(tailDir * 4, 28);
+            ctx.bezierCurveTo(
+                tailDir * 15, 29 + tailWag * 0.4,
+                tailDir * 19, 17 + tailWag,
+                tailDir * 13, 13 + tailWag * 1.2
+            );
+            ctx.bezierCurveTo(
+                tailDir * 9.5, 10.5 + tailWag * 1.2,
+                tailDir * 10.5, 16 + tailWag * 1.1,
+                tailDir * 13.8, 16.5 + tailWag * 1.1
+            );
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 3.2;
+            ctx.stroke();
+            ctx.strokeStyle = m.furMain;
+            ctx.lineWidth = 1.9;
+            ctx.stroke();
+
+            // 2. Dangling Legs swaying playfully
+            for (const side of [-1, 1]) {
+                const hipX = side * 3.4;
+                const kneeX = side * 4.6 + legKick * 0.5;
+                const footX = side * 3.5 + legKick;
+                const footY = 41.5 + (side === 1 ? 1.2 : -0.8);
+
+                ctx.beginPath();
+                ctx.moveTo(hipX, 29.5);
+                ctx.quadraticCurveTo(kneeX, 35.5, footX, footY);
+                ctx.strokeStyle = side === -1 ? m.furDark : m.furMain;
+                ctx.lineWidth = 4.2;
+                ctx.stroke();
+
+                ctx.fillStyle = m.skin;
+                ctx.beginPath();
+                ctx.ellipse(footX + side * 0.6, footY + 0.8, 2.6, 1.5, side * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 3. Torso & Tan Belly
+            ctx.beginPath();
+            ctx.ellipse(0, 22.5, 6.8, 8.6, 0, 0, Math.PI * 2);
+            ctx.fillStyle = m.furMain;
+            ctx.fill();
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.ellipse(0, 23.0, 4.3, 6.0, 0, 0, Math.PI * 2);
+            ctx.fillStyle = m.skin;
+            ctx.fill();
+
+            // 4. Both Arms reaching up in a V to grip the vine at (-7.5, -1) and (7.5, 1)
+            for (const side of [-1, 1]) {
+                const handX = side * 7.5;
+                const handY = side * 0.8;
+                const shoulderX = side * 5.8;
+                const shoulderY = 17.0;
+
+                ctx.beginPath();
+                ctx.moveTo(handX, handY + 1);
+                ctx.quadraticCurveTo(side * 8.2, 9.0, shoulderX, shoulderY);
+                ctx.strokeStyle = m.furDark;
+                ctx.lineWidth = 4.5;
+                ctx.stroke();
+
+                ctx.strokeStyle = m.furMain;
+                ctx.lineWidth = 3.1;
+                ctx.stroke();
+
+                drawGrippingHand(m, handX, handY);
+            }
+
+            // 5. Cute Monkey Head peeking right between the two arms!
+            drawMonkeyHead(m, 0, 11.5, false);
+
+            ctx.restore();
+        }
+
+        // Pose 2: Upside-down tail-hanging monkey (tail coiled tightly around vine at (0,0))
+        function drawUpsideDownMonkey(m) {
+            const armIdle = Math.sin(animTime * m.actionSpeed + m.phase) * 1.6;
+            const tailTipWag = Math.sin(animTime * m.tailSpeed + m.phase) * 2.5;
+
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 1. Back half of tail coils wrapping behind the vine at (0, 0)
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 3.2;
+            for (let c = -1; c <= 1; c++) {
+                ctx.beginPath();
+                ctx.arc(0, c * 2.6, 3.2, Math.PI * 0.5, Math.PI * 1.5);
+                ctx.stroke();
+            }
+
+            // 2. Tail stem descending from vine coil to monkey rump (y = 14)
+            ctx.beginPath();
+            ctx.moveTo(0, 2.5);
+            ctx.quadraticCurveTo(-2.5, 8.5, 0, 14.5);
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 3.8;
+            ctx.stroke();
+            ctx.strokeStyle = m.furMain;
+            ctx.lineWidth = 2.4;
+            ctx.stroke();
+
+            // Front half of tail coils overlapping the vine + cute curly tail tip
+            for (let c = -1; c <= 1; c++) {
+                ctx.beginPath();
+                ctx.arc(0, c * 2.6, 3.2, -Math.PI * 0.5, Math.PI * 0.5);
+                ctx.strokeStyle = m.furDark;
+                ctx.lineWidth = 3.4;
+                ctx.stroke();
+                ctx.strokeStyle = m.furMain;
+                ctx.lineWidth = 2.0;
+                ctx.stroke();
+            }
+
+            // Loose tail tip flicking above the coil
+            ctx.beginPath();
+            ctx.moveTo(0, -3.5);
+            ctx.quadraticCurveTo(4.5, -7.5 + tailTipWag * 0.4, 2.2, -10.5 + tailTipWag);
+            ctx.strokeStyle = m.furMain;
+            ctx.lineWidth = 2.0;
+            ctx.stroke();
+
+            // 3. Tucked / Bent Legs near the top of the inverted body
+            for (const side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.moveTo(side * 3.8, 15.5);
+                ctx.quadraticCurveTo(side * 9.5, 12.5, side * 6.5, 8.2);
+                ctx.strokeStyle = side === -1 ? m.furDark : m.furMain;
+                ctx.lineWidth = 4.0;
+                ctx.stroke();
+
+                ctx.fillStyle = m.skin;
+                ctx.beginPath();
+                ctx.ellipse(side * 6.2, 7.6, 2.4, 1.4, side * -0.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 4. Inverted Torso & Tan Belly
+            ctx.beginPath();
+            ctx.ellipse(0, 21.5, 6.6, 8.4, 0, 0, Math.PI * 2);
+            ctx.fillStyle = m.furMain;
+            ctx.fill();
+            ctx.strokeStyle = m.furDark;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.ellipse(0, 21.2, 4.2, 5.8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = m.skin;
+            ctx.fill();
+
+            // 5. Inverted Head hanging at the bottom (y = 34.5)
+            drawMonkeyHead(m, 0, 34.5, true);
+
+            // 6. Arms crossed casually behind/beside the inverted head (chilling!)
+            for (const side of [-1, 1]) {
+                const shoulderX = side * 6.0;
+                const shoulderY = 26.5;
+                const elbowX = side * 10.5;
+                const elbowY = 33.5 + armIdle * 0.5;
+                const handX = side * 5.2;
+                const handY = 39.5 + armIdle * 0.3;
+
+                ctx.beginPath();
+                ctx.moveTo(shoulderX, shoulderY);
+                ctx.quadraticCurveTo(elbowX, elbowY, handX, handY);
+                ctx.strokeStyle = m.furDark;
+                ctx.lineWidth = 4.1;
+                ctx.stroke();
+                ctx.strokeStyle = m.furMain;
+                ctx.lineWidth = 2.7;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(handX, handY, 2.1, 0, Math.PI * 2);
+                ctx.fillStyle = m.skin;
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // Draw all animated monkeys hanging from their exact vine anchor coordinates
+        function drawMonkeys() {
+            for (const m of monkeys) {
+                ctx.save();
+                ctx.translate(m.anchorX, m.anchorY);
+                ctx.rotate(m.currentAngle);
+                ctx.scale(m.scale, m.scale);
+
+                if (m.pose === 'one-arm') {
+                    drawOneArmMonkey(m);
+                } else if (m.pose === 'two-arm') {
+                    drawTwoArmMonkey(m);
+                } else if (m.pose === 'upside-down') {
+                    drawUpsideDownMonkey(m);
+                }
+
+                ctx.restore();
             }
         }
 
@@ -869,7 +1538,7 @@
             ctx.beginPath();
             ctx.moveTo(0.4, -15.6);
             ctx.lineTo(2.4, -14.0);
-            ctx.moveTo(4.8, -15.6);
+            ctx.lineTo(4.8, -15.6);
             ctx.lineTo(6.6, -14.0);
             ctx.stroke();
 
@@ -982,16 +1651,19 @@
         }
 
         function draw() {
-            // 0. Draw cached procedural jungle background
+            // 0. Draw cached procedural jungle background (including liana vines)
             ctx.drawImage(bgCanvas, 0, 0);
 
-            // Subtle drifting jungle fireflies
+            // 1. Draw Animated Monkeys Hanging from Vines
+            drawMonkeys();
+
+            // 2. Subtle drifting jungle fireflies
             drawFireflies();
 
-            // 1. Draw Central Character (Guy with a Banana Gun)
+            // 3. Draw Central Character (Guy with a Banana Gun)
             drawBananaGunGuy(centralNode.x, centralNode.y);
 
-            // 2. Draw Ball & Rainbow Trail
+            // 4. Draw Ball & Rainbow Trail
             for (const b of balls) {
                 // Draw rainbow path line
                 if (b.trail.length > 1) {
@@ -1026,6 +1698,7 @@
 
         function animate() {
             updateFireflies();
+            updateMonkeys();
             updatePhysics();
             draw();
             requestAnimationFrame(animate);
