@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Simulation - Serpent Predator</title>
     <style>
         * {
             box-sizing: border-box;
@@ -28,8 +28,10 @@
         /* Top Header Bar */
         #header {
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
+            gap: 10px;
             width: 100%;
             max-width: 1100px;
             margin-bottom: 12px;
@@ -37,10 +39,60 @@
             border-bottom: 1px solid #ffffff;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
         h1 {
             font-size: 18px;
             letter-spacing: 2px;
             text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        /* HUD Counters */
+        #stats {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 13px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .stat-item {
+            border: 1px solid #444444;
+            padding: 3px 10px;
+            background-color: #080808;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #mode-badge {
+            font-size: 11px;
+            letter-spacing: 1px;
+            padding: 5px 10px;
+            border: 1px solid #555555;
+            color: #cccccc;
+            text-transform: uppercase;
+        }
+
+        #mode-badge.manual {
+            border-color: #ffffff;
+            color: #000000;
+            background-color: #ffffff;
             font-weight: bold;
         }
 
@@ -62,6 +114,10 @@
             color: #000000;
         }
 
+        .btn-reset:active {
+            transform: scale(0.97);
+        }
+
         /* Main Canvas Container */
         #canvas-wrapper {
             position: relative;
@@ -71,6 +127,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            min-height: 0;
         }
 
         canvas {
@@ -80,6 +137,7 @@
             cursor: crosshair;
             width: 100%;
             height: 100%;
+            touch-action: none;
         }
 
         .instructions {
@@ -87,6 +145,24 @@
             font-size: 11px;
             color: #888888;
             text-align: center;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 15px;
+            }
+            #stats {
+                font-size: 11px;
+                gap: 8px;
+            }
+            .btn-reset {
+                padding: 5px 12px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -94,8 +170,17 @@
 
     <!-- Header Section -->
     <div id="header">
-        <h1>Gravity Simulation</h1>
-        <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        <div class="header-left">
+            <h1>Gravity Simulation</h1>
+            <div id="stats">
+                <span class="stat-item">Balls Eaten: <span id="eatenCount" class="stat-value">0</span></span>
+                <span class="stat-item">Snake Length: <span id="snakeLengthCount" class="stat-value">14</span></span>
+            </div>
+        </div>
+        <div class="header-right">
+            <span id="mode-badge">AI: Hunt</span>
+            <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        </div>
     </div>
 
     <!-- Canvas Container -->
@@ -104,24 +189,53 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball.
+        Click anywhere on the canvas to launch a ball. Use WASD or Arrow keys to manually steer the snake.
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // SIMULATION CONSTANTS
-        const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
-        const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
-        const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
-        const INITIAL_NODE_RADIUS = 12;    // Starting radius of the central absorber
-        const GROWTH_PER_BALL = 4;         // Radius increase each time a ball is eaten
+        // HUD DOM References
+        const eatenCountEl = document.getElementById('eatenCount');
+        const snakeLengthEl = document.getElementById('snakeLengthCount');
+        const modeBadgeEl = document.getElementById('mode-badge');
 
+        // =========================================================================
+        // SIMULATION CONSTANTS (Preserving Baseline Physics)
+        // =========================================================================
+        const GRAVITY_CONSTANT = 1800;      // Strength of gravitational pull (G)
+        const LAUNCH_VELOCITY = 5;           // Fixed velocity on click
+        const FIXED_LAUNCH_ANGLE = 90;       // Fixed direction in degrees (90° = straight right)
+        const TRAIL_LENGTH = 300;            // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;        // Prevents infinite velocity near center
+        const INITIAL_NODE_RADIUS = 12;      // Starting radius of the central absorber
+        const GROWTH_PER_BALL = 4;           // Central node radius increase if it absorbs a ball
+
+        // =========================================================================
+        // SNAKE CONSTANTS
+        // =========================================================================
+        const INITIAL_SNAKE_SEGMENTS = 14;   // Starting segment count
+        const SEGMENTS_PER_BALL = 5;         // Additional segments gained per ball eaten
+        const INITIAL_HEAD_RADIUS = 7.5;     // Starting thickness (head radius in px)
+        const THICKNESS_PER_BALL = 0.85;     // Thickness gained per ball eaten
+        const MAX_HEAD_RADIUS = 22;          // Maximum head radius cap
+        const SNAKE_BASE_SPEED = 3.8;        // Base cruising speed
+        const SNAKE_HUNT_SPEED = 4.9;        // Boosted speed while actively chasing a ball
+        const SNAKE_TURN_RATE = 0.085;       // Maximum angular turn rate per frame (radians)
+        const MANUAL_OVERRIDE_DURATION = 150; // Frames (~2.5s) after key release before AI resumes
+
+        // =========================================================================
         // STATE VARIABLES
+        // =========================================================================
         let balls = [];
+        let shockwaves = [];
+        let ballsEaten = 0;
+        let frameTick = 0;
+
+        // Keyboard input tracking for optional manual steering
+        const activeKeys = new Set();
+        let manualTimer = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -130,26 +244,137 @@
             radius: INITIAL_NODE_RADIUS
         };
 
+        // Snake Entity Definition
+        const snake = {
+            x: 0,
+            y: 0,
+            angle: 0,
+            speed: SNAKE_BASE_SPEED,
+            segmentCount: INITIAL_SNAKE_SEGMENTS,
+            headRadius: INITIAL_HEAD_RADIUS,
+            spineHistory: [],     // High-resolution path points for smooth arc-length body placement
+            segments: [],         // Computed evenly-spaced { x, y, radius } points
+            bitePulse: 0,         // Visual pulse timer when eating a ball
+            orbitDirection: 1     // 1 = clockwise, -1 = counter-clockwise
+        };
+
+        // =========================================================================
+        // UTILITY & MATH HELPERS
+        // =========================================================================
+        function normalizeAngle(angle) {
+            while (angle > Math.PI) angle -= Math.PI * 2;
+            while (angle < -Math.PI) angle += Math.PI * 2;
+            return angle;
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function updateHUD() {
+            eatenCountEl.textContent = ballsEaten;
+            snakeLengthEl.textContent = snake.segmentCount;
+
+            if (manualTimer > 0) {
+                modeBadgeEl.textContent = 'Manual Steer';
+                modeBadgeEl.classList.add('manual');
+            } else {
+                modeBadgeEl.textContent = balls.length > 0 ? 'AI: Hunting' : 'AI: Orbiting';
+                modeBadgeEl.classList.remove('manual');
+            }
+        }
+
+        // =========================================================================
+        // INITIALIZATION & RESIZING
+        // =========================================================================
+        function initSnake() {
+            const orbitR = Math.min(canvas.width, canvas.height) * 0.24 || 130;
+            snake.x = centralNode.x;
+            snake.y = centralNode.y - orbitR;
+            snake.angle = 0; // Moving right initially in a clockwise orbit
+            snake.speed = SNAKE_BASE_SPEED;
+            snake.segmentCount = INITIAL_SNAKE_SEGMENTS;
+            snake.headRadius = INITIAL_HEAD_RADIUS;
+            snake.bitePulse = 0;
+            snake.orbitDirection = 1;
+
+            // Pre-populate spine history behind the head so the snake spawns fully extended
+            const spacing = getSegmentSpacing();
+            const totalHistoryLength = (snake.segmentCount + 5) * spacing;
+            snake.spineHistory = [];
+            for (let d = 0; d <= totalHistoryLength; d += 2) {
+                snake.spineHistory.push({
+                    x: snake.x - d,
+                    y: snake.y
+                });
+            }
+            computeSnakeSegments();
+        }
+
+        function getSegmentSpacing() {
+            // Spacing scales proportionally with thickness so segments overlap cleanly without gaps
+            return Math.max(5.5, snake.headRadius * 0.85);
+        }
+
         function resizeCanvas() {
+            const prevCenterX = centralNode.x;
+            const prevCenterY = centralNode.y;
+
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
+
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            // Shift snake & history relative to the new center if already initialized
+            if (snake.spineHistory.length > 0 && (prevCenterX !== 0 || prevCenterY !== 0)) {
+                const dx = centralNode.x - prevCenterX;
+                const dy = centralNode.y - prevCenterY;
+                snake.x += dx;
+                snake.y += dy;
+                for (let i = 0; i < snake.spineHistory.length; i++) {
+                    snake.spineHistory[i].x += dx;
+                    snake.spineHistory[i].y += dy;
+                }
+                computeSnakeSegments();
+            }
         }
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+        initSnake();
+        updateHUD();
 
-        // Canvas Click Handler: Directly launch ball at click position
+        // =========================================================================
+        // INPUT HANDLING (Canvas Click & WASD / Arrow Keys)
+        // =========================================================================
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
             launchBall(clickX, clickY);
+        });
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+                // Prevent page scrolling with arrow keys
+                if (key.startsWith('arrow')) e.preventDefault();
+                activeKeys.add(key);
+                manualTimer = MANUAL_OVERRIDE_DURATION;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            activeKeys.delete(key);
+        });
+
+        window.addEventListener('blur', () => {
+            activeKeys.clear();
         });
 
         function launchBall(x, y) {
@@ -167,26 +392,293 @@
                 radius: 4,
                 trail: [] // Stores history of past {x, y} coordinates
             }];
+            updateHUD();
         }
 
         function resetSimulation() {
             balls = [];
+            shockwaves = [];
+            ballsEaten = 0;
+            manualTimer = 0;
+            activeKeys.clear();
             centralNode.radius = INITIAL_NODE_RADIUS;
+            initSnake();
+            updateHUD();
         }
 
+        // =========================================================================
+        // SNAKE KINEMATICS, AI & STEERING
+        // =========================================================================
+        function getManualTargetAngle() {
+            let inputX = 0;
+            let inputY = 0;
+
+            if (activeKeys.has('w') || activeKeys.has('arrowup')) inputY -= 1;
+            if (activeKeys.has('s') || activeKeys.has('arrowdown')) inputY += 1;
+            if (activeKeys.has('a') || activeKeys.has('arrowleft')) inputX -= 1;
+            if (activeKeys.has('d') || activeKeys.has('arrowright')) inputX += 1;
+
+            if (inputX === 0 && inputY === 0) {
+                return null;
+            }
+            return Math.atan2(inputY, inputX);
+        }
+
+        function computeAutonomousTargetAngle() {
+            const dxCenter = centralNode.x - snake.x;
+            const dyCenter = centralNode.y - snake.y;
+            const distCenter = Math.hypot(dxCenter, dyCenter) || 1;
+            const angleToCenter = Math.atan2(dyCenter, dxCenter);
+
+            // Safe buffer around the central gravity node so the snake avoids plunging into it
+            const safeNodeRadius = centralNode.radius + snake.headRadius + 38;
+
+            let desiredVx = 0;
+            let desiredVy = 0;
+
+            if (balls.length > 0) {
+                // HUNTING MODE: Predict ball's near-future position and intercept
+                const targetBall = balls[0];
+                const distToBall = Math.hypot(targetBall.x - snake.x, targetBall.y - snake.y);
+                const leadFrames = Math.min(18, distToBall / (SNAKE_HUNT_SPEED * 1.4));
+
+                const interceptX = targetBall.x + targetBall.vx * leadFrames;
+                const interceptY = targetBall.y + targetBall.vy * leadFrames;
+
+                const huntAngle = Math.atan2(interceptY - snake.y, interceptX - snake.x);
+                desiredVx += Math.cos(huntAngle) * 1.3;
+                desiredVy += Math.sin(huntAngle) * 1.3;
+            } else {
+                // ORBITAL PATROL MODE: Smoothly orbit the central gravity node
+                const preferredOrbit = Math.max(
+                    safeNodeRadius + 35,
+                    Math.min(canvas.width, canvas.height) * 0.25
+                );
+                const radialError = distCenter - preferredOrbit;
+                const tangentAngle = angleToCenter + (Math.PI / 2) * snake.orbitDirection;
+
+                // Tangential orbit velocity + radial spring correction + gentle organic wave
+                const wave = Math.sin(frameTick * 0.04) * 0.28;
+                const radialPull = Math.max(-0.9, Math.min(0.9, radialError * 0.015));
+
+                desiredVx += Math.cos(tangentAngle + wave) + Math.cos(angleToCenter) * radialPull;
+                desiredVy += Math.sin(tangentAngle + wave) + Math.sin(angleToCenter) * radialPull;
+            }
+
+            // CENTRAL-NODE AVOIDANCE: Strong tangential + outward deflection if too close to center
+            if (distCenter < safeNodeRadius) {
+                const urgency = (safeNodeRadius - distCenter) / safeNodeRadius;
+                const awayAngle = angleToCenter + Math.PI;
+                // Add tangential slide so the snake curves smoothly around the node rather than stalling
+                const cross = Math.cos(snake.angle) * dyCenter - Math.sin(snake.angle) * dxCenter;
+                const slideDir = cross >= 0 ? -1 : 1;
+                const slideAngle = angleToCenter + (Math.PI / 2) * slideDir;
+
+                desiredVx += (Math.cos(awayAngle) * 1.6 + Math.cos(slideAngle) * 1.2) * (1 + urgency * 2.5);
+                desiredVy += (Math.sin(awayAngle) * 1.6 + Math.sin(slideAngle) * 1.2) * (1 + urgency * 2.5);
+            }
+
+            // ARENA EDGE AVOIDANCE: Keep the snake comfortably inside the visible canvas
+            const edgeMargin = 45 + snake.headRadius;
+            if (snake.x < edgeMargin) desiredVx += (edgeMargin - snake.x) * 0.08;
+            if (snake.x > canvas.width - edgeMargin) desiredVx -= (snake.x - (canvas.width - edgeMargin)) * 0.08;
+            if (snake.y < edgeMargin) desiredVy += (edgeMargin - snake.y) * 0.08;
+            if (snake.y > canvas.height - edgeMargin) desiredVy -= (snake.y - (canvas.height - edgeMargin)) * 0.08;
+
+            return Math.atan2(desiredVy, desiredVx);
+        }
+
+        function computeSnakeSegments() {
+            const spacing = getSegmentSpacing();
+            const count = snake.segmentCount;
+            const newSegments = [];
+
+            // Head is always at index 0
+            newSegments.push({
+                x: snake.x,
+                y: snake.y,
+                radius: getSegmentRadius(0, count)
+            });
+
+            // Walk along spineHistory accumulating exact arc-length distances
+            let historyIdx = 0;
+            let accumulatedDist = 0;
+
+            for (let segIdx = 1; segIdx < count; segIdx++) {
+                const targetDist = segIdx * spacing;
+
+                while (historyIdx < snake.spineHistory.length - 1) {
+                    const p0 = snake.spineHistory[historyIdx];
+                    const p1 = snake.spineHistory[historyIdx + 1];
+                    const segLen = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+
+                    if (accumulatedDist + segLen >= targetDist && segLen > 0.0001) {
+                        const t = (targetDist - accumulatedDist) / segLen;
+                        newSegments.push({
+                            x: lerp(p0.x, p1.x, t),
+                            y: lerp(p0.y, p1.y, t),
+                            radius: getSegmentRadius(segIdx, count)
+                        });
+                        break;
+                    }
+
+                    accumulatedDist += segLen;
+                    historyIdx++;
+                }
+
+                // Fallback if history is shorter than targetDist
+                if (newSegments.length <= segIdx) {
+                    const lastPt = snake.spineHistory[snake.spineHistory.length - 1] || { x: snake.x, y: snake.y };
+                    newSegments.push({
+                        x: lastPt.x,
+                        y: lastPt.y,
+                        radius: getSegmentRadius(segIdx, count)
+                    });
+                }
+            }
+
+            snake.segments = newSegments;
+
+            // Prune excess spine history beyond the tail to prevent memory growth
+            const maxKeepIndex = Math.min(snake.spineHistory.length, historyIdx + 12);
+            if (snake.spineHistory.length > maxKeepIndex) {
+                snake.spineHistory.length = maxKeepIndex;
+            }
+        }
+
+        function getSegmentRadius(index, totalCount) {
+            const base = snake.headRadius + (snake.bitePulse > 0 ? Math.sin(snake.bitePulse * Math.PI) * 2.5 : 0);
+            if (index === 0) return base;
+
+            // Smooth anatomical taper from neck down to a pointed tail tip
+            const t = index / Math.max(1, totalCount - 1);
+            const neckFactor = index === 1 ? 0.92 : 1.0;
+            const taper = Math.pow(1 - t, 0.72);
+            return Math.max(1.8, base * neckFactor * (0.2 + 0.8 * taper));
+        }
+
+        function spawnShockwave(x, y) {
+            shockwaves.push({
+                x: x,
+                y: y,
+                radius: snake.headRadius * 0.8,
+                maxRadius: 48 + snake.headRadius * 1.4,
+                alpha: 0.95,
+                lineWidth: 2.2
+            });
+            // Subtle secondary inner ring for crisp monochrome feedback
+            shockwaves.push({
+                x: x,
+                y: y,
+                radius: snake.headRadius * 0.4,
+                maxRadius: 28 + snake.headRadius,
+                alpha: 0.65,
+                lineWidth: 1.0
+            });
+        }
+
+        function updateSnake() {
+            const manualAngle = getManualTargetAngle();
+            let targetAngle;
+
+            if (manualAngle !== null) {
+                manualTimer = MANUAL_OVERRIDE_DURATION;
+                targetAngle = manualAngle;
+            } else if (manualTimer > 0) {
+                manualTimer--;
+                // Maintain current heading while coasting in manual override until timer expires
+                targetAngle = snake.angle;
+                if (manualTimer === 0) {
+                    updateHUD();
+                }
+            } else {
+                targetAngle = computeAutonomousTargetAngle();
+            }
+
+            // Smoothly interpolate snake heading toward targetAngle
+            const angleDiff = normalizeAngle(targetAngle - snake.angle);
+            const turnStep = Math.max(-SNAKE_TURN_RATE, Math.min(SNAKE_TURN_RATE, angleDiff));
+            snake.angle = normalizeAngle(snake.angle + turnStep);
+
+            // Adjust speed: faster when hunting an active ball or manually steering
+            const targetSpeed = (balls.length > 0 || manualTimer > 0) ? SNAKE_HUNT_SPEED : SNAKE_BASE_SPEED;
+            snake.speed = lerp(snake.speed, targetSpeed, 0.08);
+
+            // Advance head position
+            snake.x += Math.cos(snake.angle) * snake.speed;
+            snake.y += Math.sin(snake.angle) * snake.speed;
+
+            // Soft clamp inside canvas bounds when manually steered so snake cannot get lost offscreen
+            const boundPad = snake.headRadius + 4;
+            if (snake.x < boundPad) {
+                snake.x = boundPad;
+                snake.angle = normalizeAngle(Math.PI - snake.angle);
+            } else if (snake.x > canvas.width - boundPad) {
+                snake.x = canvas.width - boundPad;
+                snake.angle = normalizeAngle(Math.PI - snake.angle);
+            }
+            if (snake.y < boundPad) {
+                snake.y = boundPad;
+                snake.angle = normalizeAngle(-snake.angle);
+            } else if (snake.y > canvas.height - boundPad) {
+                snake.y = canvas.height - boundPad;
+                snake.angle = normalizeAngle(-snake.angle);
+            }
+
+            // Record head breadcrumb at front of spine history
+            snake.spineHistory.unshift({ x: snake.x, y: snake.y });
+
+            // Decay bite pulse animation
+            if (snake.bitePulse > 0) {
+                snake.bitePulse = Math.max(0, snake.bitePulse - 0.07);
+            }
+
+            // Recompute evenly-spaced tapered body segments
+            computeSnakeSegments();
+        }
+
+        // =========================================================================
+        // PHYSICS & COLLISION UPDATE
+        // =========================================================================
         function updatePhysics() {
+            frameTick++;
+            updateSnake();
+
+            // Update balls (gravity, central node collision, and snake bite collision)
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
                 // Remove ball if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
+                if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
                     balls.splice(i, 1);
+                    updateHUD();
                     continue;
                 }
 
-                // Distance vector to central gravity node
+                // 1. Check if Snake eats the ball
+                const dxSnake = b.x - snake.x;
+                const dySnake = b.y - snake.y;
+                const distSnake = Math.hypot(dxSnake, dySnake);
+                const biteReach = snake.headRadius + b.radius + 3;
+
+                if (distSnake <= biteReach) {
+                    // Trigger bite shockwave at ball coordinates
+                    spawnShockwave(b.x, b.y);
+
+                    // Grow snake in both segment length and thickness
+                    ballsEaten++;
+                    snake.segmentCount += SEGMENTS_PER_BALL;
+                    snake.headRadius = Math.min(MAX_HEAD_RADIUS, snake.headRadius + THICKNESS_PER_BALL);
+                    snake.bitePulse = 1.0;
+
+                    balls.splice(i, 1);
+                    updateHUD();
+                    continue;
+                }
+
+                // 2. Distance vector to central gravity node
                 const dx = centralNode.x - b.x;
                 const dy = centralNode.y - b.y;
                 const distSq = dx * dx + dy * dy;
@@ -196,6 +688,7 @@
                 if (dist < centralNode.radius + b.radius) {
                     centralNode.radius += GROWTH_PER_BALL;
                     balls.splice(i, 1);
+                    updateHUD();
                     continue;
                 }
 
@@ -217,6 +710,87 @@
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
                 }
+            }
+
+            // Update expanding bite shockwaves
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                const sw = shockwaves[i];
+                sw.radius += (sw.maxRadius - sw.radius) * 0.16 + 0.8;
+                sw.alpha -= 0.038;
+                if (sw.alpha <= 0) {
+                    shockwaves.splice(i, 1);
+                }
+            }
+        }
+
+        // =========================================================================
+        // RENDERING
+        // =========================================================================
+        function drawSnake() {
+            if (snake.segments.length === 0) return;
+
+            // Draw from tail to head so the head renders cleanly on top
+            for (let i = snake.segments.length - 1; i >= 0; i--) {
+                const seg = snake.segments[i];
+
+                ctx.beginPath();
+                ctx.arc(seg.x, seg.y, seg.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                // Subtle black hairline separation on segments for crisp monochrome definition
+                if (i > 0 && i % 2 === 0) {
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+                }
+            }
+
+            // Draw directional eyes on the head (segment 0)
+            const head = snake.segments[0];
+            const cosA = Math.cos(snake.angle);
+            const sinA = Math.sin(snake.angle);
+            const perpX = -sinA;
+            const perpY = cosA;
+
+            const forwardOffset = head.radius * 0.36;
+            const sideOffset = head.radius * 0.44;
+            const eyeRadius = Math.max(1.6, head.radius * 0.22);
+
+            // Look slightly toward active ball if present
+            let lookOffsetX = cosA * (eyeRadius * 0.28);
+            let lookOffsetY = sinA * (eyeRadius * 0.28);
+            if (balls.length > 0) {
+                const toBallAngle = Math.atan2(balls[0].y - head.y, balls[0].x - head.x);
+                lookOffsetX = Math.cos(toBallAngle) * (eyeRadius * 0.32);
+                lookOffsetY = Math.sin(toBallAngle) * (eyeRadius * 0.32);
+            }
+
+            for (const side of [-1, 1]) {
+                const eyeX = head.x + cosA * forwardOffset + perpX * sideOffset * side;
+                const eyeY = head.y + sinA * forwardOffset + perpY * sideOffset * side;
+
+                // Black eye socket against the white head
+                ctx.beginPath();
+                ctx.arc(eyeX, eyeY, eyeRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#000000';
+                ctx.fill();
+
+                // Crisp white directional glint/pupil
+                ctx.beginPath();
+                ctx.arc(eyeX + lookOffsetX, eyeY + lookOffsetY, Math.max(0.7, eyeRadius * 0.38), 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+            }
+        }
+
+        function drawShockwaves() {
+            for (const sw of shockwaves) {
+                ctx.beginPath();
+                ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${Math.max(0, sw.alpha)})`;
+                ctx.lineWidth = sw.lineWidth;
+                ctx.stroke();
             }
         }
 
@@ -257,6 +831,10 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
             }
+
+            // 3. Draw Snake & Bite Shockwaves
+            drawSnake();
+            drawShockwaves();
         }
 
         function animate() {
