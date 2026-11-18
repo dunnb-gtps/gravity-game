@@ -104,7 +104,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch Spider-Man.
+        Click anywhere on the canvas for an alien spaceship to shoot Spider-Man into orbit.
     </div>
 
     <script>
@@ -125,6 +125,10 @@
         // STATE VARIABLES
         let balls = [];
         let twinklingStars = [];
+        let alienShip = null;
+        let launchParticles = [];
+        let shockwaves = [];
+        let lastTimestamp = performance.now();
 
         // Realistic stellar color tints (pure white, blue-white, pale gold, soft rose)
         const STAR_COLORS = [
@@ -388,7 +392,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch Spider-Man at click position
+        // Canvas Click Handler: Spawn alien spaceship to shoot Spider-Man from click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -397,11 +401,72 @@
             launchBall(clickX, clickY);
         });
 
+        /**
+         * Spawns the alien spaceship aligned so its plasma launcher cannon shoots
+         * Spider-Man directly from (x, y), along with muzzle blast & spark effects.
+         */
+        function spawnAlienShooter(muzzleX, muzzleY, launchAngleRad) {
+            // Cannon muzzle offset relative to spaceship center (in local unrotated coords)
+            const cannonMuzzleOffsetX = 56;
+            const cannonMuzzleOffsetY = 5;
+
+            const shipX = muzzleX - cannonMuzzleOffsetX;
+            const shipY = muzzleY - cannonMuzzleOffsetY;
+
+            alienShip = {
+                x: shipX,
+                y: shipY,
+                baseX: shipX,
+                baseY: shipY,
+                vx: 0,
+                vy: 0,
+                angle: launchAngleRad - Math.PI / 2, // 0 rad when shooting right (90°)
+                recoil: 15,                          // Immediate kickback on shot
+                pitchRecoil: -0.14,                  // Slight nose-up kick on blast
+                age: 0,
+                hoverDuration: 1.35,                 // Seconds hovering after shot
+                departDuration: 0.85,                // Seconds zooming away
+                alpha: 1,
+                muzzleGlow: 1.0,
+                bobPhase: Math.random() * Math.PI * 2
+            };
+
+            // Expanding plasma shockwave ring at cannon muzzle
+            shockwaves.push({
+                x: muzzleX,
+                y: muzzleY,
+                radius: 6,
+                maxRadius: 46,
+                alpha: 0.95
+            });
+
+            // Burst of neon alien energy sparks & plasma particles from the cannon
+            const sparkColors = ['#5eff7a', '#00f5d4', '#b8ff66', '#ffffff', '#70e4ff'];
+            for (let i = 0; i < 24; i++) {
+                const spread = (Math.random() - 0.5) * 1.15;
+                const dir = (launchAngleRad - Math.PI / 2) + spread;
+                const speed = 2.2 + Math.random() * 6.5;
+                launchParticles.push({
+                    x: muzzleX + (Math.random() - 0.5) * 4,
+                    y: muzzleY + (Math.random() - 0.5) * 6,
+                    vx: Math.cos(dir) * speed,
+                    vy: Math.sin(dir) * speed,
+                    size: 1.4 + Math.random() * 2.6,
+                    alpha: 1.0,
+                    decay: 0.022 + Math.random() * 0.025,
+                    color: sparkColors[Math.floor(Math.random() * sparkColors.length)]
+                });
+            }
+        }
+
         function launchBall(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
+
+            // Position the alien spaceship so its cannon fires the ball right out of its barrel
+            spawnAlienShooter(x, y, rad);
 
             // Overwrite existing array to strictly maintain a single Spider-Man ball on screen
             balls = [{
@@ -416,6 +481,78 @@
 
         function resetSimulation() {
             balls = [];
+            alienShip = null;
+            launchParticles = [];
+            shockwaves = [];
+        }
+
+        function updateAlienAndEffects(dt) {
+            // Update alien spaceship recoil, hover, and departure flight
+            if (alienShip) {
+                alienShip.age += dt;
+
+                // Damped spring recovery from cannon recoil
+                alienShip.recoil *= Math.pow(0.06, dt);
+                alienShip.pitchRecoil *= Math.pow(0.05, dt);
+                alienShip.muzzleGlow = Math.max(0, alienShip.muzzleGlow - dt * 2.4);
+
+                if (alienShip.age <= alienShip.hoverDuration) {
+                    // Gentle anti-gravity hover after firing
+                    const bobY = Math.sin(alienShip.age * 5.2 + alienShip.bobPhase) * 3.5;
+                    alienShip.x = alienShip.baseX - alienShip.recoil;
+                    alienShip.y = alienShip.baseY + bobY;
+                } else {
+                    // Smooth thruster fly-away upward and backward into deep space
+                    const departT = (alienShip.age - alienShip.hoverDuration) / alienShip.departDuration;
+                    alienShip.vx -= 420 * dt;
+                    alienShip.vy -= 260 * dt;
+                    alienShip.x += alienShip.vx * dt;
+                    alienShip.y += alienShip.vy * dt;
+                    alienShip.pitchRecoil = Math.max(-0.32, alienShip.pitchRecoil - 0.35 * dt);
+                    alienShip.alpha = Math.max(0, 1 - Math.pow(departT, 1.4));
+
+                    // Thruster trail sparks during departure
+                    if (Math.random() < 0.75) {
+                        launchParticles.push({
+                            x: alienShip.x - 10 + (Math.random() - 0.5) * 14,
+                            y: alienShip.y + 16,
+                            vx: (Math.random() - 0.5) * 1.4,
+                            vy: 1.8 + Math.random() * 2.2,
+                            size: 1.5 + Math.random() * 2.0,
+                            alpha: 0.75 * alienShip.alpha,
+                            decay: 0.035,
+                            color: '#38f9d7'
+                        });
+                    }
+
+                    if (departT >= 1) {
+                        alienShip = null;
+                    }
+                }
+            }
+
+            // Update plasma shockwaves
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                const sw = shockwaves[i];
+                sw.radius += (sw.maxRadius - sw.radius) * 0.22;
+                sw.alpha -= 0.055;
+                if (sw.alpha <= 0.02) {
+                    shockwaves.splice(i, 1);
+                }
+            }
+
+            // Update launch spark particles
+            for (let i = launchParticles.length - 1; i >= 0; i--) {
+                const p = launchParticles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.96;
+                p.vy *= 0.96;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0.02) {
+                    launchParticles.splice(i, 1);
+                }
+            }
         }
 
         function updatePhysics() {
@@ -460,6 +597,296 @@
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
                 }
+            }
+        }
+
+        /**
+         * Renders the alien pilot inside a glowing glass cockpit dome atop a metallic UFO saucer
+         * with a side-mounted plasma launcher cannon firing the ball.
+         */
+        function drawAlienSpaceship(time) {
+            if (!alienShip) return;
+
+            ctx.save();
+            ctx.globalAlpha = alienShip.alpha;
+            ctx.translate(alienShip.x, alienShip.y);
+            ctx.rotate(alienShip.angle + alienShip.pitchRecoil);
+
+            // 1. Soft Anti-Gravity Tractor / Hover Glow under the saucer
+            const hoverPulse = 0.85 + Math.sin(time * 0.012) * 0.15;
+            const underGlow = ctx.createRadialGradient(0, 14, 2, 0, 22, 36 * hoverPulse);
+            underGlow.addColorStop(0.0, 'rgba(64, 255, 178, 0.55)');
+            underGlow.addColorStop(0.5, 'rgba(0, 210, 255, 0.22)');
+            underGlow.addColorStop(1.0, 'rgba(0, 210, 255, 0)');
+            ctx.fillStyle = underGlow;
+            ctx.beginPath();
+            ctx.ellipse(0, 20, 32 * hoverPulse, 14 * hoverPulse, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Thruster emitter pod under belly
+            ctx.fillStyle = '#1b2838';
+            ctx.beginPath();
+            ctx.ellipse(0, 13, 14, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#5effc8';
+            ctx.beginPath();
+            ctx.ellipse(0, 14, 9, 2.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Plasma Ball Launcher Cannon mounted on the right side of the hull
+            // Barrel housing & mounting bracket
+            ctx.save();
+            ctx.translate(22, 5);
+
+            // Mounting collar
+            ctx.fillStyle = '#2d3748';
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.roundRect(-2, -9, 12, 18, 3);
+            ctx.fill();
+            ctx.stroke();
+
+            // Main cannon barrel tube
+            const barrelGrad = ctx.createLinearGradient(0, -8, 0, 8);
+            barrelGrad.addColorStop(0.0, '#94a3b8');
+            barrelGrad.addColorStop(0.35, '#e2e8f0');
+            barrelGrad.addColorStop(0.75, '#475569');
+            barrelGrad.addColorStop(1.0, '#1e293b');
+            ctx.fillStyle = barrelGrad;
+            ctx.beginPath();
+            ctx.roundRect(7, -7, 23, 14, 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Glowing plasma energy coils along the barrel
+            const coilPositions = [12, 19, 25];
+            for (const cx of coilPositions) {
+                ctx.fillStyle = alienShip.muzzleGlow > 0.1 ? '#72ff8e' : '#00e5ff';
+                ctx.shadowColor = '#39ff14';
+                ctx.shadowBlur = 6 + alienShip.muzzleGlow * 8;
+                ctx.fillRect(cx, -8, 2.6, 16);
+            }
+            ctx.shadowBlur = 0;
+
+            // Flared muzzle nozzle tip (at local x = 34 => world shipX + 56 = launchX)
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.moveTo(29, -8.5);
+            ctx.lineTo(35, -10.5);
+            ctx.lineTo(35, 10.5);
+            ctx.lineTo(29, 8.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Glowing inner cannon bore
+            ctx.fillStyle = alienShip.muzzleGlow > 0.05 ? '#b9ffca' : '#10b981';
+            ctx.beginPath();
+            ctx.ellipse(35, 0, 2.5, 8.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Muzzle flash flare on shot
+            if (alienShip.muzzleGlow > 0.05) {
+                const flashR = 24 * alienShip.muzzleGlow;
+                const flashGrad = ctx.createRadialGradient(36, 0, 1, 38, 0, flashR);
+                flashGrad.addColorStop(0.0, `rgba(255, 255, 255, ${alienShip.muzzleGlow})`);
+                flashGrad.addColorStop(0.35, `rgba(94, 255, 130, ${alienShip.muzzleGlow * 0.85})`);
+                flashGrad.addColorStop(1.0, 'rgba(0, 245, 212, 0)');
+                ctx.fillStyle = flashGrad;
+                ctx.beginPath();
+                ctx.arc(38, 0, flashR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // 3. Alien Pilot (drawn before glass dome so it sits visibly inside the cockpit)
+            ctx.save();
+            // Subtle recoil lean for the alien pilot
+            const alienLean = Math.min(0.22, alienShip.recoil * 0.015);
+            ctx.translate(0, -7);
+            ctx.rotate(-alienLean);
+
+            // Alien shoulders / flight suit
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath();
+            ctx.ellipse(0, 6, 11, 6, 0, Math.PI, Math.PI * 2);
+            ctx.fill();
+
+            // Glowing cockpit firing console & alien hands pressing the trigger button
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(6, 1, 9, 5);
+            ctx.fillStyle = '#39ff14';
+            ctx.beginPath();
+            ctx.arc(11, 1, 2.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Alien slender green arm reaching for the firing control
+            ctx.strokeStyle = '#38d958';
+            ctx.lineWidth = 2.6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(4, 4);
+            ctx.lineTo(10, 1.5);
+            ctx.stroke();
+
+            // Bobbing antennae
+            const antWiggle = Math.sin(time * 0.018) * 1.6 + alienShip.recoil * 0.18;
+            ctx.strokeStyle = '#38d958';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(-4, -12);
+            ctx.quadraticCurveTo(-7 - antWiggle * 0.4, -18, -9 - antWiggle, -20);
+            ctx.moveTo(3, -12);
+            ctx.quadraticCurveTo(5 - antWiggle * 0.4, -18, 7 - antWiggle, -20);
+            ctx.stroke();
+
+            // Glowing antenna tips
+            ctx.fillStyle = '#a3ff12';
+            ctx.beginPath();
+            ctx.arc(-9 - antWiggle, -20, 2, 0, Math.PI * 2);
+            ctx.arc(7 - antWiggle, -20, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Alien pear-shaped head
+            const headGrad = ctx.createRadialGradient(-2, -8, 1, 0, -5, 11);
+            headGrad.addColorStop(0.0, '#8aff7a');
+            headGrad.addColorStop(0.65, '#34c759');
+            headGrad.addColorStop(1.0, '#187932');
+            ctx.fillStyle = headGrad;
+            ctx.beginPath();
+            ctx.moveTo(0, 2);
+            ctx.bezierCurveTo(-9, 1, -11, -11, 0, -13);
+            ctx.bezierCurveTo(11, -11, 9, 1, 0, 2);
+            ctx.closePath();
+            ctx.fill();
+
+            // Large glossy black alien eyes (looking right toward Spider-Man!)
+            ctx.fillStyle = '#07090f';
+            // Left eye
+            ctx.beginPath();
+            ctx.ellipse(-2.2, -5.8, 2.7, 3.8, -0.25, 0, Math.PI * 2);
+            ctx.fill();
+            // Right eye
+            ctx.beginPath();
+            ctx.ellipse(4.4, -5.8, 2.9, 4.0, 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Crisp eye catchlights
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-1.4, -7.1, 0.95, 0, Math.PI * 2);
+            ctx.arc(5.2, -7.1, 1.05, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Excited alien expression ("O" right after firing, grin afterward)
+            ctx.fillStyle = '#0b3b18';
+            if (alienShip.age < 0.35) {
+                ctx.beginPath();
+                ctx.ellipse(1.5, -1.2, 1.4, 1.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.strokeStyle = '#0b3b18';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.arc(1.5, -2.0, 2.2, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 4. Translucent Glass Cockpit Canopy Dome
+            const domeGrad = ctx.createRadialGradient(-6, -18, 2, 0, -8, 24);
+            domeGrad.addColorStop(0.0, 'rgba(210, 250, 255, 0.45)');
+            domeGrad.addColorStop(0.55, 'rgba(100, 215, 255, 0.20)');
+            domeGrad.addColorStop(1.0, 'rgba(56, 189, 248, 0.38)');
+            ctx.fillStyle = domeGrad;
+            ctx.beginPath();
+            ctx.arc(0, -4, 21, Math.PI, Math.PI * 2);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(186, 243, 255, 0.75)';
+            ctx.lineWidth = 1.3;
+            ctx.stroke();
+
+            // Curved glass specular highlight streak
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.lineWidth = 1.8;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(0, -4, 17, Math.PI * 1.15, Math.PI * 1.42);
+            ctx.stroke();
+
+            // 5. Main Metallic UFO Saucer Hull
+            const hullGrad = ctx.createLinearGradient(0, -7, 0, 14);
+            hullGrad.addColorStop(0.0, '#cbd5e1');
+            hullGrad.addColorStop(0.32, '#f8fafc');
+            hullGrad.addColorStop(0.55, '#64748b');
+            hullGrad.addColorStop(0.85, '#334155');
+            hullGrad.addColorStop(1.0, '#0f172a');
+
+            ctx.fillStyle = hullGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, 3, 38, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+
+            // Metallic upper collar ring around cockpit base
+            ctx.fillStyle = '#475569';
+            ctx.beginPath();
+            ctx.ellipse(0, -4, 22, 4.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+
+            // Pulsing perimeter UFO lights along the saucer rim
+            const rimOffsets = [-28, -17, -6, 6, 17, 28];
+            for (let i = 0; i < rimOffsets.length; i++) {
+                const lx = rimOffsets[i];
+                const ly = 3.5 + Math.cos((lx / 38) * (Math.PI / 2)) * 3.2;
+                const blink = Math.sin(time * 0.015 + i * 1.1) > 0;
+                ctx.fillStyle = blink ? '#5eff7a' : '#00e5ff';
+                ctx.shadowColor = blink ? '#5eff7a' : '#00e5ff';
+                ctx.shadowBlur = 6;
+                ctx.beginPath();
+                ctx.arc(lx, ly, 2.1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            ctx.restore();
+        }
+
+        /**
+         * Renders muzzle shockwaves and glowing plasma launch sparks.
+         */
+        function drawLaunchEffects() {
+            // Shockwave rings
+            for (const sw of shockwaves) {
+                ctx.save();
+                ctx.translate(sw.x, sw.y);
+                ctx.strokeStyle = `rgba(110, 255, 165, ${sw.alpha.toFixed(3)})`;
+                ctx.lineWidth = 2.2;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, sw.radius * 0.38, sw.radius, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Glowing plasma sparks
+            for (const p of launchParticles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 6;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
             }
         }
 
@@ -628,7 +1055,10 @@
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            // 2. Draw Spider-Man & Web Trail
+            // 2. Draw Alien Spaceship (behind Spider-Man so the ball emerges cleanly out of the barrel)
+            drawAlienSpaceship(timestamp);
+
+            // 3. Draw Spider-Man & Web Trail
             for (const b of balls) {
                 // Draw web-silk path line
                 if (b.trail.length > 1) {
@@ -645,16 +1075,24 @@
                 // Draw Spider-Man ball
                 drawSpiderManBall(b);
             }
+
+            // 4. Draw Muzzle Flash Shockwaves & Plasma Sparks
+            drawLaunchEffects();
         }
 
         function animate(timestamp) {
+            const dt = Math.min(0.05, Math.max(0.001, (timestamp - lastTimestamp) / 1000));
+            lastTimestamp = timestamp;
+
+            updateAlienAndEffects(dt);
             updatePhysics();
             draw(timestamp);
             requestAnimationFrame(animate);
         }
 
         window.onload = function() {
-            animate(performance.now());
+            lastTimestamp = performance.now();
+            animate(lastTimestamp);
         };
     </script>
 </body>
