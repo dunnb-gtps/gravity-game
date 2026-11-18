@@ -128,7 +128,7 @@
         const centralNode = {
             x: 0,
             y: 0,
-            radius: 12
+            radius: 16
         };
 
         // Aurora Ribbon Configurations
@@ -388,21 +388,166 @@
             ctx.restore();
         }
 
+        function drawSeaOtter(cx, cy) {
+            const bobY = Math.sin(auroraTime * 2.5) * 1.5;
+
+            ctx.save();
+            ctx.translate(cx, cy + bobY);
+
+            // Soft ambient glow behind the sea otter
+            const aura = ctx.createRadialGradient(0, 0, 6, 0, 0, 36);
+            aura.addColorStop(0, 'rgba(180, 235, 255, 0.25)');
+            aura.addColorStop(1, 'rgba(180, 235, 255, 0)');
+            ctx.fillStyle = aura;
+            ctx.beginPath();
+            ctx.arc(0, 0, 36, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 1. Tail (gently curved on the left)
+            ctx.fillStyle = '#4a3121';
+            ctx.beginPath();
+            ctx.moveTo(-16, 2);
+            ctx.quadraticCurveTo(-29, 3, -32, 7);
+            ctx.quadraticCurveTo(-28, 11, -15, 8);
+            ctx.closePath();
+            ctx.fill();
+
+            // 2. Hind Flippers
+            ctx.fillStyle = '#3b2518';
+            ctx.beginPath();
+            ctx.ellipse(-20, -4, 6, 3.2, -0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(-20, 7, 6, 3.2, 0.35, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Main Torso (floating on back)
+            ctx.fillStyle = '#6e4930';
+            ctx.beginPath();
+            ctx.ellipse(-3, 1, 16, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Creamy-tan chest & belly fur
+            ctx.fillStyle = '#bfa084';
+            ctx.beginPath();
+            ctx.ellipse(-2, 0, 11, 7.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 4. Scallop Shell resting on chest
+            ctx.fillStyle = '#f3d9dc';
+            ctx.strokeStyle = '#c49aa0';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.arc(-2, -1, 4.6, Math.PI * 0.15, Math.PI * 0.85, true);
+            ctx.lineTo(-2, 3.6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Shell ridges
+            ctx.beginPath();
+            ctx.moveTo(-2, 3.6);
+            ctx.lineTo(-3.6, -5.0);
+            ctx.moveTo(-2, 3.6);
+            ctx.lineTo(-0.4, -5.0);
+            ctx.stroke();
+
+            // 5. Front Paws holding the shell
+            ctx.fillStyle = '#573824';
+            ctx.beginPath();
+            ctx.ellipse(-5, -3.8, 3.6, 2.3, 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(-5, 3.8, 3.6, 2.3, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 6. Head (right side)
+            const headX = 13;
+            const headY = -2;
+            const faceX = headX + 1.5;
+
+            // Ears
+            ctx.fillStyle = '#4a3121';
+            ctx.beginPath();
+            ctx.arc(headX - 3, headY - 9.5, 2.8, 0, Math.PI * 2);
+            ctx.arc(headX + 4.5, headY - 8.5, 2.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head fur base
+            ctx.fillStyle = '#7d553a';
+            ctx.beginPath();
+            ctx.arc(headX, headY, 10.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pale cream sea otter face
+            ctx.fillStyle = '#ead5be';
+            ctx.beginPath();
+            ctx.ellipse(faceX, headY + 0.6, 8.2, 7.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Muzzle whisker pads
+            ctx.fillStyle = '#f5e6d6';
+            ctx.beginPath();
+            ctx.ellipse(faceX - 1.8, headY + 2.4, 3.2, 2.3, 0, 0, Math.PI * 2);
+            ctx.ellipse(faceX + 1.8, headY + 2.4, 3.2, 2.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#170f0a';
+            ctx.beginPath();
+            ctx.arc(faceX - 3.2, headY - 2, 1.45, 0, Math.PI * 2);
+            ctx.arc(faceX + 3.2, headY - 2, 1.45, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye catchlights
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(faceX - 3.6, headY - 2.4, 0.5, 0, Math.PI * 2);
+            ctx.arc(faceX + 2.8, headY - 2.4, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose
+            ctx.fillStyle = '#261710';
+            ctx.beginPath();
+            ctx.moveTo(faceX - 1.6, headY + 0.2);
+            ctx.lineTo(faceX + 1.6, headY + 0.2);
+            ctx.lineTo(faceX, headY + 2.3);
+            ctx.closePath();
+            ctx.fill();
+
+            // Mouth
+            ctx.strokeStyle = '#4a3121';
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(faceX, headY + 2.3);
+            ctx.quadraticCurveTo(faceX - 1.3, headY + 3.8, faceX - 2.6, headY + 3.2);
+            ctx.moveTo(faceX, headY + 2.3);
+            ctx.quadraticCurveTo(faceX + 1.3, headY + 3.8, faceX + 2.6, headY + 3.2);
+            ctx.stroke();
+
+            // Whiskers
+            ctx.strokeStyle = 'rgba(255, 250, 242, 0.8)';
+            ctx.lineWidth = 0.75;
+            ctx.beginPath();
+            ctx.moveTo(faceX - 3.5, headY + 2.1);
+            ctx.lineTo(faceX - 10.5, headY + 1.1);
+            ctx.moveTo(faceX - 3.5, headY + 3.1);
+            ctx.lineTo(faceX - 10.2, headY + 3.7);
+            ctx.moveTo(faceX + 3.5, headY + 2.1);
+            ctx.lineTo(faceX + 10.5, headY + 1.1);
+            ctx.moveTo(faceX + 3.5, headY + 3.1);
+            ctx.lineTo(faceX + 10.2, headY + 3.7);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
         function draw() {
             // Render Northern Lights background
             drawNorthernLights();
 
-            // 1. Draw Central Mass Node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
-            ctx.fill();
+            // 1. Draw Central Sea Otter
+            drawSeaOtter(centralNode.x, centralNode.y);
 
             // 2. Draw Ball & Trail
             for (const b of balls) {
