@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Simulation - Earth</title>
+    <title>Gravity Physics Simulation - Sun & Earth</title>
     <style>
         * {
             box-sizing: border-box;
@@ -122,22 +122,23 @@
         // STATE VARIABLES
         let bodies = [];
 
-        // Central Gravity Node Definition
+        // Central Sun Definition
         const centralNode = {
             x: 0,
             y: 0,
-            radius: 12
+            radius: 12,
+            phase: 0
         };
 
         /**
-         * Resizes the canvas to match its responsive container and centers the gravity node.
+         * Resizes the canvas to match its responsive container and centers the Sun.
          */
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
 
-            // Recenter gravity node dynamically
+            // Recenter Sun dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
         }
@@ -183,10 +184,13 @@
         }
 
         /**
-         * Updates orbital kinematics, inverse-square gravitational acceleration,
-         * collision absorption, boundary cleanup, and Earth's axial spin.
+         * Updates solar animation, orbital kinematics, inverse-square gravitational
+         * acceleration, collision absorption, boundary cleanup, and Earth's axial spin.
          */
         function updatePhysics() {
+            // Advance solar corona & surface animation phase
+            centralNode.phase += 0.03;
+
             for (let i = bodies.length - 1; i >= 0; i--) {
                 const earth = bodies[i];
 
@@ -198,13 +202,13 @@
                     continue;
                 }
 
-                // Distance vector to central gravity node
+                // Distance vector to central Sun
                 const dx = centralNode.x - earth.x;
                 const dy = centralNode.y - earth.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: Earth collides with central mass
+                // Absorption check: Earth collides with the Sun
                 if (dist < centralNode.radius + earth.radius) {
                     bodies.splice(i, 1);
                     continue;
@@ -232,6 +236,118 @@
                     earth.trail.shift();
                 }
             }
+        }
+
+        /**
+         * Renders the central Sun with a multi-layered glowing corona, shimmering solar
+         * rays, prominence loops, limb-darkened photosphere, and rotating solar granulation.
+         */
+        function drawSun() {
+            const r = centralNode.radius;
+            const phase = centralNode.phase;
+            const pulse = 1 + Math.sin(phase * 1.4) * 0.05;
+
+            ctx.save();
+            ctx.translate(centralNode.x, centralNode.y);
+
+            // 1. Wide outer atmospheric corona halo
+            const outerRadius = r * 3.8 * pulse;
+            const outerGlow = ctx.createRadialGradient(0, 0, r * 0.7, 0, 0, outerRadius);
+            outerGlow.addColorStop(0, 'rgba(255, 213, 79, 0.55)');
+            outerGlow.addColorStop(0.3, 'rgba(255, 152, 0, 0.28)');
+            outerGlow.addColorStop(0.65, 'rgba(255, 87, 34, 0.10)');
+            outerGlow.addColorStop(1, 'rgba(255, 87, 34, 0)');
+            ctx.beginPath();
+            ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+            ctx.fillStyle = outerGlow;
+            ctx.fill();
+
+            // 2. Subtle shimmering corona rays
+            const rayCount = 12;
+            for (let i = 0; i < rayCount; i++) {
+                const angle = (i / rayCount) * Math.PI * 2 + phase * 0.12;
+                const rayLen = r * (1.85 + 0.35 * Math.sin(phase * 2.1 + i * 1.7));
+                const spread = 0.13;
+
+                const rayGrad = ctx.createRadialGradient(0, 0, r * 0.9, 0, 0, rayLen);
+                rayGrad.addColorStop(0, 'rgba(255, 224, 130, 0.32)');
+                rayGrad.addColorStop(1, 'rgba(255, 143, 0, 0)');
+
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, rayLen, angle - spread, angle + spread);
+                ctx.closePath();
+                ctx.fillStyle = rayGrad;
+                ctx.fill();
+            }
+
+            // 3. Subtle solar prominence loops along the limb
+            ctx.strokeStyle = 'rgba(255, 112, 67, 0.55)';
+            ctx.lineWidth = 1.2;
+            for (let p = 0; p < 3; p++) {
+                const pAngle = p * 2.1 + phase * 0.18;
+                const loopHeight = r * (0.24 + 0.08 * Math.sin(phase * 1.8 + p));
+                ctx.save();
+                ctx.rotate(pAngle);
+                ctx.beginPath();
+                ctx.arc(r * 0.92, 0, loopHeight, -Math.PI * 0.45, Math.PI * 0.45);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 4. Clip interior surface details to the Sun's photosphere disc
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.clip();
+
+            // 5. Photosphere gradient (brilliant white-yellow core to fiery orange limb)
+            const photoGrad = ctx.createRadialGradient(-r * 0.15, -r * 0.15, r * 0.05, 0, 0, r);
+            photoGrad.addColorStop(0, '#ffffff');
+            photoGrad.addColorStop(0.28, '#fff59d');
+            photoGrad.addColorStop(0.62, '#ffca28');
+            photoGrad.addColorStop(0.88, '#fb8c00');
+            photoGrad.addColorStop(1, '#e65100');
+            ctx.fillStyle = photoGrad;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+
+            // 6. Rotating solar convection cells & subtle sunspots
+            const span = r * 4;
+            const surfaceShift = (phase * 3.5) % span;
+            const granules = [
+                { x: 0.4,  y: -0.35, rx: 0.34, ry: 0.22, color: 'rgba(255, 255, 224, 0.32)' },
+                { x: 1.3,  y: 0.25,  rx: 0.38, ry: 0.24, color: 'rgba(239, 108, 0, 0.24)' },
+                { x: 2.2,  y: -0.20, rx: 0.32, ry: 0.20, color: 'rgba(255, 249, 196, 0.30)' },
+                { x: 3.1,  y: 0.38,  rx: 0.35, ry: 0.22, color: 'rgba(230, 81, 0, 0.22)' },
+                { x: 1.75, y: -0.45, rx: 0.14, ry: 0.11, color: 'rgba(183, 28, 28, 0.38)' }, // Sunspot
+                { x: 3.45, y: -0.10, rx: 0.12, ry: 0.10, color: 'rgba(183, 28, 28, 0.34)' }  // Sunspot
+            ];
+
+            for (let cycle = -1; cycle <= 0; cycle++) {
+                const baseOffset = surfaceShift + cycle * span;
+                for (const g of granules) {
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        baseOffset + g.x * r,
+                        g.y * r,
+                        g.rx * r,
+                        g.ry * r,
+                        0,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fillStyle = g.color;
+                    ctx.fill();
+                }
+            }
+
+            // 7. Crisp luminous solar rim
+            ctx.beginPath();
+            ctx.arc(0, 0, r - 0.3, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 245, 157, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
         }
 
         /**
@@ -396,24 +512,15 @@
         }
 
         /**
-         * Renders the central gravity node, motion trail, and planet Earth.
+         * Renders the central Sun, orbital motion trail, and planet Earth.
          */
         function draw() {
             // Clear canvas background
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Central Mass Node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
-            ctx.fill();
+            // 1. Draw Central Sun
+            drawSun();
 
             // 2. Draw Orbital Trail & Planet Earth
             for (const earth of bodies) {
