@@ -129,7 +129,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball and catch the fish before they disappear!
+        Click anywhere on the canvas to launch a starfish and catch the fish before they disappear!
     </div>
 
     <script>
@@ -370,7 +370,7 @@
         resizeCanvas();
         initInitialFishes();
 
-        // Canvas Click Handler: Directly launch ball at click position
+        // Canvas Click Handler: Directly launch starfish at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -385,14 +385,16 @@
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single ball on screen
+            // Overwrite existing array to strictly maintain a single starfish on screen
             balls = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4,
-                hue: 0,
+                radius: 8,
+                outerRadius: 12,
+                angle: Math.random() * Math.PI * 2,
+                spinSpeed: 0.055,
                 trail: [] // Stores history of past {x, y} coordinates
             }];
         }
@@ -503,7 +505,7 @@
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove starfish if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
                 if (b.x < -margin || b.x > canvas.width + margin || 
                     b.y < -margin || b.y > canvas.height + margin) {
@@ -517,7 +519,7 @@
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
+                // Absorption check: starfish collides with central mass
                 if (dist < centralNode.radius + b.radius) {
                     balls.splice(i, 1);
                     continue;
@@ -530,12 +532,12 @@
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
 
-                // Update velocity, position, and rainbow hue
+                // Update velocity, position, and rotation angle
                 b.vx += ax;
                 b.vy += ay;
                 b.x += b.vx;
                 b.y += b.vy;
-                b.hue = (b.hue + 6) % 360;
+                b.angle += b.spinSpeed;
 
                 // Record position history for line trail
                 b.trail.push({ x: b.x, y: b.y });
@@ -548,7 +550,7 @@
                     const f = fishes[j];
                     if (f.alpha < 0.25) continue;
 
-                    const hitRadius = f.size * f.scale + b.radius + 6;
+                    const hitRadius = f.size * f.scale + b.radius + 5;
                     const distFish = Math.hypot(b.x - f.x, b.y - f.y);
 
                     if (distFish <= hitRadius) {
@@ -902,6 +904,97 @@
             ctx.restore();
         }
 
+        function drawStarfish(b) {
+            const outerR = b.outerRadius;
+            const innerR = outerR * 0.44;
+            const arms = 5;
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(b.angle);
+
+            // Soft warm ambient glow
+            const glow = ctx.createRadialGradient(0, 0, outerR * 0.15, 0, 0, outerR * 1.8);
+            glow.addColorStop(0, 'rgba(255, 145, 85, 0.42)');
+            glow.addColorStop(1, 'rgba(255, 110, 60, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(0, 0, outerR * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Build organic 5-armed starfish silhouette
+            ctx.beginPath();
+            for (let i = 0; i < arms; i++) {
+                const tipAngle = (i * Math.PI * 2) / arms - Math.PI / 2;
+                const prevValleyAngle = ((i - 0.5) * Math.PI * 2) / arms - Math.PI / 2;
+                const nextValleyAngle = ((i + 0.5) * Math.PI * 2) / arms - Math.PI / 2;
+
+                const vx1 = Math.cos(prevValleyAngle) * innerR;
+                const vy1 = Math.sin(prevValleyAngle) * innerR;
+                const tx = Math.cos(tipAngle) * outerR;
+                const ty = Math.sin(tipAngle) * outerR;
+                const vx2 = Math.cos(nextValleyAngle) * innerR;
+                const vy2 = Math.sin(nextValleyAngle) * innerR;
+
+                // Control points slightly widened to give plump, rounded starfish arms
+                const leftFlankAngle = tipAngle - 0.24;
+                const rightFlankAngle = tipAngle + 0.24;
+                const c1x = Math.cos(leftFlankAngle) * (outerR * 0.72);
+                const c1y = Math.sin(leftFlankAngle) * (outerR * 0.72);
+                const c2x = Math.cos(rightFlankAngle) * (outerR * 0.72);
+                const c2y = Math.sin(rightFlankAngle) * (outerR * 0.72);
+
+                if (i === 0) {
+                    ctx.moveTo(vx1, vy1);
+                }
+                ctx.quadraticCurveTo(c1x, c1y, tx, ty);
+                ctx.quadraticCurveTo(c2x, c2y, vx2, vy2);
+            }
+            ctx.closePath();
+
+            // Rich coral-to-gold radial gradient fill
+            const bodyGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, outerR);
+            bodyGrad.addColorStop(0, '#ffd166');
+            bodyGrad.addColorStop(0.45, '#ff7b54');
+            bodyGrad.addColorStop(1, '#e84855');
+
+            ctx.fillStyle = bodyGrad;
+            ctx.shadowColor = 'rgba(255, 120, 75, 0.65)';
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Soft rounded edge highlight
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 1.3;
+            ctx.strokeStyle = '#ffb26b';
+            ctx.stroke();
+
+            // Radiating white/cream tubercles (dots) down each arm and center ring
+            ctx.fillStyle = 'rgba(255, 248, 232, 0.88)';
+            for (let i = 0; i < arms; i++) {
+                const armAngle = (i * Math.PI * 2) / arms - Math.PI / 2;
+                const ringAngle = ((i + 0.5) * Math.PI * 2) / arms - Math.PI / 2;
+
+                // Center ring dot
+                ctx.beginPath();
+                ctx.arc(Math.cos(ringAngle) * (outerR * 0.18), Math.sin(ringAngle) * (outerR * 0.18), 0.8, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Dots running along each arm
+                const dotSteps = [0.34, 0.55, 0.74];
+                const dotRadii = [0.95, 0.78, 0.58];
+                for (let d = 0; d < dotSteps.length; d++) {
+                    const dist = outerR * dotSteps[d];
+                    ctx.beginPath();
+                    ctx.arc(Math.cos(armAngle) * dist, Math.sin(armAngle) * dist, dotRadii[d], 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+        }
+
         function draw() {
             // Render Northern Lights background
             drawNorthernLights();
@@ -917,7 +1010,7 @@
             // 3. Draw Central Sea Otter
             drawSeaOtter(centralNode.x, centralNode.y);
 
-            // 4. Draw Ball & Trail
+            // 4. Draw Starfish & Trail
             for (const b of balls) {
                 // Draw path line
                 if (b.trail.length > 1) {
@@ -931,25 +1024,8 @@
                     ctx.stroke();
                 }
 
-                // Draw ball object with rainbow gradient and cycling hue
-                const rainbowGradient = ctx.createLinearGradient(
-                    b.x - b.radius,
-                    b.y - b.radius,
-                    b.x + b.radius,
-                    b.y + b.radius
-                );
-                rainbowGradient.addColorStop(0, `hsl(${b.hue}, 100%, 60%)`);
-                rainbowGradient.addColorStop(0.5, `hsl(${(b.hue + 60) % 360}, 100%, 55%)`);
-                rainbowGradient.addColorStop(1, `hsl(${(b.hue + 120) % 360}, 100%, 50%)`);
-
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = rainbowGradient;
-                ctx.shadowColor = `hsl(${b.hue}, 100%, 55%)`;
-                ctx.shadowBlur = 8;
-                ctx.fill();
-                ctx.restore();
+                // Draw starfish object
+                drawStarfish(b);
             }
         }
 
