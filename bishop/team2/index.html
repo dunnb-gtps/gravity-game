@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spider-Man & Gwen Stacy Gravity Simulation</title>
+    <title>Spider-Man, Gwen Stacy & Venom Gravity Simulation</title>
     <style>
         * {
             box-sizing: border-box;
@@ -129,6 +129,14 @@
             box-shadow: 0 0 12px rgba(236, 72, 153, 0.65);
         }
 
+        /* Active Venom State */
+        .char-btn[data-char="venom"].active {
+            background: linear-gradient(135deg, #0F172A 0%, #3B0764 100%);
+            color: #FFFFFF;
+            border-color: #C084FC;
+            box-shadow: 0 0 12px rgba(168, 85, 247, 0.75);
+        }
+
         /* Active Duo / Alternate State */
         .char-btn[data-char="duo"].active {
             background: linear-gradient(90deg, #E23636 0%, #9333EA 50%, #EC4899 100%);
@@ -235,7 +243,7 @@
 
         <div class="controls-group">
             <!-- Character Launch Selector -->
-            <div class="character-selector" role="group" aria-label="Select hero ball to launch">
+            <div class="character-selector" role="group" aria-label="Select character ball to launch">
                 <button type="button" class="char-btn active" data-char="spiderman" onclick="selectCharacter('spiderman')">
                     <svg viewBox="0 0 64 64" aria-hidden="true">
                         <ellipse cx="32" cy="32" rx="22" ry="26" fill="#E23636" stroke="#090D1C" stroke-width="4"/>
@@ -254,6 +262,17 @@
                     </svg>
                     Gwen Stacy
                 </button>
+                <button type="button" class="char-btn" data-char="venom" onclick="selectCharacter('venom')">
+                    <svg viewBox="0 0 64 64" aria-hidden="true">
+                        <ellipse cx="32" cy="32" rx="23" ry="26" fill="#070912" stroke="#CBD5E1" stroke-width="3.5"/>
+                        <path d="M12 24 C16 15, 26 19, 29 28 C23 30, 15 29, 12 24 Z" fill="#FFFFFF"/>
+                        <path d="M52 24 C48 15, 38 19, 35 28 C41 30, 49 29, 52 24 Z" fill="#FFFFFF"/>
+                        <path d="M14 38 Q32 34 50 38 Q45 53 32 53 Q19 53 14 38 Z" fill="#7F1D1D"/>
+                        <path d="M17 38 L21 44 L25 37 L29 45 L33 37 L37 45 L41 37 L45 44 L48 38" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round"/>
+                        <path d="M30 46 Q25 54 19 58" fill="none" stroke="#E11D48" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                    Venom
+                </button>
                 <button type="button" class="char-btn" data-char="duo" onclick="selectCharacter('duo')">
                     Duo Alt
                 </button>
@@ -270,7 +289,7 @@
     </div>
 
     <div class="instructions">
-        Choose Spider-Man, Gwen Stacy, or Duo Alt, then click anywhere on the canvas to launch multiple web orbits.
+        Choose Spider-Man, Gwen Stacy, Venom, or Duo Alt, then click anywhere on the canvas to launch multiple web orbits.
     </div>
 
     <script>
@@ -296,7 +315,7 @@
         let webParticles = [];     // Web-burst & web-splat particles
         let skylineBuildings = []; // Cached NYC skyline geometry
         let frameTick = 0;         // Animation clock for Spider-Sense pulse
-        let selectedMode = 'spiderman'; // 'spiderman' | 'gwen' | 'duo'
+        let selectedMode = 'spiderman'; // 'spiderman' | 'gwen' | 'venom' | 'duo'
         let duoToggle = false;     // Alternates between Spider-Man and Gwen Stacy in 'duo' mode
 
         // Central Gravity Node Definition (Spider-Emblem & Spider-Sense Core)
@@ -307,7 +326,7 @@
         };
 
         /**
-         * Updates the active hero mode ('spiderman', 'gwen', or 'duo').
+         * Updates the active character mode ('spiderman', 'gwen', 'venom', or 'duo').
          */
         function selectCharacter(mode) {
             selectedMode = mode;
@@ -316,11 +335,12 @@
             });
         }
 
-        // Optional keyboard shortcuts (1 = Spider-Man, 2 = Gwen Stacy, 3 = Duo Alt, R = Reset)
+        // Keyboard shortcuts (1 = Spider-Man, 2 = Gwen Stacy, 3 = Venom, 4 = Duo Alt, R = Reset)
         window.addEventListener('keydown', (e) => {
             if (e.key === '1') selectCharacter('spiderman');
             else if (e.key === '2') selectCharacter('gwen');
-            else if (e.key === '3') selectCharacter('duo');
+            else if (e.key === '3') selectCharacter('venom');
+            else if (e.key === '4') selectCharacter('duo');
             else if (e.key.toLowerCase() === 'r') resetSimulation();
         });
 
@@ -431,7 +451,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Launch a new Spider-Man or Gwen Stacy gravity ball
+        // Canvas Click Handler: Launch a new Spider-Man, Gwen Stacy, or Venom gravity ball
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -441,7 +461,7 @@
         });
 
         /**
-         * Launches a new Spider-Man or Gwen Stacy gravity ball from (x, y) at
+         * Launches a new character gravity ball from (x, y) at
          * FIXED_LAUNCH_ANGLE (90°) with LAUNCH_VELOCITY (5), allowing multiple
          * balls to orbit simultaneously.
          */
@@ -481,6 +501,21 @@
          */
         function spawnLaunchEffects(x, y, character) {
             const isGwen = character === 'gwen';
+            const isVenom = character === 'venom';
+
+            let shadowColor = '#E23636';
+            let strokeColor = '#050814';
+            let angle = -0.18;
+
+            if (isGwen) {
+                shadowColor = '#EC4899';
+                strokeColor = '#1E1B4B';
+                angle = 0.16;
+            } else if (isVenom) {
+                shadowColor = '#7C3AED';
+                strokeColor = '#050814';
+                angle = -0.14;
+            }
 
             comicPops.push({
                 text: 'THWIP!',
@@ -489,18 +524,20 @@
                 vy: -0.55,
                 alpha: 1.0,
                 scale: 0.7,
-                angle: isGwen ? 0.16 : -0.18,
-                shadowColor: isGwen ? '#EC4899' : '#E23636',
-                strokeColor: isGwen ? '#1E1B4B' : '#050814'
+                angle: angle,
+                shadowColor: shadowColor,
+                strokeColor: strokeColor
             });
 
             const burstCount = 10;
             for (let i = 0; i < burstCount; i++) {
-                const angle = (Math.PI * 2 * i) / burstCount + (Math.random() * 0.25);
+                const burstAngle = (Math.PI * 2 * i) / burstCount + (Math.random() * 0.25);
                 const speed = 1.4 + Math.random() * 2.2;
                 let particleColor = '#FFFFFF';
                 if (isGwen) {
                     particleColor = i % 3 === 0 ? '#EC4899' : (i % 3 === 1 ? '#22D3EE' : '#FFFFFF');
+                } else if (isVenom) {
+                    particleColor = i % 3 === 0 ? '#A855F7' : (i % 3 === 1 ? '#E2E8F0' : '#7C3AED');
                 } else {
                     particleColor = i % 3 === 0 ? '#7DD3FC' : '#FFFFFF';
                 }
@@ -508,8 +545,8 @@
                 webParticles.push({
                     x: x,
                     y: y,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
+                    vx: Math.cos(burstAngle) * speed,
+                    vy: Math.sin(burstAngle) * speed,
                     length: 5 + Math.random() * 6,
                     alpha: 0.95,
                     decay: 0.032 + Math.random() * 0.015,
@@ -519,10 +556,11 @@
         }
 
         /**
-         * Spawns a radial web-splat particle burst when a hero reaches the central emblem.
+         * Spawns a radial web-splat particle burst when a character reaches the central emblem.
          */
         function spawnImpactWebSplat(x, y, character) {
             const isGwen = character === 'gwen';
+            const isVenom = character === 'venom';
             const splatCount = 14;
             for (let i = 0; i < splatCount; i++) {
                 const angle = (Math.PI * 2 * i) / splatCount + (Math.random() * 0.2);
@@ -530,6 +568,8 @@
                 let color = '#FFFFFF';
                 if (isGwen) {
                     color = i % 3 === 0 ? '#EC4899' : (i % 3 === 1 ? '#22D3EE' : '#FFFFFF');
+                } else if (isVenom) {
+                    color = i % 3 === 0 ? '#A855F7' : (i % 3 === 1 ? '#FFFFFF' : '#64748B');
                 } else {
                     color = i % 4 === 0 ? '#E23636' : '#FFFFFF';
                 }
@@ -1571,31 +1611,44 @@
         }
 
         /**
-         * Renders the orbital trail as a silky spider-web strand themed to the hero:
+         * Renders the orbital trail as a silky spider-web strand themed to the character:
          * - Spider-Man: Cyan-white outer glow + crisp white core strand
          * - Gwen Stacy: Magenta-pink outer glow + crisp white/cyan core strand
+         * - Venom: Violet-purple symbiote aura + dark symbiote sheath + silver-white core
          */
         function drawWebTrail(trail, character) {
             if (trail.length < 2) return;
 
             const isGwen = character === 'gwen';
+            const isVenom = character === 'venom';
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // Outer Spider-Verse chromatic silken glow pass
+            // Outer chromatic silken / symbiote glow pass
             ctx.beginPath();
             ctx.moveTo(trail[0].x, trail[0].y);
             for (let t = 1; t < trail.length; t++) {
                 ctx.lineTo(trail[t].x, trail[t].y);
             }
-            ctx.strokeStyle = isGwen
-                ? 'rgba(236, 72, 153, 0.34)'
-                : 'rgba(125, 225, 255, 0.28)';
-            ctx.lineWidth = 4.2;
-            ctx.stroke();
+            if (isVenom) {
+                ctx.strokeStyle = 'rgba(139, 92, 246, 0.42)';
+                ctx.lineWidth = 4.8;
+                ctx.stroke();
 
-            // Crisp silky web core strand with progressive fade near tail
+                // Dark symbiote inner sheath
+                ctx.strokeStyle = 'rgba(10, 14, 28, 0.85)';
+                ctx.lineWidth = 2.6;
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = isGwen
+                    ? 'rgba(236, 72, 153, 0.34)'
+                    : 'rgba(125, 225, 255, 0.28)';
+                ctx.lineWidth = 4.2;
+                ctx.stroke();
+            }
+
+            // Crisp core strand with progressive fade near tail
             for (let t = 1; t < trail.length; t++) {
                 const progress = t / trail.length;
                 const alpha = 0.22 + progress * 0.78;
@@ -1603,13 +1656,18 @@
                 ctx.beginPath();
                 ctx.moveTo(trail[t - 1].x, trail[t - 1].y);
                 ctx.lineTo(trail[t].x, trail[t].y);
-                ctx.strokeStyle = isGwen
-                    ? `rgba(255, 240, 250, ${alpha})`
-                    : `rgba(255, 255, 255, ${alpha})`;
-                ctx.lineWidth = 1.1 + progress * 0.9;
+                if (isVenom) {
+                    ctx.strokeStyle = `rgba(226, 232, 240, ${alpha * 0.92})`;
+                    ctx.lineWidth = 0.95 + progress * 0.85;
+                } else {
+                    ctx.strokeStyle = isGwen
+                        ? `rgba(255, 240, 250, ${alpha})`
+                        : `rgba(255, 255, 255, ${alpha})`;
+                    ctx.lineWidth = 1.1 + progress * 0.9;
+                }
                 ctx.stroke();
 
-                // Periodic delicate web cross-nodes along the path
+                // Periodic delicate web cross-nodes / symbiote barbs along the path
                 if (t % 16 === 0 && t < trail.length - 4) {
                     const pPrev = trail[t - 1];
                     const pCurr = trail[t];
@@ -1617,10 +1675,14 @@
                     const perpAngle = tangentAngle + Math.PI / 2;
                     const barbLen = 3.2 + progress * 1.6;
 
-                    ctx.strokeStyle = isGwen
-                        ? `rgba(34, 211, 238, ${alpha * 0.8})`
-                        : `rgba(210, 242, 255, ${alpha * 0.75})`;
-                    ctx.lineWidth = 0.9;
+                    if (isVenom) {
+                        ctx.strokeStyle = `rgba(168, 85, 247, ${alpha * 0.88})`;
+                    } else if (isGwen) {
+                        ctx.strokeStyle = `rgba(34, 211, 238, ${alpha * 0.8})`;
+                    } else {
+                        ctx.strokeStyle = `rgba(210, 242, 255, ${alpha * 0.75})`;
+                    }
+                    ctx.lineWidth = 0.95;
 
                     ctx.beginPath();
                     ctx.moveTo(
@@ -1633,9 +1695,13 @@
                     );
                     ctx.stroke();
 
-                    ctx.fillStyle = isGwen
-                        ? `rgba(244, 114, 182, ${alpha})`
-                        : `rgba(255, 255, 255, ${alpha})`;
+                    if (isVenom) {
+                        ctx.fillStyle = `rgba(192, 132, 252, ${alpha})`;
+                    } else if (isGwen) {
+                        ctx.fillStyle = `rgba(244, 114, 182, ${alpha})`;
+                    } else {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    }
                     ctx.beginPath();
                     ctx.arc(pCurr.x, pCurr.y, 1.35, 0, Math.PI * 2);
                     ctx.fill();
@@ -1841,6 +1907,122 @@
             ctx.restore();
         }
 
+        /**
+         * Renders a moving Venom symbiote gravity ball (radius = 10)
+         * featuring a glossy black symbiote head, silver-violet rim glow,
+         * jagged white eyes, interlocking fangs, and flicking crimson tongue.
+         */
+        function drawVenomBall(b) {
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(b.tilt);
+
+            const rx = 10.2;
+            const ry = 11.0;
+
+            // Subtle trailing symbiote micro-tendrils
+            const tendrilDir = b.vx >= 0 ? -1 : 1;
+            const wave = Math.sin(frameTick * 0.14 + b.x * 0.05) * 1.8;
+            ctx.strokeStyle = '#64748B';
+            ctx.lineWidth = 1.4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(tendrilDir * 7.5, -5.5);
+            ctx.quadraticCurveTo(tendrilDir * 12, -8.5 + wave, tendrilDir * 14.5, -6.5 - wave);
+            ctx.moveTo(tendrilDir * 8.2, 1.5);
+            ctx.quadraticCurveTo(tendrilDir * 12.5, 2.5 - wave, tendrilDir * 14.8, 4.5 + wave);
+            ctx.stroke();
+
+            // Violet-silver symbiote aura so Venom stands out sharply against the dark sky
+            ctx.shadowColor = 'rgba(139, 92, 246, 0.78)';
+            ctx.shadowBlur = 9;
+
+            // 1. Glossy Symbiote Head Gradient
+            const symbioteGrad = ctx.createRadialGradient(-3, -4, 1.2, 0, 0, ry * 1.15);
+            symbioteGrad.addColorStop(0, '#334155');
+            symbioteGrad.addColorStop(0.45, '#0F172A');
+            symbioteGrad.addColorStop(1, '#04060C');
+
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fillStyle = symbioteGrad;
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+
+            // Crisp silver-slate outer rim so the black head reads clearly on dark backgrounds
+            ctx.strokeStyle = '#CBD5E1';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // 2. Jagged White Symbiote Eyes
+            ctx.fillStyle = '#FFFFFF';
+
+            // Left Jagged Eye
+            ctx.beginPath();
+            ctx.moveTo(-1.3, -1.2);
+            ctx.quadraticCurveTo(-4.5, -6.2, -8.4, -3.8);
+            ctx.lineTo(-6.9, -2.3);
+            ctx.lineTo(-8.0, -1.0);
+            ctx.quadraticCurveTo(-4.2, 0.2, -1.3, -1.2);
+            ctx.closePath();
+            ctx.fill();
+
+            // Right Jagged Eye
+            ctx.beginPath();
+            ctx.moveTo(1.3, -1.2);
+            ctx.quadraticCurveTo(4.5, -6.2, 8.4, -3.8);
+            ctx.lineTo(6.9, -2.3);
+            ctx.lineTo(8.0, -1.0);
+            ctx.quadraticCurveTo(4.2, 0.2, 1.3, -1.2);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3. Menacing Crimson Maw
+            ctx.fillStyle = '#7F1D1D';
+            ctx.beginPath();
+            ctx.moveTo(-7.6, 2.0);
+            ctx.quadraticCurveTo(0, 0.6, 7.6, 2.0);
+            ctx.quadraticCurveTo(6.2, 8.8, 0, 9.2);
+            ctx.quadraticCurveTo(-6.2, 8.8, -7.6, 2.0);
+            ctx.closePath();
+            ctx.fill();
+
+            // 4. Sharp White Interlocking Fangs
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            // Upper fangs
+            ctx.moveTo(-6.6, 2.0); ctx.lineTo(-5.3, 4.9); ctx.lineTo(-4.0, 1.8);
+            ctx.moveTo(-3.3, 1.7); ctx.lineTo(-1.9, 5.1); ctx.lineTo(-0.5, 1.6);
+            ctx.moveTo(0.5, 1.6);  ctx.lineTo(1.9, 5.1);  ctx.lineTo(3.3, 1.7);
+            ctx.moveTo(4.0, 1.8);  ctx.lineTo(5.3, 4.9);  ctx.lineTo(6.6, 2.0);
+            // Lower fangs
+            ctx.moveTo(-5.5, 6.8); ctx.lineTo(-4.3, 4.3); ctx.lineTo(-3.1, 7.8);
+            ctx.moveTo(-2.1, 8.2); ctx.lineTo(-0.9, 4.8); ctx.lineTo(0.3, 8.4);
+            ctx.moveTo(1.2, 8.2);  ctx.lineTo(2.4, 4.7);  ctx.lineTo(3.6, 7.7);
+            ctx.moveTo(4.1, 7.4);  ctx.lineTo(5.0, 4.6);  ctx.lineTo(6.0, 6.5);
+            ctx.fill();
+
+            // 5. Whipping Crimson Symbiote Tongue
+            const tongueFlick = Math.sin(frameTick * 0.12 + b.y * 0.05) * 1.6;
+            ctx.strokeStyle = '#E11D48';
+            ctx.lineWidth = 2.1;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0.5, 5.8);
+            ctx.quadraticCurveTo(3.5, 9.5 + tongueFlick, 6.5, 11.8 - tongueFlick);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#FB7185';
+            ctx.lineWidth = 0.75;
+            ctx.beginPath();
+            ctx.moveTo(0.7, 5.6);
+            ctx.quadraticCurveTo(3.4, 9.0 + tongueFlick, 6.0, 11.2 - tongueFlick);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
         function drawComicEffects() {
             // 1. Web-burst & web-splat particles
             for (const p of webParticles) {
@@ -1894,15 +2076,17 @@
             // 2. Central Spider-Emblem & Spider-Sense Core
             drawCentralSpiderCore();
 
-            // 3. Draw all active web trails first so hero masks sit cleanly on top
+            // 3. Draw all active web trails first so character heads sit cleanly on top
             for (const b of balls) {
                 drawWebTrail(b.trail, b.character);
             }
 
-            // 4. Draw all Spider-Man & Gwen Stacy gravity balls
+            // 4. Draw all Spider-Man, Gwen Stacy & Venom gravity balls
             for (const b of balls) {
                 if (b.character === 'gwen') {
                     drawGwenStacyBall(b);
+                } else if (b.character === 'venom') {
+                    drawVenomBall(b);
                 } else {
                     drawSpiderManBall(b);
                 }
