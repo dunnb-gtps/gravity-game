@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Physics - Fish Catch</title>
     <style>
         * {
             box-sizing: border-box;
@@ -43,6 +43,27 @@
             text-transform: uppercase;
             font-weight: bold;
             text-shadow: 0 0 10px rgba(40, 255, 170, 0.35);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        #score-board {
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #7ef9c8;
+            text-shadow: 0 0 8px rgba(40, 255, 170, 0.4);
+            transition: transform 0.15s ease;
+        }
+
+        #score-board.pulse {
+            transform: scale(1.18);
+            color: #ffffff;
         }
 
         .btn-reset {
@@ -96,7 +117,10 @@
     <!-- Header Section -->
     <div id="header">
         <h1>Gravity Simulation</h1>
-        <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        <div class="header-controls">
+            <div id="score-board">Fish Caught: <span id="score-val">0</span></div>
+            <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        </div>
     </div>
 
     <!-- Canvas Container -->
@@ -105,12 +129,14 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball.
+        Click anywhere on the canvas to launch a ball and catch the fish before they disappear!
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const scoreValEl = document.getElementById('score-val');
+        const scoreBoardEl = document.getElementById('score-board');
 
         // SIMULATION CONSTANTS
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
@@ -119,10 +145,29 @@
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
+        // FISH GAMEPLAY CONSTANTS
+        const MAX_FISH = 5;                // Max concurrent fish in the background
+        const FISH_SPAWN_INTERVAL = 1.4;   // Seconds between spawn checks
+        const FISH_FADE_IN = 0.8;          // Seconds to appear
+        const FISH_FADE_OUT = 1.2;         // Seconds to disappear
+
+        const FISH_PALETTES = [
+            { body: '#ff8c42', belly: '#ffd166', fin: '#ff5e5b', glow: 'rgba(255, 165, 80, 0.35)' },
+            { body: '#ff6b9d', belly: '#ffc2d4', fin: '#e63973', glow: 'rgba(255, 115, 165, 0.35)' },
+            { body: '#00d2ff', belly: '#a8f9ff', fin: '#0088cc', glow: 'rgba(40, 225, 255, 0.35)' },
+            { body: '#48e5c2', belly: '#c2fcef', fin: '#1eae98', glow: 'rgba(72, 229, 194, 0.35)' },
+            { body: '#c77dff', belly: '#edd2ff', fin: '#9d4edd', glow: 'rgba(199, 125, 255, 0.35)' }
+        ];
+
         // STATE VARIABLES
         let balls = [];
         let stars = [];
+        let fishes = [];
+        let catchEffects = [];
         let auroraTime = 0;
+        let lastTimestamp = 0;
+        let fishSpawnTimer = 0;
+        let score = 0;
 
         // Central Gravity Node Definition
         const centralNode = {
@@ -207,6 +252,102 @@
             }
         }
 
+        function spawnFish(initialDelayOffset = 0) {
+            if (canvas.width < 150 || canvas.height < 150) return;
+
+            const margin = 60;
+            const minOtterDist = centralNode.radius + 85;
+            const minFishDist = 65;
+
+            let x = 0;
+            let y = 0;
+            let valid = false;
+
+            for (let attempt = 0; attempt < 30; attempt++) {
+                x = margin + Math.random() * (canvas.width - margin * 2);
+                y = margin + Math.random() * (canvas.height - margin * 2);
+
+                const distOtter = Math.hypot(x - centralNode.x, y - centralNode.y);
+                if (distOtter < minOtterDist) continue;
+
+                let tooCloseToFish = false;
+                for (const other of fishes) {
+                    if (Math.hypot(x - other.x, y - other.y) < minFishDist) {
+                        tooCloseToFish = true;
+                        break;
+                    }
+                }
+                if (!tooCloseToFish) {
+                    valid = true;
+                    break;
+                }
+            }
+
+            if (!valid) return;
+
+            const speed = 18 + Math.random() * 24;
+            const dir = Math.random() < 0.5 ? 1 : -1;
+            const palette = FISH_PALETTES[Math.floor(Math.random() * FISH_PALETTES.length)];
+            const size = 14 + Math.random() * 4;
+
+            fishes.push({
+                x: x,
+                y: y,
+                vx: dir * speed,
+                vy: (Math.random() - 0.5) * 10,
+                size: size,
+                palette: palette,
+                age: initialDelayOffset,
+                maxLife: 6.5 + Math.random() * 4.0,
+                alpha: 0,
+                scale: 0.4,
+                tailPhase: Math.random() * Math.PI * 2,
+                swimWaveOffset: Math.random() * Math.PI * 2
+            });
+        }
+
+        function initInitialFishes() {
+            fishes = [];
+            for (let i = 0; i < 4; i++) {
+                spawnFish(i * 0.6);
+            }
+        }
+
+        function updateScoreDisplay(animate = false) {
+            scoreValEl.textContent = score;
+            if (animate) {
+                scoreBoardEl.classList.remove('pulse');
+                void scoreBoardEl.offsetWidth;
+                scoreBoardEl.classList.add('pulse');
+                setTimeout(() => scoreBoardEl.classList.remove('pulse'), 180);
+            }
+        }
+
+        function createCatchEffect(x, y, palette) {
+            const particles = [];
+            for (let i = 0; i < 14; i++) {
+                const angle = (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.3;
+                const speed = 45 + Math.random() * 75;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: 1.8 + Math.random() * 2.2,
+                    color: i % 2 === 0 ? palette.belly : '#7ef9c8'
+                });
+            }
+
+            catchEffects.push({
+                x: x,
+                y: y,
+                age: 0,
+                duration: 0.75,
+                particles: particles,
+                color: palette.body
+            });
+        }
+
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
@@ -216,11 +357,18 @@
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
 
+            // Keep existing fish inside bounds
+            for (const f of fishes) {
+                f.x = Math.max(50, Math.min(canvas.width - 50, f.x));
+                f.y = Math.max(50, Math.min(canvas.height - 50, f.y));
+            }
+
             generateStars();
         }
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
+        initInitialFishes();
 
         // Canvas Click Handler: Directly launch ball at click position
         canvas.addEventListener('click', (e) => {
@@ -251,10 +399,106 @@
 
         function resetSimulation() {
             balls = [];
+            catchEffects = [];
+            score = 0;
+            fishSpawnTimer = 0;
+            updateScoreDisplay(false);
+            initInitialFishes();
         }
 
-        function updatePhysics() {
+        function updateFishes(dt) {
+            fishSpawnTimer += dt;
+            if (fishSpawnTimer >= FISH_SPAWN_INTERVAL) {
+                fishSpawnTimer = 0;
+                if (fishes.length < MAX_FISH) {
+                    spawnFish(0);
+                }
+            }
+
+            const margin = 48;
+            const repelDist = centralNode.radius + 65;
+
+            for (let i = fishes.length - 1; i >= 0; i--) {
+                const f = fishes[i];
+                f.age += dt;
+                f.tailPhase += dt * 10;
+
+                // Remove fish once its lifespan ends
+                if (f.age >= f.maxLife) {
+                    fishes.splice(i, 1);
+                    continue;
+                }
+
+                // Compute smooth appear & disappear alpha and scale
+                const remaining = f.maxLife - f.age;
+                if (f.age < FISH_FADE_IN) {
+                    const t = f.age / FISH_FADE_IN;
+                    f.alpha = t;
+                    f.scale = 0.45 + 0.55 * (1 - Math.pow(1 - t, 2));
+                } else if (remaining < FISH_FADE_OUT) {
+                    const t = Math.max(0, remaining / FISH_FADE_OUT);
+                    // Subtle shimmer as fish starts disappearing
+                    const flicker = 0.85 + 0.15 * Math.sin(f.age * 24);
+                    f.alpha = t * flicker;
+                    f.scale = 0.55 + 0.45 * t;
+                } else {
+                    f.alpha = 1;
+                    f.scale = 1;
+                }
+
+                // Gentle swimming motion
+                const bobVy = Math.sin(auroraTime * 2.2 + f.swimWaveOffset) * 14;
+                f.x += f.vx * dt;
+                f.y += (f.vy + bobVy) * dt;
+
+                // Turn smoothly near canvas boundaries
+                if (f.x < margin) {
+                    f.x = margin;
+                    f.vx = Math.abs(f.vx);
+                } else if (f.x > canvas.width - margin) {
+                    f.x = canvas.width - margin;
+                    f.vx = -Math.abs(f.vx);
+                }
+
+                if (f.y < margin) {
+                    f.y = margin;
+                    f.vy = Math.abs(f.vy);
+                } else if (f.y > canvas.height - margin) {
+                    f.y = canvas.height - margin;
+                    f.vy = -Math.abs(f.vy);
+                }
+
+                // Steer gently away from the central sea otter
+                const dxOtter = f.x - centralNode.x;
+                const dyOtter = f.y - centralNode.y;
+                const distOtter = Math.hypot(dxOtter, dyOtter);
+                if (distOtter < repelDist && distOtter > 0.01) {
+                    const push = ((repelDist - distOtter) / repelDist) * 45 * dt;
+                    f.vx += (dxOtter / distOtter) * push;
+                    f.vy += (dyOtter / distOtter) * push;
+                }
+            }
+
+            // Update catch particle bursts
+            for (let i = catchEffects.length - 1; i >= 0; i--) {
+                const eff = catchEffects[i];
+                eff.age += dt;
+                if (eff.age >= eff.duration) {
+                    catchEffects.splice(i, 1);
+                    continue;
+                }
+                for (const p of eff.particles) {
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.vx *= 0.94;
+                    p.vy *= 0.94;
+                }
+            }
+        }
+
+        function updatePhysics(dt) {
             auroraTime += 0.014;
+            updateFishes(dt);
 
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
@@ -297,6 +541,22 @@
                 b.trail.push({ x: b.x, y: b.y });
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
+                }
+
+                // Check collision with visible background fish
+                for (let j = fishes.length - 1; j >= 0; j--) {
+                    const f = fishes[j];
+                    if (f.alpha < 0.25) continue;
+
+                    const hitRadius = f.size * f.scale + b.radius + 6;
+                    const distFish = Math.hypot(b.x - f.x, b.y - f.y);
+
+                    if (distFish <= hitRadius) {
+                        score += 1;
+                        updateScoreDisplay(true);
+                        createCatchEffect(f.x, f.y, f.palette);
+                        fishes.splice(j, 1);
+                    }
                 }
             }
         }
@@ -386,6 +646,106 @@
             }
 
             ctx.restore();
+        }
+
+        function drawFish(f) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, f.alpha));
+            ctx.translate(f.x, f.y);
+
+            const facing = f.vx >= 0 ? 1 : -1;
+            const tilt = Math.max(-0.25, Math.min(0.25, f.vy * 0.008));
+            ctx.scale(facing * f.scale, f.scale);
+            ctx.rotate(tilt);
+
+            const r = f.size;
+            const wag = Math.sin(f.tailPhase) * 4.5;
+
+            // Soft ambient glow
+            const glow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.9);
+            glow.addColorStop(0, f.palette.glow);
+            glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tail fin (wagging)
+            ctx.fillStyle = f.palette.fin;
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.85, 0);
+            ctx.lineTo(-r * 1.55, -r * 0.58 + wag * 0.5);
+            ctx.quadraticCurveTo(-r * 1.3, wag * 0.25, -r * 1.55, r * 0.58 + wag * 0.5);
+            ctx.closePath();
+            ctx.fill();
+
+            // Dorsal fin
+            ctx.fillStyle = f.palette.fin;
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.2, -r * 0.52);
+            ctx.quadraticCurveTo(r * 0.05, -r * 0.95, r * 0.35, -r * 0.48);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main fish body
+            const bodyGrad = ctx.createLinearGradient(0, -r * 0.6, 0, r * 0.6);
+            bodyGrad.addColorStop(0, f.palette.body);
+            bodyGrad.addColorStop(1, f.palette.belly);
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, r, r * 0.56, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pectoral side fin
+            ctx.fillStyle = f.palette.fin;
+            ctx.beginPath();
+            ctx.ellipse(r * 0.05, r * 0.14, r * 0.28, r * 0.14, -0.45, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = '#0e1624';
+            ctx.beginPath();
+            ctx.arc(r * 0.52, -r * 0.12, r * 0.14, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye catchlight
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(r * 0.56, -r * 0.16, r * 0.055, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawCatchEffects() {
+            for (const eff of catchEffects) {
+                const progress = eff.age / eff.duration;
+                const alpha = 1 - progress;
+
+                ctx.save();
+                // Expanding ripple ring
+                ctx.strokeStyle = `rgba(126, 249, 200, ${(alpha * 0.75).toFixed(3)})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(eff.x, eff.y, 10 + progress * 34, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Sparkle particles
+                ctx.globalAlpha = alpha;
+                for (const p of eff.particles) {
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius * (1 - progress * 0.5), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Floating "+1" text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 14px "Courier New", Courier, monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('+1', eff.x, eff.y - 12 - progress * 24);
+                ctx.restore();
+            }
         }
 
         function drawSeaOtter(cx, cy) {
@@ -546,10 +906,18 @@
             // Render Northern Lights background
             drawNorthernLights();
 
-            // 1. Draw Central Sea Otter
+            // 1. Draw Background Fish
+            for (const f of fishes) {
+                drawFish(f);
+            }
+
+            // 2. Draw Catch Effects
+            drawCatchEffects();
+
+            // 3. Draw Central Sea Otter
             drawSeaOtter(centralNode.x, centralNode.y);
 
-            // 2. Draw Ball & Trail
+            // 4. Draw Ball & Trail
             for (const b of balls) {
                 // Draw path line
                 if (b.trail.length > 1) {
@@ -585,14 +953,18 @@
             }
         }
 
-        function animate() {
-            updatePhysics();
+        function animate(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const dt = Math.min(0.05, (timestamp - lastTimestamp) / 1000);
+            lastTimestamp = timestamp;
+
+            updatePhysics(dt);
             draw();
             requestAnimationFrame(animate);
         }
 
         window.onload = function() {
-            animate();
+            requestAnimationFrame(animate);
         };
     </script>
 </body>
