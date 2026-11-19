@@ -137,9 +137,9 @@
             box-shadow: 0 0 12px rgba(168, 85, 247, 0.75);
         }
 
-        /* Active Duo / Alternate State */
-        .char-btn[data-char="duo"].active {
-            background: linear-gradient(90deg, #E23636 0%, #9333EA 50%, #EC4899 100%);
+        /* Active Trio / Alternate State */
+        .char-btn[data-char="trio"].active {
+            background: linear-gradient(90deg, #E23636 0%, #EC4899 50%, #7C3AED 100%);
             color: #FFFFFF;
             border-color: #FFFFFF;
             box-shadow: 0 0 12px rgba(168, 85, 247, 0.6);
@@ -273,8 +273,8 @@
                     </svg>
                     Venom
                 </button>
-                <button type="button" class="char-btn" data-char="duo" onclick="selectCharacter('duo')">
-                    Duo Alt
+                <button type="button" class="char-btn" data-char="trio" onclick="selectCharacter('trio')">
+                    Trio Alt
                 </button>
             </div>
 
@@ -289,7 +289,7 @@
     </div>
 
     <div class="instructions">
-        Choose Spider-Man, Gwen Stacy, Venom, or Duo Alt, then click anywhere on the canvas to launch multiple web orbits.
+        Choose Spider-Man, Gwen Stacy, Venom, or Trio Alt, then click anywhere on the canvas to launch multiple web orbits.
     </div>
 
     <script>
@@ -306,6 +306,7 @@
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
         const MAX_BALLS = 36;              // Cap simultaneous balls to maintain smooth 60fps
+        const TRIO_ROSTER = ['spiderman', 'gwen', 'venom'];
 
         // =========================================================================
         // STATE VARIABLES
@@ -315,8 +316,8 @@
         let webParticles = [];     // Web-burst & web-splat particles
         let skylineBuildings = []; // Cached NYC skyline geometry
         let frameTick = 0;         // Animation clock for Spider-Sense pulse
-        let selectedMode = 'spiderman'; // 'spiderman' | 'gwen' | 'venom' | 'duo'
-        let duoToggle = false;     // Alternates between Spider-Man and Gwen Stacy in 'duo' mode
+        let selectedMode = 'spiderman'; // 'spiderman' | 'gwen' | 'venom' | 'trio'
+        let trioIndex = 0;         // Cycles through Spider-Man, Gwen Stacy, and Venom in 'trio' mode
 
         // Central Gravity Node Definition (Spider-Emblem & Spider-Sense Core)
         const centralNode = {
@@ -326,7 +327,7 @@
         };
 
         /**
-         * Updates the active character mode ('spiderman', 'gwen', 'venom', or 'duo').
+         * Updates the active character mode ('spiderman', 'gwen', 'venom', or 'trio').
          */
         function selectCharacter(mode) {
             selectedMode = mode;
@@ -335,12 +336,12 @@
             });
         }
 
-        // Keyboard shortcuts (1 = Spider-Man, 2 = Gwen Stacy, 3 = Venom, 4 = Duo Alt, R = Reset)
+        // Keyboard shortcuts (1 = Spider-Man, 2 = Gwen Stacy, 3 = Venom, 4 = Trio Alt, R = Reset)
         window.addEventListener('keydown', (e) => {
             if (e.key === '1') selectCharacter('spiderman');
             else if (e.key === '2') selectCharacter('gwen');
             else if (e.key === '3') selectCharacter('venom');
-            else if (e.key === '4') selectCharacter('duo');
+            else if (e.key === '4') selectCharacter('trio');
             else if (e.key.toLowerCase() === 'r') resetSimulation();
         });
 
@@ -472,9 +473,9 @@
 
             // Resolve character for this launch
             let character = selectedMode;
-            if (selectedMode === 'duo') {
-                character = duoToggle ? 'gwen' : 'spiderman';
-                duoToggle = !duoToggle;
+            if (selectedMode === 'trio') {
+                character = TRIO_ROSTER[trioIndex];
+                trioIndex = (trioIndex + 1) % TRIO_ROSTER.length;
             }
 
             if (balls.length >= MAX_BALLS) {
@@ -591,7 +592,7 @@
             balls = [];
             comicPops = [];
             webParticles = [];
-            duoToggle = false;
+            trioIndex = 0;
             updateBallCounter();
         }
 
