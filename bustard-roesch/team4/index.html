@@ -258,10 +258,25 @@
             { name: 'Pastel Blue', fill: '#8ecae6' }
         ];
 
+        // PINK & BLUE PARTY LIGHT PALETTES
+        const PARTY_LIGHT_PALETTES = {
+            pink: [
+                { core: '#fff0f6', mid: '#ff85ab', glow: 'rgba(255, 107, 157, 0.45)' },
+                { core: '#ffe3ec', mid: '#ff6b9d', glow: 'rgba(255, 77, 148, 0.42)' },
+                { core: '#ffffff', mid: '#ff9ebb', glow: 'rgba(255, 133, 171, 0.48)' }
+            ],
+            blue: [
+                { core: '#f0f9ff', mid: '#60b5e5', glow: 'rgba(56, 189, 248, 0.45)' },
+                { core: '#e0f2fe', mid: '#38bdf8', glow: 'rgba(59, 158, 255, 0.42)' },
+                { core: '#ffffff', mid: '#8ecae6', glow: 'rgba(96, 181, 229, 0.48)' }
+            ]
+        };
+
         // STATE VARIABLES
         let launchVelocity = parseFloat(speedSlider.value); // Adjustable velocity on click
         let stars = [];
         let ambientStars = [];
+        let partyLights = [];
         let colorMode = 'cycle'; // 'cycle' or palette index (0, 1)
         let colorIndex = 0;
 
@@ -325,6 +340,39 @@
         }
 
         /**
+         * Populates luminous pink and blue party light particles that sprinkle
+         * continuously from top to bottom everywhere across the canvas.
+         */
+        function generatePartyLights() {
+            const count = Math.max(95, Math.floor((canvas.width * canvas.height) / 6800));
+            const styles = ['orb', 'sparkle', 'droplet'];
+
+            partyLights = [];
+            for (let i = 0; i < count; i++) {
+                const isPink = i % 2 === 0;
+                const paletteGroup = isPink ? PARTY_LIGHT_PALETTES.pink : PARTY_LIGHT_PALETTES.blue;
+                const tone = paletteGroup[Math.floor(Math.random() * paletteGroup.length)];
+                const depth = 0.45 + Math.random() * 0.85; // Controls size, glow, and sprinkle speed
+                const radius = 2.0 + depth * 2.8;
+
+                partyLights.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vy: 0.55 + depth * 1.35,
+                    swayAmp: 0.25 + Math.random() * 0.75,
+                    swaySpeed: 0.0014 + Math.random() * 0.0026,
+                    twinkleSpeed: 0.0035 + Math.random() * 0.0055,
+                    phase: Math.random() * Math.PI * 2,
+                    radius: radius,
+                    glowRadius: radius * (3.2 + Math.random() * 1.6),
+                    tone: tone,
+                    style: styles[i % styles.length],
+                    layer: depth > 0.92 ? 'front' : 'back'
+                });
+            }
+        }
+
+        /**
          * Resizes the HTML5 canvas to match its responsive container
          * and recenters the central gravity node.
          */
@@ -338,6 +386,7 @@
             centralNode.y = canvas.height / 2;
 
             generateAmbientStars();
+            generatePartyLights();
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -445,6 +494,29 @@
         }
 
         /**
+         * Updates the downward sprinkling motion and gentle flutter of all party lights.
+         */
+        function updatePartyLights(timestamp) {
+            for (const p of partyLights) {
+                p.y += p.vy;
+                p.x += Math.sin(timestamp * p.swaySpeed + p.phase) * p.swayAmp;
+
+                // Wrap smoothly back to the top when sprinkling past the bottom edge
+                if (p.y - p.glowRadius > canvas.height) {
+                    p.y = -p.glowRadius;
+                    p.x = Math.random() * canvas.width;
+                }
+
+                // Keep horizontal drift wrapped seamlessly across left/right edges
+                if (p.x < -p.glowRadius) {
+                    p.x = canvas.width + p.glowRadius;
+                } else if (p.x > canvas.width + p.glowRadius) {
+                    p.x = -p.glowRadius;
+                }
+            }
+        }
+
+        /**
          * Traces a symmetrical multi-pointed star path at (cx, cy).
          */
         function traceStarPath(cx, cy, spikes, outerRadius, innerRadius, rotation = 0) {
@@ -470,6 +542,101 @@
                 );
             }
             ctx.closePath();
+        }
+
+        /**
+         * Renders soft sweeping pink and blue overhead party light cones
+         * showering down from the top edge of the canvas.
+         */
+        function drawPartyLightBeams(timestamp) {
+            const beamCount = 6;
+            const spacing = canvas.width / (beamCount - 1);
+
+            for (let i = 0; i < beamCount; i++) {
+                const isPink = i % 2 === 0;
+                const originX = i * spacing;
+                const sway = Math.sin(timestamp * 0.0012 + i * 1.15) * (canvas.width * 0.09);
+                const targetX = originX + sway;
+                const topWidth = 24;
+                const bottomWidth = canvas.width * 0.24;
+
+                const beamGrad = ctx.createLinearGradient(originX, 0, targetX, canvas.height * 0.92);
+                if (isPink) {
+                    beamGrad.addColorStop(0, 'rgba(255, 107, 157, 0.24)');
+                    beamGrad.addColorStop(0.55, 'rgba(255, 158, 187, 0.10)');
+                    beamGrad.addColorStop(1, 'rgba(255, 158, 187, 0)');
+                } else {
+                    beamGrad.addColorStop(0, 'rgba(56, 189, 248, 0.24)');
+                    beamGrad.addColorStop(0.55, 'rgba(142, 202, 230, 0.10)');
+                    beamGrad.addColorStop(1, 'rgba(142, 202, 230, 0)');
+                }
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(originX - topWidth, 0);
+                ctx.lineTo(originX + topWidth, 0);
+                ctx.lineTo(targetX + bottomWidth, canvas.height * 0.92);
+                ctx.lineTo(targetX - bottomWidth, canvas.height * 0.92);
+                ctx.closePath();
+                ctx.fillStyle = beamGrad;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        /**
+         * Renders the sprinkling pink and blue party lights for the requested depth layer.
+         */
+        function drawPartyLights(timestamp, targetLayer) {
+            for (const p of partyLights) {
+                if (p.layer !== targetLayer) continue;
+
+                const pulse = 0.55 + 0.45 * Math.sin(timestamp * p.twinkleSpeed + p.phase);
+                const alpha = (targetLayer === 'front' ? 0.88 : 0.72) * pulse;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                // Soft radiant party-light bokeh halo
+                const haloGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.glowRadius);
+                haloGrad.addColorStop(0, p.tone.core);
+                haloGrad.addColorStop(0.35, p.tone.glow);
+                haloGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.glowRadius, 0, Math.PI * 2);
+                ctx.fillStyle = haloGrad;
+                ctx.fill();
+
+                // Crisp luminous center depending on particle style
+                if (p.style === 'sparkle') {
+                    traceStarPath(p.x, p.y, 4, p.radius * 1.45, p.radius * 0.42, timestamp * 0.001 + p.phase);
+                    ctx.fillStyle = p.tone.core;
+                    ctx.fill();
+                } else if (p.style === 'droplet') {
+                    ctx.beginPath();
+                    ctx.ellipse(p.x, p.y, p.radius * 0.65, p.radius * 1.35, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = p.tone.mid;
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y - p.radius * 0.25, p.radius * 0.35, 0, Math.PI * 2);
+                    ctx.fillStyle = p.tone.core;
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius * 0.85, 0, Math.PI * 2);
+                    ctx.fillStyle = p.tone.mid;
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius * 0.45, 0, Math.PI * 2);
+                    ctx.fillStyle = p.tone.core;
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
         }
 
         /**
@@ -702,8 +869,8 @@
         }
 
         /**
-         * Renders the pastel gradient backdrop, twinkling pink & blue stars,
-         * central dancing pink dog, trajectory paths, and orbiting stars.
+         * Renders the pastel gradient backdrop, pink & blue party lights,
+         * twinkling stars, central dancing pink dog, trajectory paths, and orbiting stars.
          */
         function draw(timestamp = 0) {
             // Paint diagonal pastel gradient across the canvas
@@ -714,13 +881,19 @@
             ctx.fillStyle = bgGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Ambient Twinkling Pink & Blue Background Stars
+            // 1. Draw Soft Overhead Pink & Blue Party Light Beams
+            drawPartyLightBeams(timestamp);
+
+            // 2. Draw Ambient Twinkling Pink & Blue Background Stars
             drawAmbientStars(timestamp);
 
-            // 2. Draw Central Dancing Pastel Pink Dog
+            // 3. Draw Back Layer of Sprinkling Pink & Blue Party Lights
+            drawPartyLights(timestamp, 'back');
+
+            // 4. Draw Central Dancing Pastel Pink Dog
             drawDancingDog(centralNode.x, centralNode.y, timestamp);
 
-            // 3. Draw Orbiting Pink & Blue Stars & Trails
+            // 5. Draw Orbiting Pink & Blue Stars & Trails
             for (const s of stars) {
                 // Draw path line with subtle slate casing and pastel core
                 if (s.trail.length > 1) {
@@ -748,6 +921,9 @@
                 ctx.strokeStyle = '#1e293b';
                 ctx.stroke();
             }
+
+            // 6. Draw Foreground Layer of Sprinkling Pink & Blue Party Lights
+            drawPartyLights(timestamp, 'front');
         }
 
         /**
@@ -755,6 +931,7 @@
          */
         function animate(timestamp) {
             updatePhysics();
+            updatePartyLights(timestamp);
             draw(timestamp);
             requestAnimationFrame(animate);
         }
