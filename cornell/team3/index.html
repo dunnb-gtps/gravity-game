@@ -49,7 +49,7 @@
         .header-controls {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
         }
 
@@ -79,7 +79,7 @@
             background: transparent;
             color: #ffffff;
             border: 1px solid #ffffff;
-            padding: 6px 16px;
+            padding: 6px 14px;
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
@@ -93,6 +93,41 @@
             color: #000000;
         }
 
+        .btn-store {
+            position: relative;
+            background: rgba(238, 255, 84, 0.12);
+            color: #eeff54;
+            border: 1px solid #eeff54;
+            padding: 6px 14px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-store:hover {
+            background: #eeff54;
+            color: #0b0e14;
+        }
+
+        .store-badge {
+            display: none;
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff8fa3;
+            border: 1px solid #0b0e14;
+        }
+
+        .btn-store.has-affordable .store-badge {
+            display: block;
+        }
+
         /* Main Canvas Container */
         #canvas-wrapper {
             position: relative;
@@ -102,9 +137,10 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            min-height: 0;
         }
 
-        canvas {
+        canvas#simCanvas {
             background-color: #121722;
             border: 1px solid #ffffff;
             display: block;
@@ -148,7 +184,9 @@
 
         .overlay-actions {
             display: flex;
-            gap: 16px;
+            gap: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .btn-primary {
@@ -169,6 +207,195 @@
             border-color: #ffffff;
         }
 
+        /* Skin Store Modal */
+        #storeModal {
+            position: absolute;
+            inset: 0;
+            background: rgba(11, 14, 20, 0.94);
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+            z-index: 25;
+            border: 1px solid #eeff54;
+            overflow: hidden;
+        }
+
+        #storeModal.visible {
+            display: flex;
+        }
+
+        .store-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+            margin-bottom: 14px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .store-title-group h2 {
+            font-size: 20px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #eeff54;
+        }
+
+        .store-title-group p {
+            font-size: 12px;
+            color: #9aa4b2;
+            margin-top: 2px;
+        }
+
+        .store-header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .store-toast {
+            font-size: 12px;
+            color: #6ee7ff;
+            font-weight: bold;
+            letter-spacing: 0.8px;
+            min-height: 16px;
+        }
+
+        .store-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .store-tab {
+            background: rgba(255, 255, 255, 0.05);
+            color: #d8dee9;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .store-tab:hover {
+            border-color: #ffffff;
+            color: #ffffff;
+        }
+
+        .store-tab.active {
+            background: #6ee7ff;
+            color: #0b0e14;
+            border-color: #6ee7ff;
+        }
+
+        .store-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+            gap: 14px;
+            overflow-y: auto;
+            padding-right: 4px;
+            flex-grow: 1;
+        }
+
+        .skin-card {
+            background: #121722;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: border-color 0.15s ease, transform 0.15s ease;
+        }
+
+        .skin-card:hover {
+            border-color: rgba(255, 255, 255, 0.65);
+        }
+
+        .skin-card.equipped {
+            border-color: #6ee7ff;
+            box-shadow: inset 0 0 0 1px rgba(110, 231, 255, 0.35);
+        }
+
+        .skin-preview {
+            width: 100%;
+            height: 92px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: #0b0e14;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .skin-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 4px;
+        }
+
+        .skin-desc {
+            font-size: 11px;
+            color: #9aa4b2;
+            line-height: 1.4;
+            margin-bottom: 12px;
+            flex-grow: 1;
+        }
+
+        .skin-btn {
+            width: 100%;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border: 1px solid #ffffff;
+            transition: all 0.15s ease;
+        }
+
+        .skin-btn.equipped-btn {
+            background: rgba(110, 231, 255, 0.16);
+            color: #6ee7ff;
+            border-color: #6ee7ff;
+            cursor: default;
+        }
+
+        .skin-btn.equip-btn {
+            background: transparent;
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+
+        .skin-btn.equip-btn:hover {
+            background: #ffffff;
+            color: #0b0e14;
+        }
+
+        .skin-btn.buy-btn {
+            background: #eeff54;
+            color: #0b0e14;
+            border-color: #eeff54;
+        }
+
+        .skin-btn.buy-btn:hover {
+            background: #ffffff;
+            border-color: #ffffff;
+        }
+
+        .skin-btn.locked-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: #6b7280;
+            border-color: rgba(255, 255, 255, 0.18);
+            cursor: not-allowed;
+        }
+
         .instructions {
             margin-top: 8px;
             font-size: 11px;
@@ -187,6 +414,10 @@
             <div class="stat-box mice-box">Mice: <span id="miceValue">0/1</span></div>
             <div class="stat-box">Balls: <span id="ballsValue">6</span></div>
             <div class="stat-box">Points: <span id="scoreValue">0</span></div>
+            <button class="btn-store" id="storeToggleBtn" onclick="openStore()">
+                Store
+                <span class="store-badge"></span>
+            </button>
             <button class="btn-reset" onclick="resetSimulation()">Reset</button>
         </div>
     </div>
@@ -197,17 +428,42 @@
 
         <!-- Out of Balls Overlay -->
         <div id="overlay">
-            <h2 id="overlayTitle">Out of Tennis Balls!</h2>
+            <h2 id="overlayTitle">Out of Balls!</h2>
             <p id="overlayText">Level 1 • Score: 0</p>
             <div class="overlay-actions">
                 <button class="btn-primary" onclick="retryCurrentLevel()">Retry Level</button>
+                <button class="btn-store" onclick="openStore()">Skin Store</button>
                 <button class="btn-reset" onclick="resetSimulation()">Restart Level 1</button>
             </div>
+        </div>
+
+        <!-- Skin Store Overlay -->
+        <div id="storeModal">
+            <div class="store-header">
+                <div class="store-title-group">
+                    <h2>Skin Store</h2>
+                    <p>Trade in points to unlock & equip new visual styles</p>
+                </div>
+                <div class="store-header-right">
+                    <span class="store-toast" id="storeToast"></span>
+                    <div class="stat-box">Points: <span id="storePointsValue">0</span></div>
+                    <button class="btn-reset" onclick="closeStore()">Close</button>
+                </div>
+            </div>
+
+            <div class="store-tabs" id="storeTabs">
+                <button class="store-tab active" data-category="background" onclick="selectStoreTab('background')">Background</button>
+                <button class="store-tab" data-category="mice" onclick="selectStoreTab('mice')">Mice</button>
+                <button class="store-tab" data-category="centerBall" onclick="selectStoreTab('centerBall')">Center Ball</button>
+                <button class="store-tab" data-category="throwingBall" onclick="selectStoreTab('throwingBall')">Throwing Ball</button>
+            </div>
+
+            <div class="store-grid" id="storeGrid"></div>
         </div>
     </div>
 
     <div class="instructions">
-        Click anywhere to launch a tennis ball rightward around the yarn ball's gravity. Hit all mice to advance—each level gets harder!
+        Click anywhere to launch a ball rightward around the center's gravity. Hit all mice to advance—trade points in the Store for new skins!
     </div>
 
     <script>
@@ -221,6 +477,12 @@
         const overlayEl = document.getElementById('overlay');
         const overlayTextEl = document.getElementById('overlayText');
 
+        const storeModalEl = document.getElementById('storeModal');
+        const storePointsValueEl = document.getElementById('storePointsValue');
+        const storeGridEl = document.getElementById('storeGrid');
+        const storeToastEl = document.getElementById('storeToast');
+        const storeToggleBtnEl = document.getElementById('storeToggleBtn');
+
         // SIMULATION CONSTANTS
         const BASE_GRAVITY_CONSTANT = 1800; // Base strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;          // Fixed velocity on click
@@ -228,10 +490,210 @@
         const TRAIL_LENGTH = 300;           // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;       // Prevents infinite velocity near center
 
+        // SKIN CATALOG DEFINITION
+        const SKIN_CATALOG = {
+            background: [
+                {
+                    id: 'cats_dogs',
+                    name: 'Cats & Dogs',
+                    desc: 'Classic midnight pet pattern with paw prints.',
+                    price: 0,
+                    fallbackColor: '#121722'
+                },
+                {
+                    id: 'cheese_kitchen',
+                    name: 'Swiss Kitchen',
+                    desc: 'Warm slate tiles dotted with cheddar wedges & crumbs.',
+                    price: 150,
+                    fallbackColor: '#1a1714'
+                },
+                {
+                    id: 'cosmic_space',
+                    name: 'Cosmic Orbit',
+                    desc: 'Deep space starfield with ringed planets & moons.',
+                    price: 300,
+                    fallbackColor: '#080b18'
+                },
+                {
+                    id: 'garden_meadow',
+                    name: 'Midnight Turf',
+                    desc: 'Dark emerald grass with clovers, daisies & ladybugs.',
+                    price: 500,
+                    fallbackColor: '#0e1d16'
+                },
+                {
+                    id: 'cyber_grid',
+                    name: 'Cyber Blueprint',
+                    desc: 'Tactical navy grid with glowing orbital schematics.',
+                    price: 750,
+                    fallbackColor: '#091424'
+                }
+            ],
+            mice: [
+                {
+                    id: 'classic',
+                    name: 'Classic Field',
+                    desc: 'Standard woodland mice with rosy ears & tails.',
+                    price: 0
+                },
+                {
+                    id: 'cheddar',
+                    name: 'Cheddar Gold',
+                    desc: 'Golden-furred mice toasted to a warm cheese hue.',
+                    price: 150
+                },
+                {
+                    id: 'cyber',
+                    name: 'Cyber Neon',
+                    desc: 'Obsidian stealth mice with glowing cyan & pink optics.',
+                    price: 300
+                },
+                {
+                    id: 'royal',
+                    name: 'Royal Velvet',
+                    desc: 'Regal purple fur topped with miniature gold crowns.',
+                    price: 500
+                },
+                {
+                    id: 'clockwork',
+                    name: 'Clockwork Toy',
+                    desc: 'Wind-up brass mice with spinning back keys & rivets.',
+                    price: 750
+                }
+            ],
+            centerBall: [
+                {
+                    id: 'yarn',
+                    name: 'Crimson Yarn',
+                    desc: 'Tangled ball of red yarn with a trailing thread.',
+                    price: 0
+                },
+                {
+                    id: 'black_hole',
+                    name: 'Singularity',
+                    desc: 'Event horizon core wrapped in swirling plasma rings.',
+                    price: 200
+                },
+                {
+                    id: 'cheese_wheel',
+                    name: 'Cheddar Wheel',
+                    desc: 'Giant wheel of cratered golden Swiss cheese.',
+                    price: 350
+                },
+                {
+                    id: 'disco',
+                    name: 'Disco Mirror',
+                    desc: 'Faceted silver sphere shimmering with neon glints.',
+                    price: 550
+                },
+                {
+                    id: 'sun',
+                    name: 'Solar Star',
+                    desc: 'Blazing miniature sun radiating coronal flares.',
+                    price: 800
+                }
+            ],
+            throwingBall: [
+                {
+                    id: 'tennis',
+                    name: 'Tennis Ball',
+                    desc: 'Fuzzy optic-yellow tennis ball with lime trail.',
+                    price: 0,
+                    trailColor: 'rgba(235, 255, 110, 0.8)',
+                    burstColor: '#eeff54'
+                },
+                {
+                    id: 'capture_orb',
+                    name: 'Capture Orb',
+                    desc: 'Crimson-and-white split sphere with center latch.',
+                    price: 150,
+                    trailColor: 'rgba(255, 110, 130, 0.85)',
+                    burstColor: '#ff758f'
+                },
+                {
+                    id: 'fireball',
+                    name: 'Meteor Flame',
+                    desc: 'Incandescent magma orb leaving an ember trail.',
+                    price: 300,
+                    trailColor: 'rgba(255, 146, 43, 0.88)',
+                    burstColor: '#ff922b'
+                },
+                {
+                    id: 'eight_ball',
+                    name: 'Billiard 8-Ball',
+                    desc: 'Glossy obsidian 8-ball with crisp silver trail.',
+                    price: 500,
+                    trailColor: 'rgba(180, 230, 255, 0.82)',
+                    burstColor: '#6ee7ff'
+                },
+                {
+                    id: 'rainbow_comet',
+                    name: 'Prism Comet',
+                    desc: 'Star-core orb trailing a full rainbow spectrum.',
+                    price: 750,
+                    trailColor: 'rainbow',
+                    burstColor: '#f472b6'
+                }
+            ]
+        };
+
+        // STORE STATE & PERSISTENCE
+        const STORAGE_KEY = 'gravity_mouse_hunt_skins_v1';
+        let activeStoreCategory = 'background';
+        let toastTimeout = null;
+
+        let storeState = {
+            unlocked: {
+                background: ['cats_dogs'],
+                mice: ['classic'],
+                centerBall: ['yarn'],
+                throwingBall: ['tennis']
+            },
+            equipped: {
+                background: 'cats_dogs',
+                mice: 'classic',
+                centerBall: 'yarn',
+                throwingBall: 'tennis'
+            }
+        };
+
+        function loadStoreState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                for (const cat of Object.keys(SKIN_CATALOG)) {
+                    if (parsed.unlocked && Array.isArray(parsed.unlocked[cat])) {
+                        const validIds = new Set(SKIN_CATALOG[cat].map(s => s.id));
+                        const merged = new Set([SKIN_CATALOG[cat][0].id, ...parsed.unlocked[cat].filter(id => validIds.has(id))]);
+                        storeState.unlocked[cat] = Array.from(merged);
+                    }
+                    if (parsed.equipped && storeState.unlocked[cat].includes(parsed.equipped[cat])) {
+                        storeState.equipped[cat] = parsed.equipped[cat];
+                    }
+                }
+            } catch (e) {
+                // Ignore storage access errors in restricted environments
+            }
+        }
+
+        function saveStoreState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(storeState));
+            } catch (e) {
+                // Ignore storage access errors
+            }
+        }
+
+        function getEquippedSkin(category) {
+            const id = storeState.equipped[category];
+            return SKIN_CATALOG[category].find(item => item.id === id) || SKIN_CATALOG[category][0];
+        }
+
         // GAME STATE VARIABLES
         let balls = [];
         let mice = [];
-        let bgPattern = null;
+        const bgPatternCache = {};
         let score = 0;
         let level = 1;
         let totalLevelMice = 1;
@@ -257,359 +719,630 @@
         // Mouse hover position for trajectory preview
         let hoverPos = null;
 
-        // Central Gravity Node Definition (Yarn Ball)
+        // Central Gravity Node Definition
         const centralNode = {
             x: 0,
             y: 0,
             radius: 20
         };
 
+        function hasAffordableUnownedSkin() {
+            for (const cat of Object.keys(SKIN_CATALOG)) {
+                for (const item of SKIN_CATALOG[cat]) {
+                    if (!storeState.unlocked[cat].includes(item.id) && score >= item.price) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         function updateHUD() {
             levelValueEl.textContent = level;
             miceValueEl.textContent = `${miceCaughtInLevel}/${totalLevelMice}`;
             ballsValueEl.textContent = ballsRemaining;
             scoreValueEl.textContent = score;
+            if (storePointsValueEl) {
+                storePointsValueEl.textContent = score;
+            }
+            if (hasAffordableUnownedSkin()) {
+                storeToggleBtnEl.classList.add('has-affordable');
+            } else {
+                storeToggleBtnEl.classList.remove('has-affordable');
+            }
         }
 
-        // Build seamless cats-and-dogs background pattern
-        function createCatsAndDogsPattern() {
+        // ==========================================
+        // BACKGROUND PATTERN GENERATORS
+        // ==========================================
+        function getBackgroundPattern(skinId, targetCtx = ctx) {
+            if (targetCtx === ctx && bgPatternCache[skinId]) {
+                return bgPatternCache[skinId];
+            }
+
             const tile = document.createElement('canvas');
             const size = 360;
             tile.width = size;
             tile.height = size;
             const pctx = tile.getContext('2d');
 
-            pctx.fillStyle = '#121722';
-            pctx.fillRect(0, 0, size, size);
+            if (skinId === 'cheese_kitchen') {
+                // Checkerboard dark slate kitchen floor + Swiss cheese wedges
+                pctx.fillStyle = '#181512';
+                pctx.fillRect(0, 0, size, size);
 
-            function drawPaw(x, y, angle, scale) {
-                pctx.save();
-                pctx.translate(x, y);
-                pctx.rotate(angle);
-                pctx.scale(scale, scale);
-                pctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+                const tileStep = 90;
+                for (let row = 0; row < 4; row++) {
+                    for (let col = 0; col < 4; col++) {
+                        if ((row + col) % 2 === 0) {
+                            pctx.fillStyle = '#201c18';
+                            pctx.fillRect(col * tileStep, row * tileStep, tileStep, tileStep);
+                        }
+                        pctx.strokeStyle = 'rgba(255, 235, 190, 0.05)';
+                        pctx.lineWidth = 1;
+                        pctx.strokeRect(col * tileStep, row * tileStep, tileStep, tileStep);
+                    }
+                }
 
-                pctx.beginPath();
-                pctx.ellipse(0, 4, 8, 6, 0, 0, Math.PI * 2);
-                pctx.fill();
+                function drawCheeseWedge(x, y, rot, sc) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.rotate(rot);
+                    pctx.scale(sc, sc);
+                    pctx.globalAlpha = 0.78;
 
-                const toes = [
-                    { x: -9, y: -4, r: 3.2 },
-                    { x: -3.5, y: -8, r: 3.5 },
-                    { x: 3.5, y: -8, r: 3.5 },
-                    { x: 9, y: -4, r: 3.2 }
-                ];
-                for (const t of toes) {
+                    // Top face
+                    pctx.fillStyle = '#facc15';
                     pctx.beginPath();
-                    pctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+                    pctx.moveTo(-24, -4);
+                    pctx.lineTo(24, -14);
+                    pctx.lineTo(18, 10);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    // Front side
+                    pctx.fillStyle = '#eab308';
+                    pctx.beginPath();
+                    pctx.moveTo(-24, -4);
+                    pctx.lineTo(18, 10);
+                    pctx.lineTo(18, 22);
+                    pctx.lineTo(-24, 8);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    // Holes
+                    pctx.fillStyle = '#a16207';
+                    pctx.beginPath();
+                    pctx.arc(-5, 6, 3.2, 0, Math.PI * 2);
+                    pctx.arc(8, 11, 2.5, 0, Math.PI * 2);
+                    pctx.arc(4, -2, 2.8, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.restore();
+                }
+
+                drawCheeseWedge(85, 85, -0.2, 1.05);
+                drawCheeseWedge(265, 95, 0.35, 0.95);
+                drawCheeseWedge(95, 265, 0.25, 0.95);
+                drawCheeseWedge(265, 265, -0.3, 1.05);
+
+                // Crumbs
+                pctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+                for (const [cx, cy, cr] of [[175, 50, 2.2], [45, 180, 2], [180, 185, 2.6], [315, 175, 2], [175, 315, 2.4]]) {
+                    pctx.beginPath();
+                    pctx.arc(cx, cy, cr, 0, Math.PI * 2);
                     pctx.fill();
                 }
-                pctx.restore();
-            }
 
-            function drawGingerCat(x, y) {
-                pctx.save();
-                pctx.translate(x, y);
-                pctx.globalAlpha = 0.82;
+            } else if (skinId === 'cosmic_space') {
+                pctx.fillStyle = '#080b18';
+                pctx.fillRect(0, 0, size, size);
 
-                pctx.fillStyle = '#c97538';
-                pctx.beginPath();
-                pctx.moveTo(-26, -12);
-                pctx.lineTo(-30, -43);
-                pctx.lineTo(-6, -24);
-                pctx.closePath();
-                pctx.fill();
+                // Subtle nebula glow
+                const neb = pctx.createRadialGradient(180, 180, 10, 180, 180, 160);
+                neb.addColorStop(0, 'rgba(99, 102, 241, 0.14)');
+                neb.addColorStop(0.6, 'rgba(236, 72, 153, 0.06)');
+                neb.addColorStop(1, 'rgba(8, 11, 24, 0)');
+                pctx.fillStyle = neb;
+                pctx.fillRect(0, 0, size, size);
 
-                pctx.beginPath();
-                pctx.moveTo(26, -12);
-                pctx.lineTo(30, -43);
-                pctx.lineTo(6, -24);
-                pctx.closePath();
-                pctx.fill();
-
-                pctx.fillStyle = '#c46d7a';
-                pctx.beginPath();
-                pctx.moveTo(-23, -15);
-                pctx.lineTo(-26, -35);
-                pctx.lineTo(-10, -23);
-                pctx.closePath();
-                pctx.fill();
-
-                pctx.beginPath();
-                pctx.moveTo(23, -15);
-                pctx.lineTo(26, -35);
-                pctx.lineTo(10, -23);
-                pctx.closePath();
-                pctx.fill();
-
-                pctx.fillStyle = '#c97538';
-                pctx.beginPath();
-                pctx.ellipse(0, 0, 32, 26, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.strokeStyle = '#8a4619';
-                pctx.lineWidth = 2.5;
-                pctx.lineCap = 'round';
-                for (const sx of [-7, 0, 7]) {
+                // Stars
+                const stars = [
+                    [30, 40, 1.5], [140, 28, 2], [220, 60, 1.3], [320, 35, 1.8],
+                    [55, 145, 1.4], [175, 120, 2.1], [295, 155, 1.4], [25, 250, 1.8],
+                    [145, 230, 1.3], [215, 290, 2], [330, 310, 1.5], [110, 330, 1.6]
+                ];
+                for (const [sx, sy, sr] of stars) {
+                    pctx.fillStyle = sr > 1.8 ? 'rgba(238, 255, 84, 0.65)' : 'rgba(255, 255, 255, 0.45)';
                     pctx.beginPath();
-                    pctx.moveTo(sx, -23);
-                    pctx.lineTo(sx, -14);
-                    pctx.stroke();
+                    pctx.arc(sx, sy, sr, 0, Math.PI * 2);
+                    pctx.fill();
                 }
 
-                pctx.fillStyle = '#181412';
+                // Ringed planet
+                pctx.save();
+                pctx.translate(95, 95);
+                pctx.rotate(-0.35);
+                pctx.fillStyle = '#38bdf8';
+                pctx.globalAlpha = 0.65;
                 pctx.beginPath();
-                pctx.arc(-11, -3, 3.8, 0, Math.PI * 2);
-                pctx.arc(11, -3, 3.8, 0, Math.PI * 2);
+                pctx.arc(0, 0, 18, 0, Math.PI * 2);
                 pctx.fill();
-
-                pctx.fillStyle = '#ffffff';
+                pctx.strokeStyle = '#bae6fd';
+                pctx.lineWidth = 3;
                 pctx.beginPath();
-                pctx.arc(-12, -4.2, 1.3, 0, Math.PI * 2);
-                pctx.arc(10, -4.2, 1.3, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#d97a86';
-                pctx.beginPath();
-                pctx.moveTo(-3.5, 4);
-                pctx.lineTo(3.5, 4);
-                pctx.lineTo(0, 8);
-                pctx.closePath();
-                pctx.fill();
-
-                pctx.strokeStyle = '#3b1e0c';
-                pctx.lineWidth = 1.8;
-                pctx.beginPath();
-                pctx.moveTo(-6, 10);
-                pctx.quadraticCurveTo(-3, 13, 0, 8);
-                pctx.quadraticCurveTo(3, 13, 6, 10);
+                pctx.ellipse(0, 0, 32, 8, 0, 0, Math.PI * 2);
                 pctx.stroke();
+                pctx.restore();
 
-                pctx.strokeStyle = 'rgba(255, 245, 235, 0.7)';
-                pctx.lineWidth = 1.3;
-                for (const side of [-1, 1]) {
-                    for (let w = -1; w <= 1; w++) {
+                // Crescent moon
+                pctx.save();
+                pctx.translate(265, 260);
+                pctx.globalAlpha = 0.65;
+                pctx.fillStyle = '#fde047';
+                pctx.beginPath();
+                pctx.arc(0, 0, 18, 0, Math.PI * 2);
+                pctx.fill();
+                pctx.fillStyle = '#080b18';
+                pctx.beginPath();
+                pctx.arc(7, -5, 15, 0, Math.PI * 2);
+                pctx.fill();
+                pctx.restore();
+
+            } else if (skinId === 'garden_meadow') {
+                pctx.fillStyle = '#0e1d16';
+                pctx.fillRect(0, 0, size, size);
+
+                // Subtle grass blades
+                pctx.strokeStyle = 'rgba(74, 222, 128, 0.14)';
+                pctx.lineWidth = 1.6;
+                for (let gx = 20; gx < size; gx += 60) {
+                    for (let gy = 25; gy < size; gy += 60) {
                         pctx.beginPath();
-                        pctx.moveTo(side * 18, 5 + w * 4);
-                        pctx.lineTo(side * 38, 3 + w * 6);
+                        pctx.moveTo(gx, gy);
+                        pctx.lineTo(gx - 4, gy - 10);
+                        pctx.moveTo(gx + 4, gy);
+                        pctx.lineTo(gx + 8, gy - 9);
                         pctx.stroke();
                     }
                 }
 
-                pctx.restore();
-            }
-
-            function drawGoldenDog(x, y) {
-                pctx.save();
-                pctx.translate(x, y);
-                pctx.globalAlpha = 0.82;
-
-                pctx.fillStyle = '#8c5830';
-                pctx.beginPath();
-                pctx.ellipse(-30, 5, 10, 23, 0.24, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.beginPath();
-                pctx.ellipse(30, 5, 10, 23, -0.24, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#cfa063';
-                pctx.beginPath();
-                pctx.ellipse(0, 0, 29, 27, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#e6cfa8';
-                pctx.beginPath();
-                pctx.ellipse(0, 9, 17, 13, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#1c140e';
-                pctx.beginPath();
-                pctx.arc(-11, -6, 3.8, 0, Math.PI * 2);
-                pctx.arc(11, -6, 3.8, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#ffffff';
-                pctx.beginPath();
-                pctx.arc(-12, -7.2, 1.3, 0, Math.PI * 2);
-                pctx.arc(10, -7.2, 1.3, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#d46a7a';
-                pctx.beginPath();
-                pctx.ellipse(0, 17, 5, 6.5, 0, 0, Math.PI);
-                pctx.fill();
-
-                pctx.fillStyle = '#241811';
-                pctx.beginPath();
-                pctx.ellipse(0, 3.5, 6.5, 4.8, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.strokeStyle = '#3b2618';
-                pctx.lineWidth = 1.8;
-                pctx.beginPath();
-                pctx.moveTo(0, 8);
-                pctx.lineTo(0, 12);
-                pctx.moveTo(-8, 12);
-                pctx.quadraticCurveTo(0, 16, 8, 12);
-                pctx.stroke();
-
-                pctx.restore();
-            }
-
-            function drawSittingCat(x, y) {
-                pctx.save();
-                pctx.translate(x, y);
-                pctx.globalAlpha = 0.82;
-
-                pctx.strokeStyle = '#636f82';
-                pctx.lineWidth = 7;
-                pctx.lineCap = 'round';
-                pctx.beginPath();
-                pctx.moveTo(14, 34);
-                pctx.bezierCurveTo(42, 34, 44, 6, 28, 2);
-                pctx.stroke();
-
-                pctx.fillStyle = '#636f82';
-                pctx.beginPath();
-                pctx.ellipse(0, 17, 21, 25, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#dce2ea';
-                pctx.beginPath();
-                pctx.ellipse(0, 15, 10, 15, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#636f82';
-                pctx.beginPath();
-                pctx.moveTo(-20, -18);
-                pctx.lineTo(-22, -40);
-                pctx.lineTo(-5, -26);
-                pctx.closePath();
-                pctx.fill();
-
-                pctx.beginPath();
-                pctx.moveTo(20, -18);
-                pctx.lineTo(22, -40);
-                pctx.lineTo(5, -26);
-                pctx.closePath();
-                pctx.fill();
-
-                pctx.beginPath();
-                pctx.ellipse(0, -13, 23, 19, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#e6c86e';
-                pctx.beginPath();
-                pctx.arc(-8, -14, 3.5, 0, Math.PI * 2);
-                pctx.arc(8, -14, 3.5, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#12151c';
-                pctx.beginPath();
-                pctx.ellipse(-8, -14, 1.4, 3, 0, 0, Math.PI * 2);
-                pctx.ellipse(8, -14, 1.4, 3, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#d97a86';
-                pctx.beginPath();
-                pctx.arc(0, -8, 2.4, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-                pctx.lineWidth = 1.2;
-                for (const side of [-1, 1]) {
+                // Daisies
+                function drawDaisy(x, y) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.globalAlpha = 0.72;
+                    pctx.fillStyle = '#f8fafc';
+                    for (let i = 0; i < 6; i++) {
+                        pctx.rotate(Math.PI / 3);
+                        pctx.beginPath();
+                        pctx.ellipse(0, -10, 4, 8, 0, 0, Math.PI * 2);
+                        pctx.fill();
+                    }
+                    pctx.fillStyle = '#facc15';
                     pctx.beginPath();
-                    pctx.moveTo(side * 12, -8);
-                    pctx.lineTo(side * 28, -10);
-                    pctx.moveTo(side * 12, -5);
-                    pctx.lineTo(side * 28, -4);
+                    pctx.arc(0, 0, 5, 0, Math.PI * 2);
+                    pctx.fill();
+                    pctx.restore();
+                }
+
+                // Ladybug
+                function drawLadybug(x, y, rot) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.rotate(rot);
+                    pctx.globalAlpha = 0.78;
+                    pctx.fillStyle = '#ef4444';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 2, 12, 14, 0, 0, Math.PI * 2);
+                    pctx.fill();
+                    pctx.fillStyle = '#111827';
+                    pctx.beginPath();
+                    pctx.arc(0, -11, 6, 0, Math.PI * 2);
+                    pctx.fill();
+                    pctx.strokeStyle = '#111827';
+                    pctx.lineWidth = 1.6;
+                    pctx.beginPath();
+                    pctx.moveTo(0, -10);
+                    pctx.lineTo(0, 16);
+                    pctx.stroke();
+                    for (const [dx, dy] of [[-5, 0], [5, 0], [-4, 8], [4, 8]]) {
+                        pctx.beginPath();
+                        pctx.arc(dx, dy, 2, 0, Math.PI * 2);
+                        pctx.fill();
+                    }
+                    pctx.restore();
+                }
+
+                drawDaisy(90, 90);
+                drawLadybug(265, 95, 0.5);
+                drawLadybug(95, 265, -0.4);
+                drawDaisy(265, 265);
+
+            } else if (skinId === 'cyber_grid') {
+                pctx.fillStyle = '#091424';
+                pctx.fillRect(0, 0, size, size);
+
+                // Fine grid
+                pctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+                pctx.lineWidth = 1;
+                for (let i = 0; i <= size; i += 30) {
+                    pctx.beginPath();
+                    pctx.moveTo(i, 0);
+                    pctx.lineTo(i, size);
+                    pctx.stroke();
+                    pctx.beginPath();
+                    pctx.moveTo(0, i);
+                    pctx.lineTo(size, i);
                     pctx.stroke();
                 }
 
-                pctx.restore();
+                // Major grid lines
+                pctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
+                for (let i = 0; i <= size; i += 180) {
+                    pctx.beginPath();
+                    pctx.moveTo(i, 0);
+                    pctx.lineTo(i, size);
+                    pctx.stroke();
+                    pctx.beginPath();
+                    pctx.moveTo(0, i);
+                    pctx.lineTo(size, i);
+                    pctx.stroke();
+                }
+
+                // Tech target nodes
+                for (const [nx, ny] of [[90, 90], [270, 90], [90, 270], [270, 270]]) {
+                    pctx.strokeStyle = 'rgba(110, 231, 255, 0.25)';
+                    pctx.beginPath();
+                    pctx.arc(nx, ny, 22, 0, Math.PI * 2);
+                    pctx.stroke();
+
+                    pctx.fillStyle = 'rgba(238, 255, 84, 0.35)';
+                    pctx.beginPath();
+                    pctx.arc(nx, ny, 3, 0, Math.PI * 2);
+                    pctx.fill();
+                }
+
+            } else {
+                // Default: 'cats_dogs'
+                pctx.fillStyle = '#121722';
+                pctx.fillRect(0, 0, size, size);
+
+                function drawPaw(x, y, angle, scale) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.rotate(angle);
+                    pctx.scale(scale, scale);
+                    pctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+
+                    pctx.beginPath();
+                    pctx.ellipse(0, 4, 8, 6, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    const toes = [
+                        { x: -9, y: -4, r: 3.2 },
+                        { x: -3.5, y: -8, r: 3.5 },
+                        { x: 3.5, y: -8, r: 3.5 },
+                        { x: 9, y: -4, r: 3.2 }
+                    ];
+                    for (const t of toes) {
+                        pctx.beginPath();
+                        pctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+                        pctx.fill();
+                    }
+                    pctx.restore();
+                }
+
+                function drawGingerCat(x, y) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.globalAlpha = 0.82;
+
+                    pctx.fillStyle = '#c97538';
+                    pctx.beginPath();
+                    pctx.moveTo(-26, -12);
+                    pctx.lineTo(-30, -43);
+                    pctx.lineTo(-6, -24);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    pctx.beginPath();
+                    pctx.moveTo(26, -12);
+                    pctx.lineTo(30, -43);
+                    pctx.lineTo(6, -24);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    pctx.fillStyle = '#c46d7a';
+                    pctx.beginPath();
+                    pctx.moveTo(-23, -15);
+                    pctx.lineTo(-26, -35);
+                    pctx.lineTo(-10, -23);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    pctx.beginPath();
+                    pctx.moveTo(23, -15);
+                    pctx.lineTo(26, -35);
+                    pctx.lineTo(10, -23);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    pctx.fillStyle = '#c97538';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 0, 32, 26, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.strokeStyle = '#8a4619';
+                    pctx.lineWidth = 2.5;
+                    pctx.lineCap = 'round';
+                    for (const sx of [-7, 0, 7]) {
+                        pctx.beginPath();
+                        pctx.moveTo(sx, -23);
+                        pctx.lineTo(sx, -14);
+                        pctx.stroke();
+                    }
+
+                    pctx.fillStyle = '#181412';
+                    pctx.beginPath();
+                    pctx.arc(-11, -3, 3.8, 0, Math.PI * 2);
+                    pctx.arc(11, -3, 3.8, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#ffffff';
+                    pctx.beginPath();
+                    pctx.arc(-12, -4.2, 1.3, 0, Math.PI * 2);
+                    pctx.arc(10, -4.2, 1.3, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#d97a86';
+                    pctx.beginPath();
+                    pctx.moveTo(-3.5, 4);
+                    pctx.lineTo(3.5, 4);
+                    pctx.lineTo(0, 8);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    pctx.strokeStyle = '#3b1e0c';
+                    pctx.lineWidth = 1.8;
+                    pctx.beginPath();
+                    pctx.moveTo(-6, 10);
+                    pctx.quadraticCurveTo(-3, 13, 0, 8);
+                    pctx.quadraticCurveTo(3, 13, 6, 10);
+                    pctx.stroke();
+
+                    pctx.strokeStyle = 'rgba(255, 245, 235, 0.7)';
+                    pctx.lineWidth = 1.3;
+                    for (const side of [-1, 1]) {
+                        for (let w = -1; w <= 1; w++) {
+                            pctx.beginPath();
+                            pctx.moveTo(side * 18, 5 + w * 4);
+                            pctx.lineTo(side * 38, 3 + w * 6);
+                            pctx.stroke();
+                        }
+                    }
+
+                    pctx.restore();
+                }
+
+                function drawGoldenDog(x, y) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.globalAlpha = 0.82;
+
+                    pctx.fillStyle = '#8c5830';
+                    pctx.beginPath();
+                    pctx.ellipse(-30, 5, 10, 23, 0.24, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.beginPath();
+                    pctx.ellipse(30, 5, 10, 23, -0.24, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#cfa063';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 0, 29, 27, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#e6cfa8';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 9, 17, 13, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#1c140e';
+                    pctx.beginPath();
+                    pctx.arc(-11, -6, 3.8, 0, Math.PI * 2);
+                    pctx.arc(11, -6, 3.8, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#ffffff';
+                    pctx.beginPath();
+                    pctx.arc(-12, -7.2, 1.3, 0, Math.PI * 2);
+                    pctx.arc(10, -7.2, 1.3, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#d46a7a';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 17, 5, 6.5, 0, 0, Math.PI);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#241811';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 3.5, 6.5, 4.8, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.strokeStyle = '#3b2618';
+                    pctx.lineWidth = 1.8;
+                    pctx.beginPath();
+                    pctx.moveTo(0, 8);
+                    pctx.lineTo(0, 12);
+                    pctx.moveTo(-8, 12);
+                    pctx.quadraticCurveTo(0, 16, 8, 12);
+                    pctx.stroke();
+
+                    pctx.restore();
+                }
+
+                function drawSittingCat(x, y) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.globalAlpha = 0.82;
+
+                    pctx.strokeStyle = '#636f82';
+                    pctx.lineWidth = 7;
+                    pctx.lineCap = 'round';
+                    pctx.beginPath();
+                    pctx.moveTo(14, 34);
+                    pctx.bezierCurveTo(42, 34, 44, 6, 28, 2);
+                    pctx.stroke();
+
+                    pctx.fillStyle = '#636f82';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 17, 21, 25, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#dce2ea';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 15, 10, 15, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#636f82';
+                    pctx.beginPath();
+                    pctx.moveTo(-20, -18);
+                    pctx.lineTo(-22, -40);
+                    pctx.lineTo(-5, -26);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    pctx.beginPath();
+                    pctx.moveTo(20, -18);
+                    pctx.lineTo(22, -40);
+                    pctx.lineTo(5, -26);
+                    pctx.closePath();
+                    pctx.fill();
+
+                    pctx.beginPath();
+                    pctx.ellipse(0, -13, 23, 19, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#e6c86e';
+                    pctx.beginPath();
+                    pctx.arc(-8, -14, 3.5, 0, Math.PI * 2);
+                    pctx.arc(8, -14, 3.5, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#12151c';
+                    pctx.beginPath();
+                    pctx.ellipse(-8, -14, 1.4, 3, 0, 0, Math.PI * 2);
+                    pctx.ellipse(8, -14, 1.4, 3, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#d97a86';
+                    pctx.beginPath();
+                    pctx.arc(0, -8, 2.4, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+                    pctx.lineWidth = 1.2;
+                    for (const side of [-1, 1]) {
+                        pctx.beginPath();
+                        pctx.moveTo(side * 12, -8);
+                        pctx.lineTo(side * 28, -10);
+                        pctx.moveTo(side * 12, -5);
+                        pctx.lineTo(side * 28, -4);
+                        pctx.stroke();
+                    }
+
+                    pctx.restore();
+                }
+
+                function drawSpottedDog(x, y) {
+                    pctx.save();
+                    pctx.translate(x, y);
+                    pctx.globalAlpha = 0.82;
+
+                    pctx.fillStyle = '#6e452b';
+                    pctx.beginPath();
+                    pctx.ellipse(-26, -6, 9, 19, 0.35, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.beginPath();
+                    pctx.ellipse(26, -6, 9, 19, -0.35, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#dfd5c5';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 0, 27, 25, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#7c4d2f';
+                    pctx.beginPath();
+                    pctx.ellipse(-11, -5, 11, 10, -0.2, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#1a1410';
+                    pctx.beginPath();
+                    pctx.arc(-11, -5, 3.6, 0, Math.PI * 2);
+                    pctx.arc(11, -5, 3.6, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#ffffff';
+                    pctx.beginPath();
+                    pctx.arc(-12, -6.2, 1.2, 0, Math.PI * 2);
+                    pctx.arc(10, -6.2, 1.2, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.strokeStyle = '#b84a4a';
+                    pctx.lineWidth = 4.5;
+                    pctx.lineCap = 'round';
+                    pctx.beginPath();
+                    pctx.arc(0, 6, 22, 0.25 * Math.PI, 0.75 * Math.PI);
+                    pctx.stroke();
+
+                    pctx.fillStyle = '#e0b84c';
+                    pctx.beginPath();
+                    pctx.arc(0, 30, 4, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.fillStyle = '#241811';
+                    pctx.beginPath();
+                    pctx.ellipse(0, 5, 6, 4.5, 0, 0, Math.PI * 2);
+                    pctx.fill();
+
+                    pctx.strokeStyle = '#3b2618';
+                    pctx.lineWidth = 1.7;
+                    pctx.beginPath();
+                    pctx.moveTo(0, 9);
+                    pctx.lineTo(0, 14);
+                    pctx.moveTo(-7, 13);
+                    pctx.quadraticCurveTo(0, 17, 7, 13);
+                    pctx.stroke();
+
+                    pctx.restore();
+                }
+
+                drawGingerCat(85, 85);
+                drawGoldenDog(265, 95);
+                drawSpottedDog(85, 265);
+                drawSittingCat(265, 265);
+
+                drawPaw(175, 45, -0.3, 0.95);
+                drawPaw(40, 175, 0.4, 0.9);
+                drawPaw(180, 180, -0.2, 1.05);
+                drawPaw(320, 185, 0.35, 0.9);
+                drawPaw(175, 315, 0.25, 0.95);
             }
 
-            function drawSpottedDog(x, y) {
-                pctx.save();
-                pctx.translate(x, y);
-                pctx.globalAlpha = 0.82;
-
-                pctx.fillStyle = '#6e452b';
-                pctx.beginPath();
-                pctx.ellipse(-26, -6, 9, 19, 0.35, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.beginPath();
-                pctx.ellipse(26, -6, 9, 19, -0.35, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#dfd5c5';
-                pctx.beginPath();
-                pctx.ellipse(0, 0, 27, 25, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#7c4d2f';
-                pctx.beginPath();
-                pctx.ellipse(-11, -5, 11, 10, -0.2, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#1a1410';
-                pctx.beginPath();
-                pctx.arc(-11, -5, 3.6, 0, Math.PI * 2);
-                pctx.arc(11, -5, 3.6, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#ffffff';
-                pctx.beginPath();
-                pctx.arc(-12, -6.2, 1.2, 0, Math.PI * 2);
-                pctx.arc(10, -6.2, 1.2, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.strokeStyle = '#b84a4a';
-                pctx.lineWidth = 4.5;
-                pctx.lineCap = 'round';
-                pctx.beginPath();
-                pctx.arc(0, 6, 22, 0.25 * Math.PI, 0.75 * Math.PI);
-                pctx.stroke();
-
-                pctx.fillStyle = '#e0b84c';
-                pctx.beginPath();
-                pctx.arc(0, 30, 4, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.fillStyle = '#241811';
-                pctx.beginPath();
-                pctx.ellipse(0, 5, 6, 4.5, 0, 0, Math.PI * 2);
-                pctx.fill();
-
-                pctx.strokeStyle = '#3b2618';
-                pctx.lineWidth = 1.7;
-                pctx.beginPath();
-                pctx.moveTo(0, 9);
-                pctx.lineTo(0, 14);
-                pctx.moveTo(-7, 13);
-                pctx.quadraticCurveTo(0, 17, 7, 13);
-                pctx.stroke();
-
-                pctx.restore();
+            const pattern = targetCtx.createPattern(tile, 'repeat');
+            if (targetCtx === ctx) {
+                bgPatternCache[skinId] = pattern;
             }
-
-            drawGingerCat(85, 85);
-            drawGoldenDog(265, 95);
-            drawSpottedDog(85, 265);
-            drawSittingCat(265, 265);
-
-            drawPaw(175, 45, -0.3, 0.95);
-            drawPaw(40, 175, 0.4, 0.9);
-            drawPaw(180, 180, -0.2, 1.05);
-            drawPaw(320, 185, 0.35, 0.9);
-            drawPaw(175, 315, 0.25, 0.95);
-
-            return ctx.createPattern(tile, 'repeat');
+            return pattern;
         }
 
-        // Generate mice for a given level with progressively harder traits
+        // ==========================================
+        // LEVEL & SIMULATION SETUP
+        // ==========================================
         function setupLevel(lvl) {
             level = lvl;
             balls = [];
@@ -617,19 +1350,15 @@
             miceCaughtInLevel = 0;
             overlayEl.classList.remove('visible');
 
-            // Escalate gravity pull gently with each level (capped at 2.1x base)
             const gravityMultiplier = Math.min(2.1, 1 + (lvl - 1) * 0.09);
             currentGravity = BASE_GRAVITY_CONSTANT * gravityMultiplier;
 
-            // Number of mice scales up with level
             const count = lvl === 1 ? 1 : Math.min(7, 1 + Math.floor(lvl * 0.85));
             totalLevelMice = count;
 
-            // Generous ball supply that tightens relative to mouse count as levels rise
             maxBallsForLevel = Math.max(4, count + 4 - Math.floor((lvl - 1) / 3));
             ballsRemaining = maxBallsForLevel;
 
-            // Scale down size and scale up speed with level
             const baseScale = Math.max(0.76, 1.15 - (lvl - 1) * 0.045);
             const baseSpeed = lvl === 1 ? 0.65 : Math.min(3.3, 0.95 + (lvl - 1) * 0.24);
 
@@ -638,34 +1367,31 @@
             const maxOrbit = Math.max(160, minDim * 0.40);
 
             for (let i = 0; i < count; i++) {
-                // Distribute spawn angles evenly around the center yarn ball
                 const angleOffset = (lvl * 0.7) + (i * (Math.PI * 2)) / count;
                 const orbitRadius = count === 1
                     ? Math.min(155, maxOrbit * 0.75)
                     : minOrbit + ((i % 3) / 2) * (maxOrbit - minOrbit);
 
-                // Determine mouse archetype based on level & index
-                let variant = 'classic'; // Grey mouse: steady patrol/orbit
+                let variant = 'classic';
                 let hp = 1;
                 let speed = baseSpeed;
                 let scale = baseScale;
 
                 if (lvl >= 5 && i === 0) {
-                    variant = 'armored'; // Thimble-helmet mouse: takes 2 hits!
+                    variant = 'armored';
                     hp = 2;
                     speed = baseSpeed * 0.95;
                     scale = baseScale * 1.06;
                 } else if (lvl >= 4 && i % 3 === 1) {
-                    variant = 'evasive'; // White ninja mouse: dodges nearby tennis balls
+                    variant = 'evasive';
                     speed = baseSpeed * 1.1;
                     scale = baseScale * 0.95;
                 } else if (lvl >= 3 && i % 2 === 1) {
-                    variant = 'speedy'; // Brown field mouse: sprints in bursts
+                    variant = 'speedy';
                     speed = baseSpeed * 1.28;
                     scale = baseScale * 0.94;
                 }
 
-                // Movement pattern variety
                 const patterns = ['orbit', 'patrol', 'figure8', 'weave'];
                 const pattern = lvl === 1
                     ? 'patrol'
@@ -724,7 +1450,6 @@
             const dx = centralNode.x - prevCenterX;
             const dy = centralNode.y - prevCenterY;
 
-            // Keep existing mice aligned relative to center on resize
             for (const m of mice) {
                 m.x += dx;
                 m.y += dy;
@@ -734,7 +1459,7 @@
         }
 
         window.addEventListener('resize', resizeCanvas);
-        bgPattern = createCatsAndDogsPattern();
+        loadStoreState();
         resizeCanvas();
         setupLevel(1);
 
@@ -751,9 +1476,9 @@
             hoverPos = null;
         });
 
-        // Canvas Click Handler: Launch tennis ball from click position
+        // Canvas Click Handler: Launch ball from click position
         canvas.addEventListener('click', (e) => {
-            if (levelBanner.active || overlayEl.classList.contains('visible')) return;
+            if (isStoreOpen() || levelBanner.active || overlayEl.classList.contains('visible')) return;
             if (ballsRemaining <= 0) return;
 
             const rect = canvas.getBoundingClientRect();
@@ -768,8 +1493,8 @@
             updateHUD();
 
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
-            const vx = LAUNCH_VELOCITY * Math.sin(rad);  // Straight right: vx = 5
-            const vy = -LAUNCH_VELOCITY * Math.cos(rad); // vy = 0
+            const vx = LAUNCH_VELOCITY * Math.sin(rad);
+            const vy = -LAUNCH_VELOCITY * Math.cos(rad);
 
             balls = [{
                 x: x,
@@ -833,18 +1558,15 @@
                 const prevX = m.x;
                 const prevY = m.y;
 
-                // Speed modulation for speedy mice
                 let effectiveSpeed = m.speed;
                 if (m.variant === 'speedy') {
                     effectiveSpeed *= 1 + 0.55 * Math.sin(frameTick * 0.08 + m.phase);
                 }
 
-                // Evasive mouse checks if an active tennis ball is approaching
                 if (m.variant === 'evasive' && m.dodgeCooldown === 0 && balls.length > 0) {
                     const b = balls[0];
                     const distToBall = Math.hypot(b.x - m.x, b.y - m.y);
                     if (distToBall < 125) {
-                        // Sidestep perpendicular to the incoming ball's velocity
                         const perpAngle = Math.atan2(b.vy, b.vx) + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
                         m.dodgeVx = Math.cos(perpAngle) * 5.2;
                         m.dodgeVy = Math.sin(perpAngle) * 5.2;
@@ -859,7 +1581,6 @@
                     m.y += m.dodgeVy;
                     m.dodgeTimer--;
                 } else {
-                    // Standard pattern movement
                     const angularVel = (effectiveSpeed / Math.max(90, m.orbitRadius)) * m.direction;
 
                     if (m.pattern === 'orbit') {
@@ -879,7 +1600,6 @@
                         m.x = centralNode.x + Math.cos(m.angle) * rx;
                         m.y = centralNode.y + Math.sin(m.angle * 2) * ry * 0.65;
                     } else {
-                        // Gentle patrol arc around anchor point
                         const t = frameTick * 0.025 * effectiveSpeed + m.phase;
                         const span = level === 1 ? 42 : 75;
                         m.x = m.anchorX + Math.cos(t) * span * 0.65;
@@ -887,7 +1607,6 @@
                     }
                 }
 
-                // Keep mouse safely inside canvas bounds and away from center yarn ball
                 m.x = Math.max(margin, Math.min(canvas.width - margin, m.x));
                 m.y = Math.max(margin, Math.min(canvas.height - margin, m.y));
 
@@ -900,7 +1619,6 @@
                     m.y = centralNode.y + (cdy / cDist) * minSafeCenter;
                 }
 
-                // Smoothly orient mouse toward movement direction
                 const moveDx = m.x - prevX;
                 const moveDy = m.y - prevY;
                 if (Math.hypot(moveDx, moveDy) > 0.05) {
@@ -910,13 +1628,14 @@
         }
 
         function updatePhysics() {
+            if (isStoreOpen()) return;
+
             frameTick++;
 
             if (centerPulse > 0) {
                 centerPulse = Math.max(0, centerPulse - 0.06);
             }
 
-            // Handle level-up banner countdown
             if (levelBanner.active) {
                 levelBanner.timer--;
                 if (levelBanner.timer <= 0) {
@@ -925,7 +1644,6 @@
                 }
             }
 
-            // Update floating popups
             for (let i = hitEffects.length - 1; i >= 0; i--) {
                 const fx = hitEffects[i];
                 fx.y -= 1.05;
@@ -936,7 +1654,6 @@
                 }
             }
 
-            // Update burst particles
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
                 p.x += p.vx;
@@ -953,10 +1670,11 @@
                 updateMice();
             }
 
+            const equippedThrowSkin = getEquippedSkin('throwingBall');
+
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
-                // Off-screen removal check
                 const margin = 350;
                 if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
@@ -964,22 +1682,19 @@
                     continue;
                 }
 
-                // Distance vector to central gravity yarn ball
                 const dx = centralNode.x - b.x;
                 const dy = centralNode.y - b.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Central yarn ball traps/tangles the tennis ball if hit directly
                 if (dist < centralNode.radius + b.radius) {
                     centerPulse = 1;
                     spawnBurst(b.x, b.y, '#f06878', 10);
-                    addFloatingText(centralNode.x, centralNode.y - centralNode.radius - 12, 'TANGLED!', '#ff8fa3', centralNode.radius);
+                    addFloatingText(centralNode.x, centralNode.y - centralNode.radius - 12, 'TRAPPED!', '#ff8fa3', centralNode.radius);
                     balls.splice(i, 1);
                     continue;
                 }
 
-                // Inverse square law gravity acceleration
                 const acceleration = currentGravity / (distSq + SOFTENING_FACTOR);
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
@@ -995,7 +1710,6 @@
                     b.trail.shift();
                 }
 
-                // Check collisions against active mice
                 for (let j = mice.length - 1; j >= 0; j--) {
                     const m = mice[j];
                     if (m.hitCooldown > 0) continue;
@@ -1006,21 +1720,17 @@
                         m.hitCooldown = 16;
 
                         if (m.hp > 0) {
-                            // Armored mouse lost its helmet!
                             m.speed *= 1.3;
                             spawnBurst(m.x, m.y, '#cbd5e1', 14);
                             addFloatingText(m.x, m.y - 18, 'HELMET OFF!', '#6ee7ff', 18);
-                            // Slight deflection
                             b.vx *= 0.88;
                             b.vy = -b.vy * 0.8;
                         } else {
-                            // Mouse caught!
                             b.combo += 1;
                             const pts = 100 * level * b.combo;
                             score += pts;
                             miceCaughtInLevel += 1;
 
-                            // Refund +1 ball on hit (up to level cap) to reward accuracy
                             if (ballsRemaining < maxBallsForLevel) {
                                 ballsRemaining += 1;
                             }
@@ -1030,18 +1740,16 @@
                                 ? `COMBO x${b.combo}! +${pts}`
                                 : `SQUEAK! +${pts}`;
 
-                            spawnBurst(m.x, m.y, '#eeff54', 18);
+                            spawnBurst(m.x, m.y, equippedThrowSkin.burstColor || '#eeff54', 18);
                             addFloatingText(m.x, m.y - 16, label, '#eeff54', 20);
                             mice.splice(j, 1);
 
-                            // Slight velocity retention so trick shots can hit multiple mice
                             b.vx *= 0.92;
                             b.vy *= 0.92;
                         }
                     }
                 }
 
-                // Check if all mice in the level have been cleared
                 if (mice.length === 0 && !levelBanner.active) {
                     const ballBonus = ballsRemaining * 50;
                     if (ballBonus > 0) {
@@ -1064,7 +1772,6 @@
                 }
             }
 
-            // Check Out-of-Balls condition once no tennis balls are flying
             if (balls.length === 0 && ballsRemaining === 0 && mice.length > 0 && !levelBanner.active) {
                 const remaining = mice.length;
                 overlayTextEl.textContent = `Level ${level} • ${remaining} ${remaining === 1 ? 'mouse' : 'mice'} escaped • Score: ${score}`;
@@ -1072,9 +1779,11 @@
             }
         }
 
-        // Draw subtle dotted gravity trajectory preview from hover point
+        // ==========================================
+        // SKINNED RENDERING HELPERS
+        // ==========================================
         function drawTrajectoryPreview() {
-            if (!hoverPos || levelBanner.active || overlayEl.classList.contains('visible') || ballsRemaining <= 0) {
+            if (!hoverPos || isStoreOpen() || levelBanner.active || overlayEl.classList.contains('visible') || ballsRemaining <= 0) {
                 return;
             }
 
@@ -1085,14 +1794,12 @@
             let pvy = -LAUNCH_VELOCITY * Math.cos(rad);
 
             ctx.save();
-            // Aim reticle at cursor
             ctx.strokeStyle = 'rgba(238, 255, 84, 0.7)';
             ctx.lineWidth = 1.2;
             ctx.beginPath();
             ctx.arc(px, py, 10, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Simulate 28 preview steps
             for (let step = 0; step < 28; step++) {
                 const dx = centralNode.x - px;
                 const dy = centralNode.y - py;
@@ -1117,270 +1824,617 @@
             ctx.restore();
         }
 
-        // Draw animated scurrying mouse target
-        function drawMouse(m) {
-            ctx.save();
-            ctx.translate(m.x, m.y);
-            ctx.scale(m.scale, m.scale);
-            ctx.rotate(m.facing);
+        function drawMouse(m, targetCtx = ctx, skinOverride = null) {
+            const skinId = skinOverride || storeState.equipped.mice;
 
-            // Color palette by mouse variant
+            targetCtx.save();
+            targetCtx.translate(m.x, m.y);
+            targetCtx.scale(m.scale, m.scale);
+            targetCtx.rotate(m.facing);
+
             let bodyMain = '#8d99ae';
             let bodyDark = '#5c677d';
             let earInner = '#f497a9';
+            let tailColor = '#f2849b';
+            let pawColor = '#f497a9';
+            let noseColor = '#ff758f';
+            let eyeColor = m.variant === 'evasive' ? '#e11d48' : '#111827';
 
-            if (m.variant === 'speedy') {
-                bodyMain = '#b07d4f';
-                bodyDark = '#7a5230';
-                earInner = '#e5989b';
-            } else if (m.variant === 'evasive') {
-                bodyMain = '#f1f5f9';
-                bodyDark = '#cbd5e1';
-                earInner = '#ff8fa3';
-            } else if (m.variant === 'armored') {
-                bodyMain = '#64748b';
-                bodyDark = '#334155';
-                earInner = '#f497a9';
+            if (skinId === 'classic') {
+                if (m.variant === 'speedy') {
+                    bodyMain = '#b07d4f';
+                    bodyDark = '#7a5230';
+                    earInner = '#e5989b';
+                } else if (m.variant === 'evasive') {
+                    bodyMain = '#f1f5f9';
+                    bodyDark = '#cbd5e1';
+                    earInner = '#ff8fa3';
+                } else if (m.variant === 'armored') {
+                    bodyMain = '#64748b';
+                    bodyDark = '#334155';
+                    earInner = '#f497a9';
+                }
+            } else if (skinId === 'cheddar') {
+                bodyMain = '#fde047';
+                bodyDark = '#ca8a04';
+                earInner = '#fef08a';
+                tailColor = '#facc15';
+                pawColor = '#fde047';
+                noseColor = '#fb923c';
+                eyeColor = '#422006';
+            } else if (skinId === 'cyber') {
+                bodyMain = '#1e293b';
+                bodyDark = '#090d16';
+                earInner = '#22d3ee';
+                tailColor = '#22d3ee';
+                pawColor = '#38bdf8';
+                noseColor = '#f43f5e';
+                eyeColor = '#f43f5e';
+            } else if (skinId === 'royal') {
+                bodyMain = '#9333ea';
+                bodyDark = '#581c87';
+                earInner = '#facc15';
+                tailColor = '#e879f9';
+                pawColor = '#f3e8ff';
+                noseColor = '#f472b6';
+                eyeColor = '#1e1b4b';
+            } else if (skinId === 'clockwork') {
+                bodyMain = '#d97706';
+                bodyDark = '#78350f';
+                earInner = '#fcd34d';
+                tailColor = '#94a3b8';
+                pawColor = '#b45309';
+                noseColor = '#ef4444';
+                eyeColor = '#38bdf8';
             }
 
-            // 1. Wiggling pink tail
-            const wag = Math.sin(frameTick * 0.24 + m.phase) * 7;
-            ctx.strokeStyle = '#f2849b';
-            ctx.lineWidth = 2.4;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(-14, 0);
-            ctx.bezierCurveTo(-24, wag, -30, -wag, -37, wag * 0.6);
-            ctx.stroke();
+            // 1. Tail
+            const wag = Math.sin(frameTick * 0.24 + (m.phase || 0)) * 7;
+            targetCtx.strokeStyle = tailColor;
+            targetCtx.lineWidth = 2.4;
+            targetCtx.lineCap = 'round';
+            targetCtx.beginPath();
+            targetCtx.moveTo(-14, 0);
+            targetCtx.bezierCurveTo(-24, wag, -30, -wag, -37, wag * 0.6);
+            targetCtx.stroke();
 
-            // 2. Little scurrying pink paws
-            const stride = Math.sin(frameTick * 0.32 + m.phase) * 3;
-            ctx.fillStyle = '#f497a9';
-            ctx.beginPath();
-            ctx.ellipse(6 + stride, -11, 3.2, 2, 0.2, 0, Math.PI * 2);
-            ctx.ellipse(6 - stride, 11, 3.2, 2, -0.2, 0, Math.PI * 2);
-            ctx.ellipse(-7 - stride, -11, 3.5, 2.2, 0, 0, Math.PI * 2);
-            ctx.ellipse(-7 + stride, 11, 3.5, 2.2, 0, 0, Math.PI * 2);
-            ctx.fill();
+            // 2. Paws
+            const stride = Math.sin(frameTick * 0.32 + (m.phase || 0)) * 3;
+            targetCtx.fillStyle = pawColor;
+            targetCtx.beginPath();
+            targetCtx.ellipse(6 + stride, -11, 3.2, 2, 0.2, 0, Math.PI * 2);
+            targetCtx.ellipse(6 - stride, 11, 3.2, 2, -0.2, 0, Math.PI * 2);
+            targetCtx.ellipse(-7 - stride, -11, 3.5, 2.2, 0, 0, Math.PI * 2);
+            targetCtx.ellipse(-7 + stride, 11, 3.5, 2.2, 0, 0, Math.PI * 2);
+            targetCtx.fill();
 
-            // 3. Teardrop mouse body
-            const bodyGrad = ctx.createRadialGradient(2, -3, 2, 0, 0, 18);
+            // 3. Body
+            const bodyGrad = targetCtx.createRadialGradient(2, -3, 2, 0, 0, 18);
             bodyGrad.addColorStop(0, bodyMain);
             bodyGrad.addColorStop(1, bodyDark);
-            ctx.fillStyle = bodyGrad;
-            ctx.beginPath();
-            ctx.moveTo(18, 0);
-            ctx.bezierCurveTo(14, -12, -12, -14, -16, 0);
-            ctx.bezierCurveTo(-12, 14, 14, 12, 18, 0);
-            ctx.fill();
+            targetCtx.fillStyle = bodyGrad;
+            targetCtx.beginPath();
+            targetCtx.moveTo(18, 0);
+            targetCtx.bezierCurveTo(14, -12, -12, -14, -16, 0);
+            targetCtx.bezierCurveTo(-12, 14, 14, 12, 18, 0);
+            targetCtx.fill();
 
-            // 4. Round ears
-            ctx.fillStyle = bodyDark;
-            ctx.beginPath();
-            ctx.arc(3, -10, 6.2, 0, Math.PI * 2);
-            ctx.arc(3, 10, 6.2, 0, Math.PI * 2);
-            ctx.fill();
+            // Skin-specific body details
+            if (skinId === 'cyber') {
+                targetCtx.strokeStyle = '#22d3ee';
+                targetCtx.lineWidth = 1.2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(-8, -5);
+                targetCtx.lineTo(4, -5);
+                targetCtx.moveTo(-8, 5);
+                targetCtx.lineTo(4, 5);
+                targetCtx.stroke();
+            } else if (skinId === 'clockwork') {
+                // Seam line + spinning brass wind-up key
+                targetCtx.strokeStyle = '#451a03';
+                targetCtx.lineWidth = 1.2;
+                targetCtx.beginPath();
+                targetCtx.moveTo(-2, -10);
+                targetCtx.lineTo(-2, 10);
+                targetCtx.stroke();
 
-            ctx.fillStyle = earInner;
-            ctx.beginPath();
-            ctx.arc(3.5, -10, 3.6, 0, Math.PI * 2);
-            ctx.arc(3.5, 10, 3.6, 0, Math.PI * 2);
-            ctx.fill();
+                const keyTurn = Math.sin(frameTick * 0.18 + (m.phase || 0));
+                targetCtx.fillStyle = '#fbbf24';
+                targetCtx.strokeStyle = '#78350f';
+                targetCtx.lineWidth = 1;
+                targetCtx.beginPath();
+                targetCtx.ellipse(-6, 0, 3, 6 * Math.max(0.25, Math.abs(keyTurn)), 0, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.stroke();
+            }
+
+            // 4. Ears
+            targetCtx.fillStyle = bodyDark;
+            targetCtx.beginPath();
+            targetCtx.arc(3, -10, 6.2, 0, Math.PI * 2);
+            targetCtx.arc(3, 10, 6.2, 0, Math.PI * 2);
+            targetCtx.fill();
+
+            targetCtx.fillStyle = earInner;
+            targetCtx.beginPath();
+            targetCtx.arc(3.5, -10, 3.6, 0, Math.PI * 2);
+            targetCtx.arc(3.5, 10, 3.6, 0, Math.PI * 2);
+            targetCtx.fill();
 
             // 5. Eyes
-            ctx.fillStyle = m.variant === 'evasive' ? '#e11d48' : '#111827';
-            ctx.beginPath();
-            ctx.arc(10, -4.5, 2.2, 0, Math.PI * 2);
-            ctx.arc(10, 4.5, 2.2, 0, Math.PI * 2);
-            ctx.fill();
+            targetCtx.fillStyle = eyeColor;
+            targetCtx.beginPath();
+            targetCtx.arc(10, -4.5, 2.2, 0, Math.PI * 2);
+            targetCtx.arc(10, 4.5, 2.2, 0, Math.PI * 2);
+            targetCtx.fill();
 
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(10.7, -5.1, 0.8, 0, Math.PI * 2);
-            ctx.arc(10.7, 3.9, 0.8, 0, Math.PI * 2);
-            ctx.fill();
+            targetCtx.fillStyle = '#ffffff';
+            targetCtx.beginPath();
+            targetCtx.arc(10.7, -5.1, 0.8, 0, Math.PI * 2);
+            targetCtx.arc(10.7, 3.9, 0.8, 0, Math.PI * 2);
+            targetCtx.fill();
 
-            // 6. Pink nose & whiskers
-            ctx.fillStyle = '#ff758f';
-            ctx.beginPath();
-            ctx.arc(18.5, 0, 2.4, 0, Math.PI * 2);
-            ctx.fill();
+            // 6. Nose & whiskers
+            targetCtx.fillStyle = noseColor;
+            targetCtx.beginPath();
+            targetCtx.arc(18.5, 0, 2.4, 0, Math.PI * 2);
+            targetCtx.fill();
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-            ctx.lineWidth = 1;
+            targetCtx.strokeStyle = skinId === 'cyber' ? 'rgba(34, 211, 238, 0.8)' : 'rgba(255, 255, 255, 0.75)';
+            targetCtx.lineWidth = 1;
             for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.moveTo(15, side * 3);
-                ctx.lineTo(22, side * 8);
-                ctx.moveTo(14, side * 4.5);
-                ctx.lineTo(19, side * 10.5);
-                ctx.stroke();
+                targetCtx.beginPath();
+                targetCtx.moveTo(15, side * 3);
+                targetCtx.lineTo(22, side * 8);
+                targetCtx.moveTo(14, side * 4.5);
+                targetCtx.lineTo(19, side * 10.5);
+                targetCtx.stroke();
             }
 
-            // 7. Thimble armor helmet if Armored Mouse still has HP > 1
+            // 7. Royal Crown for Royal Velvet skin
+            if (skinId === 'royal') {
+                targetCtx.fillStyle = '#facc15';
+                targetCtx.strokeStyle = '#854d0e';
+                targetCtx.lineWidth = 0.9;
+                targetCtx.beginPath();
+                targetCtx.moveTo(-2, -4);
+                targetCtx.lineTo(4, -6);
+                targetCtx.lineTo(1, -1);
+                targetCtx.lineTo(5, 0);
+                targetCtx.lineTo(1, 1);
+                targetCtx.lineTo(4, 6);
+                targetCtx.lineTo(-2, 4);
+                targetCtx.closePath();
+                targetCtx.fill();
+                targetCtx.stroke();
+            }
+
+            // 8. Thimble armor helmet if Armored Mouse still has HP > 1
             if (m.hp > 1) {
-                ctx.fillStyle = '#cbd5e1';
-                ctx.strokeStyle = '#475569';
-                ctx.lineWidth = 1.4;
-                ctx.beginPath();
-                ctx.arc(6, 0, 9.5, -Math.PI * 0.55, Math.PI * 0.55);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
+                targetCtx.fillStyle = '#cbd5e1';
+                targetCtx.strokeStyle = '#475569';
+                targetCtx.lineWidth = 1.4;
+                targetCtx.beginPath();
+                targetCtx.arc(6, 0, 9.5, -Math.PI * 0.55, Math.PI * 0.55);
+                targetCtx.closePath();
+                targetCtx.fill();
+                targetCtx.stroke();
 
-                // Metallic rivet glint
-                ctx.fillStyle = '#ffffff';
-                ctx.beginPath();
-                ctx.arc(9, -3, 1.5, 0, Math.PI * 2);
-                ctx.fill();
+                targetCtx.fillStyle = '#ffffff';
+                targetCtx.beginPath();
+                targetCtx.arc(9, -3, 1.5, 0, Math.PI * 2);
+                targetCtx.fill();
             }
 
-            ctx.restore();
+            targetCtx.restore();
         }
 
-        // Draw the moving projectile as a tennis ball
-        function drawTennisBall(x, y, r, rotation) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(rotation);
+        function drawThrowingBall(x, y, r, rotation, targetCtx = ctx, skinOverride = null) {
+            const skinId = skinOverride || storeState.equipped.throwingBall;
 
-            ctx.beginPath();
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.fillStyle = '#c8e619';
-            ctx.fill();
+            targetCtx.save();
+            targetCtx.translate(x, y);
+            targetCtx.rotate(rotation);
 
-            ctx.shadowColor = 'transparent';
-            ctx.clip();
+            if (skinId === 'capture_orb') {
+                // Red & white capture ball
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+                targetCtx.clip();
 
-            const feltGrad = ctx.createRadialGradient(-r * 0.32, -r * 0.32, r * 0.1, 0, 0, r);
+                targetCtx.fillStyle = '#ef4444';
+                targetCtx.fillRect(-r, -r, r * 2, r);
+                targetCtx.fillStyle = '#f8fafc';
+                targetCtx.fillRect(-r, 0, r * 2, r);
+
+                // Center band
+                targetCtx.fillStyle = '#111827';
+                targetCtx.fillRect(-r, -r * 0.16, r * 2, r * 0.32);
+
+                // Center button
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 0.32, 0, Math.PI * 2);
+                targetCtx.fillStyle = '#111827';
+                targetCtx.fill();
+
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 0.18, 0, Math.PI * 2);
+                targetCtx.fillStyle = '#ffffff';
+                targetCtx.fill();
+
+                targetCtx.restore();
+                targetCtx.save();
+                targetCtx.beginPath();
+                targetCtx.arc(x, y, r, 0, Math.PI * 2);
+                targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+                targetCtx.lineWidth = 1;
+                targetCtx.stroke();
+                targetCtx.restore();
+                return;
+            }
+
+            if (skinId === 'fireball') {
+                const fireGrad = targetCtx.createRadialGradient(-r * 0.25, -r * 0.25, r * 0.1, 0, 0, r);
+                fireGrad.addColorStop(0, '#fef9c3');
+                fireGrad.addColorStop(0.45, '#facc15');
+                fireGrad.addColorStop(0.78, '#f97316');
+                fireGrad.addColorStop(1, '#dc2626');
+                targetCtx.fillStyle = fireGrad;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Swirling magma arcs
+                targetCtx.strokeStyle = 'rgba(254, 240, 138, 0.75)';
+                targetCtx.lineWidth = 1.4;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 0.62, 0.2, 2.1);
+                targetCtx.stroke();
+                targetCtx.restore();
+                return;
+            }
+
+            if (skinId === 'eight_ball') {
+                const eightGrad = targetCtx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.08, 0, 0, r);
+                eightGrad.addColorStop(0, '#475569');
+                eightGrad.addColorStop(0.45, '#0f172a');
+                eightGrad.addColorStop(1, '#020617');
+                targetCtx.fillStyle = eightGrad;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                targetCtx.fillStyle = '#f8fafc';
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 0.48, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                targetCtx.fillStyle = '#0f172a';
+                targetCtx.font = `bold ${Math.round(r * 0.85)}px "Courier New", monospace`;
+                targetCtx.textAlign = 'center';
+                targetCtx.textBaseline = 'middle';
+                targetCtx.fillText('8', 0, 0.5);
+
+                targetCtx.restore();
+                targetCtx.save();
+                targetCtx.beginPath();
+                targetCtx.arc(x, y, r, 0, Math.PI * 2);
+                targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                targetCtx.lineWidth = 1;
+                targetCtx.stroke();
+                targetCtx.restore();
+                return;
+            }
+
+            if (skinId === 'rainbow_comet') {
+                const prismGrad = targetCtx.createLinearGradient(-r, -r, r, r);
+                prismGrad.addColorStop(0, '#f43f5e');
+                prismGrad.addColorStop(0.25, '#facc15');
+                prismGrad.addColorStop(0.5, '#4ade80');
+                prismGrad.addColorStop(0.75, '#38bdf8');
+                prismGrad.addColorStop(1, '#c084fc');
+                targetCtx.fillStyle = prismGrad;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Bright white star center
+                targetCtx.fillStyle = '#ffffff';
+                targetCtx.beginPath();
+                for (let s = 0; s < 8; s++) {
+                    const ang = (s * Math.PI) / 4;
+                    const rad = s % 2 === 0 ? r * 0.58 : r * 0.22;
+                    const sx = Math.cos(ang) * rad;
+                    const sy = Math.sin(ang) * rad;
+                    if (s === 0) targetCtx.moveTo(sx, sy);
+                    else targetCtx.lineTo(sx, sy);
+                }
+                targetCtx.closePath();
+                targetCtx.fill();
+                targetCtx.restore();
+                return;
+            }
+
+            // Default: 'tennis'
+            targetCtx.beginPath();
+            targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+            targetCtx.fillStyle = '#c8e619';
+            targetCtx.fill();
+
+            targetCtx.shadowColor = 'transparent';
+            targetCtx.clip();
+
+            const feltGrad = targetCtx.createRadialGradient(-r * 0.32, -r * 0.32, r * 0.1, 0, 0, r);
             feltGrad.addColorStop(0, '#eeff54');
             feltGrad.addColorStop(0.55, '#c6e317');
             feltGrad.addColorStop(1, '#7c9606');
-            ctx.fillStyle = feltGrad;
-            ctx.fillRect(-r, -r, r * 2, r * 2);
+            targetCtx.fillStyle = feltGrad;
+            targetCtx.fillRect(-r, -r, r * 2, r * 2);
 
-            ctx.fillStyle = 'rgba(255, 255, 225, 0.24)';
+            targetCtx.fillStyle = 'rgba(255, 255, 225, 0.24)';
             const fuzzPoints = [
                 [-0.45, -0.2], [0.3, -0.45], [-0.15, 0.45], [0.45, 0.25],
                 [0.05, -0.15], [-0.35, 0.25], [0.25, 0.05], [-0.1, -0.5]
             ];
             for (const [fx, fy] of fuzzPoints) {
-                ctx.beginPath();
-                ctx.arc(fx * r, fy * r, 0.75, 0, Math.PI * 2);
-                ctx.fill();
+                targetCtx.beginPath();
+                targetCtx.arc(fx * r, fy * r, 0.75, 0, Math.PI * 2);
+                targetCtx.fill();
             }
 
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = 'rgba(72, 88, 4, 0.48)';
-            ctx.lineWidth = r * 0.25;
-            ctx.beginPath();
-            ctx.arc(-r * 1.15, 0, r * 0.92, -Math.PI * 0.42, Math.PI * 0.42);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(r * 1.15, 0, r * 0.92, Math.PI - Math.PI * 0.42, Math.PI + Math.PI * 0.42);
-            ctx.stroke();
+            targetCtx.lineCap = 'round';
+            targetCtx.strokeStyle = 'rgba(72, 88, 4, 0.48)';
+            targetCtx.lineWidth = r * 0.25;
+            targetCtx.beginPath();
+            targetCtx.arc(-r * 1.15, 0, r * 0.92, -Math.PI * 0.42, Math.PI * 0.42);
+            targetCtx.stroke();
+            targetCtx.beginPath();
+            targetCtx.arc(r * 1.15, 0, r * 0.92, Math.PI - Math.PI * 0.42, Math.PI + Math.PI * 0.42);
+            targetCtx.stroke();
 
-            ctx.strokeStyle = '#f7f9f0';
-            ctx.lineWidth = r * 0.16;
-            ctx.beginPath();
-            ctx.arc(-r * 1.15, 0, r * 0.92, -Math.PI * 0.42, Math.PI * 0.42);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(r * 1.15, 0, r * 0.92, Math.PI - Math.PI * 0.42, Math.PI + Math.PI * 0.42);
-            ctx.stroke();
+            targetCtx.strokeStyle = '#f7f9f0';
+            targetCtx.lineWidth = r * 0.16;
+            targetCtx.beginPath();
+            targetCtx.arc(-r * 1.15, 0, r * 0.92, -Math.PI * 0.42, Math.PI * 0.42);
+            targetCtx.stroke();
+            targetCtx.beginPath();
+            targetCtx.arc(r * 1.15, 0, r * 0.92, Math.PI - Math.PI * 0.42, Math.PI + Math.PI * 0.42);
+            targetCtx.stroke();
 
-            ctx.restore();
+            targetCtx.restore();
 
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(245, 255, 170, 0.45)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.restore();
+            targetCtx.save();
+            targetCtx.beginPath();
+            targetCtx.arc(x, y, r, 0, Math.PI * 2);
+            targetCtx.strokeStyle = 'rgba(245, 255, 170, 0.45)';
+            targetCtx.lineWidth = 1;
+            targetCtx.stroke();
+            targetCtx.restore();
         }
 
-        // Draw the central gravity node as a detailed ball of yarn
-        function drawYarnBall(cx, cy, r) {
-            ctx.save();
+        function drawCenterBall(cx, cy, r, targetCtx = ctx, skinOverride = null) {
+            const skinId = skinOverride || storeState.equipped.centerBall;
 
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(cx + r * 0.45, cy + r * 0.72);
-            ctx.bezierCurveTo(
+            if (skinId === 'black_hole') {
+                targetCtx.save();
+                // Swirling accretion disk
+                const spin = frameTick * 0.03;
+                targetCtx.translate(cx, cy);
+                targetCtx.rotate(spin);
+
+                const halo = targetCtx.createRadialGradient(0, 0, r * 0.5, 0, 0, r * 1.75);
+                halo.addColorStop(0, 'rgba(168, 85, 247, 0.85)');
+                halo.addColorStop(0.55, 'rgba(56, 189, 248, 0.35)');
+                halo.addColorStop(1, 'rgba(56, 189, 248, 0)');
+                targetCtx.fillStyle = halo;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 1.75, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                targetCtx.strokeStyle = 'rgba(216, 180, 254, 0.8)';
+                targetCtx.lineWidth = 1.8;
+                targetCtx.beginPath();
+                targetCtx.ellipse(0, 0, r * 1.55, r * 0.52, 0.3, 0, Math.PI * 2);
+                targetCtx.stroke();
+
+                targetCtx.strokeStyle = 'rgba(103, 232, 249, 0.75)';
+                targetCtx.beginPath();
+                targetCtx.ellipse(0, 0, r * 1.4, r * 0.48, -0.5, 0, Math.PI * 2);
+                targetCtx.stroke();
+
+                // Event horizon core
+                targetCtx.fillStyle = '#03050a';
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 0.86, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                targetCtx.strokeStyle = '#c084fc';
+                targetCtx.lineWidth = 1.5;
+                targetCtx.stroke();
+                targetCtx.restore();
+                return;
+            }
+
+            if (skinId === 'cheese_wheel') {
+                targetCtx.save();
+                const cheeseGrad = targetCtx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+                cheeseGrad.addColorStop(0, '#fef08a');
+                cheeseGrad.addColorStop(0.55, '#facc15');
+                cheeseGrad.addColorStop(1, '#ca8a04');
+                targetCtx.fillStyle = cheeseGrad;
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                targetCtx.strokeStyle = '#a16207';
+                targetCtx.lineWidth = 2;
+                targetCtx.stroke();
+
+                // Cheese holes
+                const holes = [
+                    [-0.38, -0.25, 0.2],
+                    [0.32, -0.32, 0.16],
+                    [0.05, 0.36, 0.22],
+                    [-0.42, 0.28, 0.13],
+                    [0.45, 0.15, 0.15],
+                    [0.02, -0.05, 0.14]
+                ];
+                for (const [hx, hy, hr] of holes) {
+                    targetCtx.fillStyle = '#b45309';
+                    targetCtx.beginPath();
+                    targetCtx.arc(cx + hx * r, cy + hy * r, hr * r, 0, Math.PI * 2);
+                    targetCtx.fill();
+                }
+                targetCtx.restore();
+                return;
+            }
+
+            if (skinId === 'disco') {
+                targetCtx.save();
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
+                targetCtx.clip();
+
+                const baseGrad = targetCtx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+                baseGrad.addColorStop(0, '#ffffff');
+                baseGrad.addColorStop(0.55, '#94a3b8');
+                baseGrad.addColorStop(1, '#334155');
+                targetCtx.fillStyle = baseGrad;
+                targetCtx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+                const tileSz = r * 0.34;
+                const colors = ['rgba(255,255,255,0.55)', 'rgba(110,231,255,0.45)', 'rgba(244,114,182,0.42)', 'rgba(238,255,84,0.42)', 'rgba(15,23,42,0.28)'];
+                let idx = 0;
+                for (let ty = cy - r; ty < cy + r; ty += tileSz) {
+                    for (let tx = cx - r; tx < cx + r; tx += tileSz) {
+                        const cIdx = (idx + Math.floor(frameTick * 0.08)) % colors.length;
+                        targetCtx.fillStyle = colors[cIdx];
+                        targetCtx.fillRect(tx, ty, tileSz - 1, tileSz - 1);
+                        idx++;
+                    }
+                }
+                targetCtx.restore();
+
+                targetCtx.save();
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
+                targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                targetCtx.lineWidth = 1.2;
+                targetCtx.stroke();
+                targetCtx.restore();
+                return;
+            }
+
+            if (skinId === 'sun') {
+                targetCtx.save();
+                // Coronal rays
+                const rays = 12;
+                targetCtx.translate(cx, cy);
+                targetCtx.rotate(frameTick * 0.015);
+                for (let i = 0; i < rays; i++) {
+                    targetCtx.rotate((Math.PI * 2) / rays);
+                    targetCtx.fillStyle = i % 2 === 0 ? 'rgba(250, 204, 21, 0.45)' : 'rgba(249, 115, 22, 0.35)';
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(-3, -r * 0.9);
+                    targetCtx.lineTo(0, -r * 1.42);
+                    targetCtx.lineTo(3, -r * 0.9);
+                    targetCtx.closePath();
+                    targetCtx.fill();
+                }
+
+                const sunGrad = targetCtx.createRadialGradient(-r * 0.25, -r * 0.25, r * 0.1, 0, 0, r);
+                sunGrad.addColorStop(0, '#fef9c3');
+                sunGrad.addColorStop(0.5, '#facc15');
+                sunGrad.addColorStop(0.85, '#f97316');
+                sunGrad.addColorStop(1, '#dc2626');
+                targetCtx.fillStyle = sunGrad;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.restore();
+                return;
+            }
+
+            // Default: 'yarn'
+            targetCtx.save();
+
+            targetCtx.lineCap = 'round';
+            targetCtx.beginPath();
+            targetCtx.moveTo(cx + r * 0.45, cy + r * 0.72);
+            targetCtx.bezierCurveTo(
                 cx + r * 1.15, cy + r * 1.15,
                 cx + r * 1.45, cy + r * 0.55,
                 cx + r * 1.85, cy + r * 0.85
             );
-            ctx.strokeStyle = '#c93848';
-            ctx.lineWidth = 2.6;
-            ctx.stroke();
+            targetCtx.strokeStyle = '#c93848';
+            targetCtx.lineWidth = 2.6;
+            targetCtx.stroke();
 
-            ctx.shadowColor = 'transparent';
+            targetCtx.shadowColor = 'transparent';
 
-            ctx.beginPath();
-            ctx.moveTo(cx + r * 0.45, cy + r * 0.72 - 0.5);
-            ctx.bezierCurveTo(
+            targetCtx.beginPath();
+            targetCtx.moveTo(cx + r * 0.45, cy + r * 0.72 - 0.5);
+            targetCtx.bezierCurveTo(
                 cx + r * 1.15, cy + r * 1.15 - 0.5,
                 cx + r * 1.45, cy + r * 0.55 - 0.5,
                 cx + r * 1.85, cy + r * 0.85 - 0.5
             );
-            ctx.strokeStyle = 'rgba(255, 190, 198, 0.45)';
-            ctx.lineWidth = 0.9;
-            ctx.stroke();
+            targetCtx.strokeStyle = 'rgba(255, 190, 198, 0.45)';
+            targetCtx.lineWidth = 0.9;
+            targetCtx.stroke();
 
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.clip();
+            targetCtx.beginPath();
+            targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
+            targetCtx.clip();
 
-            const baseGrad = ctx.createRadialGradient(
+            const baseGrad = targetCtx.createRadialGradient(
                 cx - r * 0.3, cy - r * 0.3, r * 0.1,
                 cx, cy, r
             );
             baseGrad.addColorStop(0, '#f06878');
             baseGrad.addColorStop(0.55, '#d13b4c');
             baseGrad.addColorStop(1, '#851b27');
-            ctx.fillStyle = baseGrad;
-            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+            targetCtx.fillStyle = baseGrad;
+            targetCtx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
             function drawYarnBand(angle, offsetY, bandWidth, curveAmount, strandCount) {
-                ctx.save();
-                ctx.translate(cx, cy);
-                ctx.rotate(angle);
+                targetCtx.save();
+                targetCtx.translate(cx, cy);
+                targetCtx.rotate(angle);
 
-                ctx.beginPath();
-                ctx.moveTo(-r * 1.2, offsetY - bandWidth / 2);
-                ctx.quadraticCurveTo(0, offsetY - bandWidth / 2 + curveAmount, r * 1.2, offsetY - bandWidth / 2);
-                ctx.lineTo(r * 1.2, offsetY + bandWidth / 2);
-                ctx.quadraticCurveTo(0, offsetY + bandWidth / 2 + curveAmount, -r * 1.2, offsetY + bandWidth / 2);
-                ctx.closePath();
-                ctx.fillStyle = '#cf3a4b';
-                ctx.fill();
+                targetCtx.beginPath();
+                targetCtx.moveTo(-r * 1.2, offsetY - bandWidth / 2);
+                targetCtx.quadraticCurveTo(0, offsetY - bandWidth / 2 + curveAmount, r * 1.2, offsetY - bandWidth / 2);
+                targetCtx.lineTo(r * 1.2, offsetY + bandWidth / 2);
+                targetCtx.quadraticCurveTo(0, offsetY + bandWidth / 2 + curveAmount, -r * 1.2, offsetY + bandWidth / 2);
+                targetCtx.closePath();
+                targetCtx.fillStyle = '#cf3a4b';
+                targetCtx.fill();
 
-                ctx.strokeStyle = 'rgba(75, 12, 20, 0.65)';
-                ctx.lineWidth = 1.2;
-                ctx.stroke();
+                targetCtx.strokeStyle = 'rgba(75, 12, 20, 0.65)';
+                targetCtx.lineWidth = 1.2;
+                targetCtx.stroke();
 
                 for (let i = 0; i < strandCount; i++) {
                     const frac = (i + 0.5) / strandCount - 0.5;
                     const yPos = offsetY + frac * bandWidth;
 
-                    ctx.beginPath();
-                    ctx.moveTo(-r * 1.2, yPos);
-                    ctx.quadraticCurveTo(0, yPos + curveAmount, r * 1.2, yPos);
-                    ctx.strokeStyle = 'rgba(82, 14, 24, 0.55)';
-                    ctx.lineWidth = 1.1;
-                    ctx.stroke();
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(-r * 1.2, yPos);
+                    targetCtx.quadraticCurveTo(0, yPos + curveAmount, r * 1.2, yPos);
+                    targetCtx.strokeStyle = 'rgba(82, 14, 24, 0.55)';
+                    targetCtx.lineWidth = 1.1;
+                    targetCtx.stroke();
 
-                    ctx.beginPath();
-                    ctx.moveTo(-r * 1.2, yPos - 0.8);
-                    ctx.quadraticCurveTo(0, yPos + curveAmount - 0.8, r * 1.2, yPos - 0.8);
-                    ctx.strokeStyle = 'rgba(255, 185, 195, 0.35)';
-                    ctx.lineWidth = 0.8;
-                    ctx.stroke();
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(-r * 1.2, yPos - 0.8);
+                    targetCtx.quadraticCurveTo(0, yPos + curveAmount - 0.8, r * 1.2, yPos - 0.8);
+                    targetCtx.strokeStyle = 'rgba(255, 185, 195, 0.35)';
+                    targetCtx.lineWidth = 0.8;
+                    targetCtx.stroke();
                 }
 
-                ctx.restore();
+                targetCtx.restore();
             }
 
             drawYarnBand(-0.55, -r * 0.35, r * 0.68, r * 0.25, 4);
@@ -1389,33 +2443,35 @@
             drawYarnBand(1.15, r * 0.22, r * 0.65, -r * 0.25, 4);
             drawYarnBand(-0.85, r * 0.05, r * 0.58, r * 0.18, 3);
 
-            const shadeGrad = ctx.createRadialGradient(
+            const shadeGrad = targetCtx.createRadialGradient(
                 cx - r * 0.35, cy - r * 0.35, r * 0.05,
                 cx, cy, r
             );
             shadeGrad.addColorStop(0, 'rgba(255, 225, 230, 0.28)');
             shadeGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
             shadeGrad.addColorStop(1, 'rgba(35, 4, 10, 0.58)');
-            ctx.fillStyle = shadeGrad;
-            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+            targetCtx.fillStyle = shadeGrad;
+            targetCtx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-            ctx.restore();
+            targetCtx.restore();
 
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255, 215, 220, 0.45)';
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-            ctx.restore();
+            targetCtx.save();
+            targetCtx.beginPath();
+            targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
+            targetCtx.strokeStyle = 'rgba(255, 215, 220, 0.45)';
+            targetCtx.lineWidth = 1.2;
+            targetCtx.stroke();
+            targetCtx.restore();
         }
 
         function draw() {
-            // Draw Cats & Dogs Background Pattern
-            ctx.fillStyle = bgPattern || '#121722';
+            const equippedBg = getEquippedSkin('background');
+            const bgPattern = getBackgroundPattern(equippedBg.id, ctx);
+
+            ctx.fillStyle = bgPattern || equippedBg.fallbackColor || '#121722';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Subtle gravity field rings around center yarn ball
+            // Subtle gravity field rings around center node
             ctx.save();
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
             ctx.lineWidth = 1;
@@ -1427,20 +2483,19 @@
             }
             ctx.restore();
 
-            // Draw aim preview dots when hovering
             drawTrajectoryPreview();
 
             ctx.save();
             ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
             ctx.shadowBlur = 5;
 
-            // 1. Draw Central Yarn Ball Node
+            // 1. Draw Central Gravity Node
             const pulseScale = 1 + centerPulse * 0.22;
             ctx.save();
             ctx.translate(centralNode.x, centralNode.y);
             ctx.scale(pulseScale, pulseScale);
             ctx.translate(-centralNode.x, -centralNode.y);
-            drawYarnBall(centralNode.x, centralNode.y, centralNode.radius);
+            drawCenterBall(centralNode.x, centralNode.y, centralNode.radius);
             ctx.restore();
 
             // 2. Draw Active Mice
@@ -1448,20 +2503,33 @@
                 drawMouse(m);
             }
 
-            // 3. Draw Tennis Ball & Trail
+            // 3. Draw Throwing Ball & Trail
+            const equippedThrow = getEquippedSkin('throwingBall');
             for (const b of balls) {
                 if (b.trail.length > 1) {
+                    if (equippedThrow.trailColor === 'rainbow') {
+                        const first = b.trail[0];
+                        const last = b.trail[b.trail.length - 1];
+                        const grad = ctx.createLinearGradient(first.x, first.y, last.x, last.y);
+                        grad.addColorStop(0, 'rgba(244, 63, 94, 0.75)');
+                        grad.addColorStop(0.25, 'rgba(250, 204, 21, 0.85)');
+                        grad.addColorStop(0.5, 'rgba(74, 222, 128, 0.85)');
+                        grad.addColorStop(0.75, 'rgba(56, 189, 248, 0.85)');
+                        grad.addColorStop(1, 'rgba(192, 132, 252, 0.9)');
+                        ctx.strokeStyle = grad;
+                    } else {
+                        ctx.strokeStyle = equippedThrow.trailColor || 'rgba(235, 255, 110, 0.8)';
+                    }
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = 'rgba(235, 255, 110, 0.8)';
-                    ctx.lineWidth = 1.4;
+                    ctx.lineWidth = 1.6;
                     ctx.stroke();
                 }
 
-                drawTennisBall(b.x, b.y, b.radius, b.rotation);
+                drawThrowingBall(b.x, b.y, b.radius, b.rotation);
             }
 
             // 4. Draw Burst Particles
@@ -1523,6 +2591,186 @@
                 ctx.restore();
             }
         }
+
+        // ==========================================
+        // STORE MODAL LOGIC & LIVE PREVIEWS
+        // ==========================================
+        function isStoreOpen() {
+            return storeModalEl.classList.contains('visible');
+        }
+
+        function openStore() {
+            storePointsValueEl.textContent = score;
+            storeToastEl.textContent = '';
+            storeModalEl.classList.add('visible');
+            renderStoreGrid();
+        }
+
+        function closeStore() {
+            storeModalEl.classList.remove('visible');
+            updateHUD();
+        }
+
+        function showStoreToast(message) {
+            storeToastEl.textContent = message;
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                storeToastEl.textContent = '';
+            }, 2200);
+        }
+
+        function selectStoreTab(category) {
+            activeStoreCategory = category;
+            const tabs = document.querySelectorAll('.store-tab');
+            tabs.forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.category === category);
+            });
+            renderStoreGrid();
+        }
+
+        function handleSkinAction(category, skinId) {
+            const item = SKIN_CATALOG[category].find(s => s.id === skinId);
+            if (!item) return;
+
+            const isUnlocked = storeState.unlocked[category].includes(skinId);
+            const isEquipped = storeState.equipped[category] === skinId;
+
+            if (isEquipped) return;
+
+            if (isUnlocked) {
+                storeState.equipped[category] = skinId;
+                saveStoreState();
+                updateHUD();
+                renderStoreGrid();
+                showStoreToast(`EQUIPPED: ${item.name}`);
+                return;
+            }
+
+            if (score >= item.price) {
+                score -= item.price;
+                storeState.unlocked[category].push(skinId);
+                storeState.equipped[category] = skinId;
+                saveStoreState();
+                updateHUD();
+                renderStoreGrid();
+                showStoreToast(`UNLOCKED & EQUIPPED: ${item.name} (-${item.price} PTS)`);
+            }
+        }
+
+        function renderSkinPreview(previewCanvas, category, skinId) {
+            const pctx = previewCanvas.getContext('2d');
+            const w = previewCanvas.width;
+            const h = previewCanvas.height;
+            pctx.clearRect(0, 0, w, h);
+
+            if (category === 'background') {
+                const pat = getBackgroundPattern(skinId, pctx);
+                pctx.save();
+                pctx.scale(0.45, 0.45);
+                pctx.fillStyle = pat || '#121722';
+                pctx.fillRect(0, 0, w / 0.45, h / 0.45);
+                pctx.restore();
+            } else if (category === 'mice') {
+                pctx.fillStyle = '#0e131d';
+                pctx.fillRect(0, 0, w, h);
+                drawMouse({
+                    x: w * 0.54,
+                    y: h * 0.5,
+                    scale: 1.55,
+                    facing: 0,
+                    variant: 'classic',
+                    hp: 1,
+                    phase: 0
+                }, pctx, skinId);
+            } else if (category === 'centerBall') {
+                pctx.fillStyle = '#0e131d';
+                pctx.fillRect(0, 0, w, h);
+                drawCenterBall(w * 0.5, h * 0.5, 22, pctx, skinId);
+            } else if (category === 'throwingBall') {
+                pctx.fillStyle = '#0e131d';
+                pctx.fillRect(0, 0, w, h);
+
+                const item = SKIN_CATALOG.throwingBall.find(s => s.id === skinId);
+                pctx.save();
+                if (item && item.trailColor === 'rainbow') {
+                    const grad = pctx.createLinearGradient(24, h * 0.5, w * 0.62, h * 0.5);
+                    grad.addColorStop(0, 'rgba(244, 63, 94, 0.2)');
+                    grad.addColorStop(0.5, 'rgba(74, 222, 128, 0.85)');
+                    grad.addColorStop(1, 'rgba(192, 132, 252, 0.95)');
+                    pctx.strokeStyle = grad;
+                } else {
+                    pctx.strokeStyle = (item && item.trailColor) || '#eeff54';
+                }
+                pctx.lineWidth = 2.5;
+                pctx.beginPath();
+                pctx.moveTo(22, h * 0.62);
+                pctx.quadraticCurveTo(w * 0.4, h * 0.35, w * 0.62, h * 0.5);
+                pctx.stroke();
+                pctx.restore();
+
+                drawThrowingBall(w * 0.62, h * 0.5, 14, -0.3, pctx, skinId);
+            }
+        }
+
+        function renderStoreGrid() {
+            const items = SKIN_CATALOG[activeStoreCategory];
+            storePointsValueEl.textContent = score;
+            storeGridEl.innerHTML = '';
+
+            for (const item of items) {
+                const isUnlocked = storeState.unlocked[activeStoreCategory].includes(item.id);
+                const isEquipped = storeState.equipped[activeStoreCategory] === item.id;
+                const canAfford = score >= item.price;
+
+                const card = document.createElement('div');
+                card.className = `skin-card${isEquipped ? ' equipped' : ''}`;
+
+                const preview = document.createElement('canvas');
+                preview.className = 'skin-preview';
+                preview.width = 200;
+                preview.height = 92;
+                renderSkinPreview(preview, activeStoreCategory, item.id);
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'skin-name';
+                nameEl.textContent = item.name;
+
+                const descEl = document.createElement('div');
+                descEl.className = 'skin-desc';
+                descEl.textContent = item.desc;
+
+                const btn = document.createElement('button');
+                if (isEquipped) {
+                    btn.className = 'skin-btn equipped-btn';
+                    btn.textContent = 'Equipped';
+                    btn.disabled = true;
+                } else if (isUnlocked) {
+                    btn.className = 'skin-btn equip-btn';
+                    btn.textContent = 'Equip';
+                    btn.onclick = () => handleSkinAction(activeStoreCategory, item.id);
+                } else if (canAfford) {
+                    btn.className = 'skin-btn buy-btn';
+                    btn.textContent = `Buy • ${item.price} PTS`;
+                    btn.onclick = () => handleSkinAction(activeStoreCategory, item.id);
+                } else {
+                    btn.className = 'skin-btn locked-btn';
+                    btn.textContent = `${item.price} PTS`;
+                    btn.disabled = true;
+                }
+
+                card.appendChild(preview);
+                card.appendChild(nameEl);
+                card.appendChild(descEl);
+                card.appendChild(btn);
+                storeGridEl.appendChild(card);
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isStoreOpen()) {
+                closeStore();
+            }
+        });
 
         function animate() {
             updatePhysics();
