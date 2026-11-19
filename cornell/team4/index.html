@@ -252,7 +252,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a flower and collect the floating blossoms!
+        Click anywhere on the canvas to throw flowers into orbit and collect the floating blossoms!
     </div>
 
     <script>
@@ -270,6 +270,89 @@
         const TRAIL_LENGTH = 300;          // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
         const COLLECTIBLE_COUNT = 5;       // Number of collectible blossoms active per wave
+        const MAX_THROWN_FLOWERS = 25;     // Maximum simultaneous thrown flower projectiles
+
+        // Vibrant Kawaii Flower Styles for Thrown Flower Projectiles
+        const THROWN_FLOWER_STYLES = [
+            {
+                name: 'strawberry',
+                petalInner: '#ff477e',
+                petalMid: '#ff85b2',
+                petalOuter: '#ffe3ee',
+                stroke: '#591936',
+                crease: 'rgba(137, 24, 69, 0.45)',
+                centerInner: '#fff3bf',
+                centerMid: '#ffd43b',
+                centerOuter: '#f59f00',
+                trailColor: '#e63973',
+                burstRgb: '255, 92, 147'
+            },
+            {
+                name: 'sakura',
+                petalInner: '#ff70a6',
+                petalMid: '#ffacc7',
+                petalOuter: '#fff0f6',
+                stroke: '#6b2144',
+                crease: 'rgba(166, 44, 96, 0.42)',
+                centerInner: '#fff9db',
+                centerMid: '#ffe066',
+                centerOuter: '#fab005',
+                trailColor: '#f06595',
+                burstRgb: '255, 135, 178'
+            },
+            {
+                name: 'cinnamoroll-blue',
+                petalInner: '#228be6',
+                petalMid: '#74c0fc',
+                petalOuter: '#e7f5ff',
+                stroke: '#1c4e80',
+                crease: 'rgba(28, 78, 128, 0.42)',
+                centerInner: '#fff3bf',
+                centerMid: '#ffd43b',
+                centerOuter: '#f59f00',
+                trailColor: '#339af0',
+                burstRgb: '77, 171, 247'
+            },
+            {
+                name: 'sunny-daisy',
+                petalInner: '#f59f00',
+                petalMid: '#ffd43b',
+                petalOuter: '#fff9db',
+                stroke: '#784800',
+                crease: 'rgba(156, 99, 0, 0.42)',
+                centerInner: '#ffe3ec',
+                centerMid: '#ff7aa8',
+                centerOuter: '#d93870',
+                trailColor: '#f59f00',
+                burstRgb: '252, 196, 25'
+            },
+            {
+                name: 'sweet-lavender',
+                petalInner: '#7950f2',
+                petalMid: '#b197fc',
+                petalOuter: '#f3f0ff',
+                stroke: '#3b2082',
+                crease: 'rgba(82, 52, 168, 0.42)',
+                centerInner: '#fff3bf',
+                centerMid: '#ffd43b',
+                centerOuter: '#f59f00',
+                trailColor: '#845ef7',
+                burstRgb: '151, 117, 250'
+            },
+            {
+                name: 'peach-blossom',
+                petalInner: '#f76707',
+                petalMid: '#ffa94d',
+                petalOuter: '#fff4e6',
+                stroke: '#7a3004',
+                crease: 'rgba(156, 66, 8, 0.42)',
+                centerInner: '#fff3bf',
+                centerMid: '#ffd43b',
+                centerOuter: '#f59f00',
+                trailColor: '#fd7e14',
+                burstRgb: '255, 146, 43'
+            }
+        ];
 
         // Kawaii Pastel Palettes for Collectible Flowers
         const COLLECTIBLE_PALETTES = [
@@ -334,6 +417,7 @@
         let launchBursts = [];
         let floatingTexts = [];
         let collectedCount = 0;
+        let throwCount = 0;
         let animTime = 0;
         let scorePopTimeout = null;
 
@@ -492,7 +576,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch flower projectile at click position
+        // Canvas Click Handler: Launch a new flower projectile at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -502,19 +586,23 @@
         });
 
         /**
-         * Spawns a kawaii floral burst at the click point when the flower shoots out.
+         * Spawns a kawaii floral burst at the click point when a flower shoots out.
          */
-        function spawnLaunchBurst(x, y, vx, vy) {
+        function spawnLaunchBurst(x, y, vx, vy, style) {
+            const burstRgb = style ? style.burstRgb : '255, 92, 147';
             launchBursts.push({
                 x: x,
                 y: y,
                 radius: 4,
                 maxRadius: 28,
                 alpha: 0.95,
-                color: '255, 92, 147'
+                color: burstRgb
             });
 
-            const petalColors = ['#ff5c93', '#ff8ab4', '#ffd43b', '#ffffff'];
+            const petalColors = style
+                ? [style.petalInner, style.petalMid, style.centerMid, '#ffffff']
+                : ['#ff5c93', '#ff8ab4', '#ffd43b', '#ffffff'];
+
             for (let i = 0; i < 9; i++) {
                 const spreadAngle = ((i / 9) * Math.PI * 2) + (Math.random() * 0.35);
                 const speed = 1.4 + Math.random() * 2.2;
@@ -585,7 +673,7 @@
         }
 
         /**
-         * Launches a single flower projectile at (x, y) using the exact baseline physics parameters.
+         * Throws a new flower projectile at (x, y) while keeping existing thrown flowers in orbit.
          */
         function launchBall(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
@@ -593,23 +681,32 @@
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            spawnLaunchBurst(x, y, vx, vy);
+            const flowerStyle = THROWN_FLOWER_STYLES[throwCount % THROWN_FLOWER_STYLES.length];
+            throwCount++;
 
-            // Overwrite existing array to strictly maintain a single active projectile on screen
-            balls = [{
+            spawnLaunchBurst(x, y, vx, vy, flowerStyle);
+
+            // Maintain a generous cap of simultaneous thrown flowers so many can orbit together
+            if (balls.length >= MAX_THROWN_FLOWERS) {
+                balls.shift();
+            }
+
+            balls.push({
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
                 radius: 4,         // Physical collision radius preserved from baseline
-                rotation: 0,
+                rotation: Math.random() * Math.PI * 2,
+                spinSpeed: 0.08 + (throwCount % 3) * 0.015,
                 frameCount: 0,
+                style: flowerStyle,
                 trail: []          // Stores history of past {x, y} coordinates
-            }];
+            });
         }
 
         /**
-         * Clears active flower projectile, resets collected flower count, and spawns fresh flowers.
+         * Clears active flower projectiles, resets collected flower count, and spawns fresh flowers.
          */
         function resetSimulation() {
             balls = [];
@@ -617,6 +714,7 @@
             launchBursts = [];
             floatingTexts = [];
             collectedCount = 0;
+            throwCount = 0;
             updateScoreDisplay(false);
             spawnCollectibleWave();
         }
@@ -652,7 +750,7 @@
 
                 // Absorption check: projectile collides with central mass
                 if (dist < centralNode.radius + b.radius) {
-                    spawnLaunchBurst(b.x, b.y, 0, 0);
+                    spawnLaunchBurst(b.x, b.y, 0, 0, b.style);
                     balls.splice(i, 1);
                     continue;
                 }
@@ -669,7 +767,7 @@
                 b.vy += ay;
                 b.x += b.vx;
                 b.y += b.vy;
-                b.rotation += 0.09;
+                b.rotation += b.spinSpeed;
                 b.frameCount++;
 
                 // Check collection against floating collectible flowers
@@ -700,11 +798,11 @@
                     }
                 }
 
-                // Shoot tiny petals and sparkles outward from the flying flower
-                if (b.frameCount % 4 === 0 && petalParticles.length < 85) {
+                // Shoot tiny petals and sparkles outward from each flying flower
+                if (b.frameCount % 6 === 0 && petalParticles.length < 110) {
                     const ejectAngle = Math.atan2(-b.vy, -b.vx) + (Math.random() - 0.5) * 1.6;
                     const ejectSpeed = 0.7 + Math.random() * 1.1;
-                    const colors = ['#ff7aa8', '#ffb3cf', '#ffe066', '#ffffff'];
+                    const colors = [b.style.petalMid, b.style.petalOuter, b.style.centerMid, '#ffffff'];
                     petalParticles.push({
                         x: b.x,
                         y: b.y,
@@ -714,9 +812,9 @@
                         vRot: (Math.random() - 0.5) * 0.14,
                         size: 2.8 + Math.random() * 1.8,
                         alpha: 0.92,
-                        decay: 0.025,
+                        decay: 0.026,
                         color: colors[b.frameCount % colors.length],
-                        isSparkle: b.frameCount % 8 === 0
+                        isSparkle: b.frameCount % 12 === 0
                     });
                 }
 
@@ -885,7 +983,7 @@
             ctx.save();
             ctx.translate(baseX, baseY);
             ctx.scale(scale, scale);
-            ctx.globalAlpha = 0.88; // Soft harmony so orbit paths remain super clear
+            ctx.globalAlpha = 0.88;
 
             // 1. Blue Overalls & Yellow Shirt Peek (Bottom torso)
             ctx.fillStyle = '#ffe375';
@@ -1263,48 +1361,63 @@
 
         /**
          * Draws a spinning 5-petal kawaii flower projectile at (b.x, b.y)
-         * with a soft white aura, strawberry-blush petals, and sunny yellow center.
+         * with a soft white aura, mint leaf accent, colorful petals, and sunny center.
          */
         function drawFlowerProjectile(b) {
+            const s = b.style || THROWN_FLOWER_STYLES[0];
+
             ctx.save();
             ctx.translate(b.x, b.y);
-            ctx.rotate(b.rotation);
-
-            const petalCount = 5;
-            const petalDist = 6.2;
-            const petalRadiusX = 5.4;
-            const petalRadiusY = 4.3;
 
             // Soft white halo behind flower so it stays crisp over clouds and characters
             ctx.beginPath();
-            ctx.arc(0, 0, 13.5, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+            ctx.arc(0, 0, 14.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
             ctx.fill();
 
-            // 5 rounded strawberry-pink kawaii petals
+            // Cute mint-green leaf tucked behind the flower
+            ctx.save();
+            ctx.rotate(b.rotation * 0.45 + 0.65);
+            ctx.beginPath();
+            ctx.ellipse(11.5, 0, 5.2, 2.7, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#51cf66';
+            ctx.fill();
+            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = '#2b8a3e';
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.rotate(b.rotation);
+
+            const petalCount = 5;
+            const petalDist = 6.5;
+            const petalRadiusX = 5.7;
+            const petalRadiusY = 4.5;
+
+            // 5 rounded kawaii flower petals
             for (let i = 0; i < petalCount; i++) {
                 const angle = (i * Math.PI * 2) / petalCount;
                 ctx.save();
                 ctx.rotate(angle);
 
                 const petalGrad = ctx.createRadialGradient(2, 0, 1, petalDist, 0, petalRadiusX + 1);
-                petalGrad.addColorStop(0, '#ff477e');
-                petalGrad.addColorStop(0.65, '#ff85b2');
-                petalGrad.addColorStop(1, '#ffe3ee');
+                petalGrad.addColorStop(0, s.petalInner);
+                petalGrad.addColorStop(0.65, s.petalMid);
+                petalGrad.addColorStop(1, s.petalOuter);
 
                 ctx.beginPath();
                 ctx.ellipse(petalDist, 0, petalRadiusX, petalRadiusY, 0, 0, Math.PI * 2);
                 ctx.fillStyle = petalGrad;
                 ctx.fill();
                 ctx.lineWidth = 1.4;
-                ctx.strokeStyle = '#591936';
+                ctx.strokeStyle = s.stroke;
                 ctx.stroke();
 
                 // Tiny inner petal crease detail
                 ctx.beginPath();
                 ctx.moveTo(petalDist - 2.2, 0);
                 ctx.lineTo(petalDist + 1.5, 0);
-                ctx.strokeStyle = 'rgba(137, 24, 69, 0.45)';
+                ctx.strokeStyle = s.crease;
                 ctx.lineWidth = 1;
                 ctx.lineCap = 'round';
                 ctx.stroke();
@@ -1312,23 +1425,23 @@
                 ctx.restore();
             }
 
-            // Sunny yellow flower pistil center
-            const centerGrad = ctx.createRadialGradient(-1, -1, 0.5, 0, 0, 4.3);
-            centerGrad.addColorStop(0, '#fff3bf');
-            centerGrad.addColorStop(0.55, '#ffd43b');
-            centerGrad.addColorStop(1, '#f59f00');
+            // Flower pistil center
+            const centerGrad = ctx.createRadialGradient(-1, -1, 0.5, 0, 0, 4.4);
+            centerGrad.addColorStop(0, s.centerInner);
+            centerGrad.addColorStop(0.55, s.centerMid);
+            centerGrad.addColorStop(1, s.centerOuter);
 
             ctx.beginPath();
-            ctx.arc(0, 0, 4.2, 0, Math.PI * 2);
+            ctx.arc(0, 0, 4.3, 0, Math.PI * 2);
             ctx.fillStyle = centerGrad;
             ctx.fill();
             ctx.lineWidth = 1.4;
-            ctx.strokeStyle = '#591936';
+            ctx.strokeStyle = s.stroke;
             ctx.stroke();
 
             // Glossy catchlight dot on center
             ctx.beginPath();
-            ctx.arc(-1.2, -1.2, 1.1, 0, Math.PI * 2);
+            ctx.arc(-1.2, -1.2, 1.15, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
 
@@ -1465,7 +1578,7 @@
             // 7. Launch & Collection Bursts, Shooting Mini-Petals & Popups
             drawPetalEffects();
 
-            // 8. Flower Projectile & High-Contrast Magenta-Pink Orbit Trail
+            // 8. All Thrown Flower Projectiles & Their Orbit Trails
             for (const b of balls) {
                 if (b.trail.length > 1) {
                     ctx.save();
@@ -1482,13 +1595,13 @@
                     ctx.lineWidth = 4.2;
                     ctx.stroke();
 
-                    // Rich magenta-pink core orbit trail (#e63973)
+                    // Matching flower-colored orbit trail
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = '#e63973';
+                    ctx.strokeStyle = b.style ? b.style.trailColor : '#e63973';
                     ctx.lineWidth = 2.2;
                     ctx.stroke();
 
