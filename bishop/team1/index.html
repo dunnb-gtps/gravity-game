@@ -115,7 +115,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere in the winter sky to launch a Christmas elf into orbit.
+        Click anywhere in the winter sky to launch more Christmas elves into orbit.
     </div>
 
     <script>
@@ -128,12 +128,16 @@
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const MAX_ORBITING_ELVES = 45;    // Cap active orbiting elves for smooth performance
 
         // FESTIVE PALETTE FOR ELVES & FAIRY LIGHTS
         const ELF_THEMES = [
             { main: '#2ec4b6', hat: '#2d6a4f', tunic: '#2d6a4f', trim: '#e63946', boots: '#c1121f', trail: 'rgba(46, 196, 182, 0.7)' },  // Classic Evergreen Elf
             { main: '#e63946', hat: '#c1121f', tunic: '#c1121f', trim: '#ffd166', boots: '#2d6a4f', trail: 'rgba(230, 57, 70, 0.7)' },   // Holly Red Elf
-            { main: '#ffd166', hat: '#1b9aaa', tunic: '#2d6a4f', trim: '#ffd166', boots: '#e63946', trail: 'rgba(255, 209, 102, 0.75)' } // North Pole Frosted Elf
+            { main: '#ffd166', hat: '#1b9aaa', tunic: '#2d6a4f', trim: '#ffd166', boots: '#e63946', trail: 'rgba(255, 209, 102, 0.75)' }, // North Pole Frosted Elf
+            { main: '#52b788', hat: '#e63946', tunic: '#40916c', trim: '#ffffff', boots: '#9e1b24', trail: 'rgba(82, 183, 136, 0.7)' },  // Candy Cane Mint Elf
+            { main: '#c77dff', hat: '#7b2cbf', tunic: '#9d4edd', trim: '#ffd166', boots: '#2d6a4f', trail: 'rgba(199, 125, 255, 0.7)' }, // Sugarplum Elf
+            { main: '#5ac8fa', hat: '#0077b6', tunic: '#0096c7', trim: '#e63946', boots: '#c1121f', trail: 'rgba(90, 200, 250, 0.7)' }   // Frost Blue Elf
         ];
         const FAIRY_LIGHT_COLORS = ['#ff3b30', '#ffd166', '#34c759', '#5ac8fa', '#ffffff'];
         const TREE_LIGHT_COLORS = ['#ff3b30', '#ffd166', '#34c759', '#5ac8fa', '#ff9f1c'];
@@ -151,6 +155,16 @@
             { rx: 0.79, height: 40, seed: 8 },
             { rx: 0.88, height: 56, seed: 9 },
             { rx: 0.95, height: 42, seed: 10 }
+        ];
+
+        // Cheerful elves standing on the snowy ground near the Christmas trees
+        const GROUND_ELVES = [
+            { rx: 0.08, themeIndex: 0, phase: 0.2, holdingGift: true },
+            { rx: 0.23, themeIndex: 1, phase: 1.4, holdingGift: false },
+            { rx: 0.33, themeIndex: 2, phase: 2.6, holdingGift: true },
+            { rx: 0.54, themeIndex: 3, phase: 0.9, holdingGift: false },
+            { rx: 0.74, themeIndex: 4, phase: 2.1, holdingGift: true },
+            { rx: 0.91, themeIndex: 5, phase: 3.3, holdingGift: false }
         ];
 
         // STATE VARIABLES
@@ -236,6 +250,46 @@
             ];
         }
 
+        function spawnInitialElves() {
+            elves = [];
+            const maxRadius = Math.max(120, Math.min(canvas.width, canvas.height) * 0.36);
+            const orbitPresets = [
+                { rRatio: 0.38, angle: 0.0, dir: 1, ecc: 1.0 },
+                { rRatio: 0.54, angle: 2.1, dir: -1, ecc: 1.02 },
+                { rRatio: 0.70, angle: 4.2, dir: 1, ecc: 0.98 },
+                { rRatio: 0.86, angle: 1.1, dir: 1, ecc: 1.01 },
+                { rRatio: 1.00, angle: 3.5, dir: -1, ecc: 0.97 }
+            ];
+
+            for (let i = 0; i < orbitPresets.length; i++) {
+                const preset = orbitPresets[i];
+                const r = Math.max(55, maxRadius * preset.rRatio);
+                const x = centralNode.x + Math.cos(preset.angle) * r;
+                const y = centralNode.y + Math.sin(preset.angle) * r;
+
+                // Circular orbital speed adjusted for gravity softening factor
+                const accel = GRAVITY_CONSTANT / (r * r + SOFTENING_FACTOR);
+                const speed = Math.sqrt(r * accel) * preset.ecc;
+
+                const vx = -Math.sin(preset.angle) * speed * preset.dir;
+                const vy = Math.cos(preset.angle) * speed * preset.dir;
+
+                const theme = ELF_THEMES[launchCount % ELF_THEMES.length];
+                launchCount++;
+
+                elves.push({
+                    x: x,
+                    y: y,
+                    vx: vx,
+                    vy: vy,
+                    radius: 6,
+                    theme: theme,
+                    phaseOffset: i * 1.3,
+                    trail: []
+                });
+            }
+        }
+
         function createHolidayFlyer(type, randomX = false) {
             const goingRight = type === 'sleigh' ? true : Math.random() > 0.35;
             const dir = goingRight ? 1 : -1;
@@ -286,6 +340,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
         initBackground();
+        spawnInitialElves();
 
         // Canvas Click Handler: Launch festive Christmas elf at click position
         canvas.addEventListener('click', (e) => {
@@ -322,23 +377,27 @@
             const theme = ELF_THEMES[launchCount % ELF_THEMES.length];
             launchCount++;
 
-            spawnSparkles(x, y, theme.main, 10);
+            spawnSparkles(x, y, theme.main, 12);
 
-            // Overwrite existing array to strictly maintain a single elf on screen
-            elves = [{
+            if (elves.length >= MAX_ORBITING_ELVES) {
+                elves.shift();
+            }
+
+            elves.push({
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
                 radius: 6,
                 theme: theme,
+                phaseOffset: Math.random() * Math.PI * 2,
                 trail: [] // Stores history of past {x, y} coordinates
-            }];
+            });
         }
 
         function resetSimulation() {
-            elves = [];
             sparkles = [];
+            spawnInitialElves();
         }
 
         function updateBackground() {
@@ -643,6 +702,26 @@
             ctx.restore();
         }
 
+        function drawGroundElves(w, h) {
+            for (const gElf of GROUND_ELVES) {
+                const ex = gElf.rx * w;
+                const hop = Math.abs(Math.sin(frameCount * 0.06 + gElf.phase)) * 2.2;
+                const ey = getGroundY(gElf.rx, h) - 8 - hop;
+                const theme = ELF_THEMES[gElf.themeIndex % ELF_THEMES.length];
+
+                drawChristmasElf({
+                    x: ex,
+                    y: ey,
+                    vx: 0,
+                    vy: 0,
+                    theme: theme,
+                    phaseOffset: gElf.phase,
+                    isGrounded: true,
+                    holdingGift: gElf.holdingGift
+                });
+            }
+        }
+
         function drawWinterHorizon() {
             const w = canvas.width;
             const h = canvas.height;
@@ -684,6 +763,9 @@
                 const groundY = getGroundY(tree.rx, h);
                 drawChristmasTreeWithLights(tx, groundY, tree.height, tree.seed);
             }
+
+            // Draw cheerful elves standing by the trees on the snow
+            drawGroundElves(w, h);
 
             ctx.restore();
         }
@@ -1026,15 +1108,20 @@
         }
 
         function drawChristmasElf(elf) {
-            const tilt = Math.max(-0.35, Math.min(0.35, elf.vx * 0.05));
-            const kick = Math.sin(frameCount * 0.25) * 1.4;
-            const tipSway = Math.sin(frameCount * 0.15) * 1.5;
+            const phase = elf.phaseOffset || 0;
+            const isGrounded = Boolean(elf.isGrounded);
+            const tilt = isGrounded ? 0 : Math.max(-0.35, Math.min(0.35, elf.vx * 0.05));
+            const kick = isGrounded ? 0 : Math.sin(frameCount * 0.25 + phase) * 1.4;
+            const tipSway = Math.sin(frameCount * 0.15 + phase) * 1.5;
 
             ctx.save();
             ctx.translate(elf.x, elf.y);
+            if (isGrounded) {
+                ctx.scale(0.88, 0.88);
+            }
             ctx.rotate(tilt);
 
-            // Soft festive aura around the flying elf
+            // Soft festive aura around the elf
             const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 14);
             glow.addColorStop(0, 'rgba(255, 243, 176, 0.28)');
             glow.addColorStop(1, 'rgba(255, 243, 176, 0)');
@@ -1079,6 +1166,30 @@
             ctx.strokeStyle = '#ffd166';
             ctx.lineWidth = 0.7;
             ctx.stroke();
+
+            // Waving arm for grounded elves
+            if (isGrounded) {
+                const wave = Math.sin(frameCount * 0.14 + phase) * 2.2;
+                ctx.strokeStyle = elf.theme.tunic;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(3.8, 1.8);
+                ctx.lineTo(7.4, -1.5 + wave);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffcdb2';
+                ctx.beginPath();
+                ctx.arc(7.6, -1.7 + wave, 1.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (elf.holdingGift) {
+                    ctx.fillStyle = '#e63946';
+                    ctx.fillRect(-8.8, 1.5, 5.2, 5.2);
+                    ctx.fillStyle = '#ffd166';
+                    ctx.fillRect(-6.6, 1.5, 1.0, 5.2);
+                    ctx.fillRect(-8.8, 3.6, 5.2, 1.0);
+                }
+            }
 
             // Jagged festive collar
             ctx.fillStyle = elf.theme.trim;
@@ -1183,7 +1294,7 @@
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 0. Draw Festive Background Layer (Stars, Snow, Horizon & Lit Trees, Landmarks, Flyers)
+            // 0. Draw Festive Background Layer (Stars, Snow, Horizon, Trees & Elves, Landmarks, Flyers)
             drawStarsAndSnow();
             drawWinterHorizon();
             drawFestiveObjects();
@@ -1192,7 +1303,7 @@
             // 1. Draw Central Gravity Ornament Node
             drawCentralOrnament();
 
-            // 2. Draw Launched Christmas Elf & Glowing Fairy-Light Trail
+            // 2. Draw All Orbiting Christmas Elves & Glowing Fairy-Light Trails
             for (const elf of elves) {
                 // Draw smooth golden-tinted ribbon trail
                 if (elf.trail.length > 1) {
