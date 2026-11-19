@@ -663,7 +663,7 @@
                     p2: { x: w * 0.24, y: h * 0.20 },
                     baseThickness: 15 * scale
                 },
-                // Upper-right bough (hosts perched toucan & swinging/peeking monkey)
+                // Upper-right bough (hosts perched toucan & swinging monkey)
                 {
                     p0: { x: w + 12, y: h * 0.17 },
                     p1: { x: w * 0.88, y: h * 0.14 },
@@ -775,15 +775,17 @@
                 };
             }
 
-            // 3. Curious Jungle Monkey on the upper-right bough
+            // 3. Playful Jungle Monkey swinging on a vine from the upper-right bough
             if (canopyBranches.length >= 2) {
                 const monkeyAnchor = evalQuadBezier(canopyBranches[1].p0, canopyBranches[1].p1, canopyBranches[1].p2, 0.74);
                 jungleMonkey = {
-                    x: monkeyAnchor.x,
-                    y: monkeyAnchor.y - 2 * scale,
-                    scale: scale * 0.92,
+                    anchorX: monkeyAnchor.x,
+                    anchorY: monkeyAnchor.y + 2 * scale,
+                    vineLength: 42 * scale,
+                    scale: scale * 1.32,
                     phase: rand() * Math.PI * 2,
-                    blinkTimer: 110
+                    blinkTimer: 110,
+                    headAngle: 0
                 };
             }
 
@@ -1038,73 +1040,274 @@
             if (!jungleMonkey) return;
             const m = jungleMonkey;
             const s = m.scale;
-            const bounce = Math.sin(frameTick * 0.05 + m.phase) * 1.1;
-            const tailWave = Math.sin(frameTick * 0.04 + m.phase) * 0.25;
+
+            // Gentle pendulum swing on hanging jungle vine
+            const swingAngle = Math.sin(frameTick * 0.028 + m.phase) * 0.16;
+            const gripX = m.anchorX - Math.sin(swingAngle) * m.vineLength;
+            const gripY = m.anchorY + Math.cos(swingAngle) * m.vineLength;
+            const tailWave = Math.sin(frameTick * 0.045 + m.phase) * 0.28;
+            const armWave = Math.sin(frameTick * 0.055 + m.phase * 1.4) * 0.18;
 
             if (m.blinkTimer > 0) {
                 m.blinkTimer--;
             } else if (m.blinkTimer <= -7) {
-                m.blinkTimer = 130 + ((frameTick * 19) % 150);
+                m.blinkTimer = 135 + ((frameTick * 19) % 140);
             } else {
                 m.blinkTimer--;
             }
 
-            ctx.save();
-            ctx.translate(m.x, m.y + bounce * 0.4);
-            ctx.scale(s, s);
+            // Track active ball or snake subtly with head tilt
+            const focusTarget = balls.length > 0 ? balls[0] : snake;
+            const rawLook = Math.atan2(focusTarget.y - (gripY + 12 * s), focusTarget.x - gripX);
+            const desiredTilt = Math.max(-0.22, Math.min(0.22, normalizeAngle(rawLook - Math.PI) * 0.25));
+            m.headAngle = lerp(m.headAngle, desiredTilt, 0.06);
 
-            // Long curled prehensile tail swaying gracefully
-            ctx.strokeStyle = '#041a0e';
-            ctx.lineWidth = 2.6;
+            // 1. Draw the hanging vine from canopy branch down through the monkey's grip
+            ctx.save();
+            ctx.strokeStyle = '#0e4225';
+            ctx.lineWidth = 2.6 * (s / 1.32);
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(6, -5);
-            ctx.bezierCurveTo(
-                18, -12 + tailWave * 12,
-                22, -26 + tailWave * 8,
-                14, -30 + tailWave * 10
+            ctx.moveTo(m.anchorX, m.anchorY);
+            ctx.quadraticCurveTo(
+                (m.anchorX + gripX) * 0.5 + swingAngle * 14,
+                (m.anchorY + gripY) * 0.5,
+                gripX,
+                gripY
+            );
+            // Trailing vine tail below hand
+            ctx.quadraticCurveTo(
+                gripX - swingAngle * 10,
+                gripY + 14 * s,
+                gripX - swingAngle * 18,
+                gripY + 26 * s
             );
             ctx.stroke();
 
-            // Crouched torso silhouette
-            ctx.fillStyle = '#041a0e';
-            ctx.strokeStyle = '#0d3920';
+            // Small vine leaf near top anchor
+            ctx.fillStyle = '#12522f';
+            ctx.beginPath();
+            ctx.ellipse(m.anchorX + 4 * s, m.anchorY + 11 * s, 5 * s, 2.2 * s, 0.55, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 2. Draw Monkey Body & Face anchored at the gripping hand (gripX, gripY)
+            const furMain = '#633d22';
+            const furDark = '#472a16';
+            const furHighlight = '#7c4f2e';
+            const skinTan = '#d4a674';
+            const skinShadow = '#b88754';
+            const outlineColor = '#180d06';
+
+            ctx.save();
+            ctx.translate(gripX, gripY);
+            ctx.rotate(swingAngle * 0.85);
+            ctx.scale(s, s);
+
+            // Long curled prehensile tail curving behind the monkey
+            ctx.save();
+            ctx.strokeStyle = furDark;
+            ctx.lineWidth = 3.2;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(6, 26);
+            ctx.bezierCurveTo(
+                18, 28 + tailWave * 8,
+                25, 16 + tailWave * 10,
+                21, 5 + tailWave * 6
+            );
+            ctx.bezierCurveTo(
+                18, -2 + tailWave * 5,
+                11, 0 + tailWave * 4,
+                13, 6 + tailWave * 4
+            );
+            ctx.stroke();
+            ctx.restore();
+
+            // Back leg (bent slightly behind torso)
+            ctx.strokeStyle = furDark;
+            ctx.lineWidth = 4.2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(4, 27);
+            ctx.lineTo(10, 34);
+            ctx.lineTo(6, 41);
+            ctx.stroke();
+
+            // Back foot
+            ctx.fillStyle = skinShadow;
+            ctx.beginPath();
+            ctx.ellipse(4.5, 41.5, 3.2, 1.8, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Torso
+            ctx.fillStyle = furMain;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.ellipse(0, 21, 8.2, 10.5, -0.12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Warm tan belly patch
+            ctx.fillStyle = skinTan;
+            ctx.beginPath();
+            ctx.ellipse(-2.2, 21.5, 4.8, 7.2, -0.12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Front leg (bent forward playfully)
+            ctx.strokeStyle = furMain;
+            ctx.lineWidth = 4.4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-2, 28);
+            ctx.lineTo(-9, 34);
+            ctx.lineTo(-5, 41);
+            ctx.stroke();
+
+            // Front foot
+            ctx.fillStyle = skinTan;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.ellipse(-6.5, 41.5, 3.4, 1.9, 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Raised right arm reaching up to hold the vine
+            ctx.strokeStyle = furMain;
+            ctx.lineWidth = 4.0;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(2, 14);
+            ctx.quadraticCurveTo(4, 7, 0, 0);
+            ctx.stroke();
+
+            // Gripping hand wrapped around the vine at (0, 0)
+            ctx.fillStyle = skinTan;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.arc(0, 0, 2.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Left balance arm reaching outward toward the left
+            ctx.save();
+            ctx.translate(-5, 16);
+            ctx.rotate(armWave);
+            ctx.strokeStyle = furHighlight;
+            ctx.lineWidth = 3.8;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(-7, -2, -13, -7);
+            ctx.stroke();
+
+            // Open monkey hand
+            ctx.fillStyle = skinTan;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.arc(-13.5, -7.5, 2.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            // Monkey Head & Expressive Face
+            ctx.save();
+            ctx.translate(-2.5, 10.5);
+            ctx.rotate(m.headAngle);
+
+            // Far ear (left)
+            ctx.fillStyle = furDark;
+            ctx.strokeStyle = outlineColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.ellipse(0, -9, 7.5, 9.5, 0.22, 0, Math.PI * 2);
+            ctx.arc(-7.8, -0.5, 3.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = skinShadow;
+            ctx.beginPath();
+            ctx.arc(-7.8, -0.5, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Near ear (right)
+            ctx.fillStyle = furMain;
+            ctx.beginPath();
+            ctx.arc(6.8, -0.2, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = skinTan;
+            ctx.beginPath();
+            ctx.arc(6.8, -0.2, 2.0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Main rounded head
+            ctx.fillStyle = furMain;
+            ctx.beginPath();
+            ctx.arc(0, 0, 7.6, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
 
-            // Forearm resting on knee/branch
-            ctx.strokeStyle = '#041a0e';
-            ctx.lineWidth = 3;
+            // Playful hair tuft on crown
+            ctx.strokeStyle = furHighlight;
+            ctx.lineWidth = 1.6;
             ctx.beginPath();
-            ctx.moveTo(-4, -12);
-            ctx.quadraticCurveTo(-9, -6, -6, 0);
+            ctx.moveTo(-1, -7.2);
+            ctx.quadraticCurveTo(-2.5, -10.5, -4.5, -9.8);
+            ctx.moveTo(0.5, -7.3);
+            ctx.quadraticCurveTo(1.5, -10.6, 3.2, -9.5);
             ctx.stroke();
 
-            // Head & round monkey ear facing inward (left)
-            const headLook = Math.sin(frameTick * 0.025 + m.phase) * 0.15;
-            ctx.save();
-            ctx.translate(-3, -19);
-            ctx.rotate(headLook);
-
-            ctx.fillStyle = '#041a0e';
+            // Heart-shaped tan eye mask
+            ctx.fillStyle = skinTan;
             ctx.beginPath();
-            ctx.arc(0, 0, 5.8, 0, Math.PI * 2);
+            ctx.arc(-3.1, -1.2, 3.1, 0, Math.PI * 2);
+            ctx.arc(1.2, -1.2, 3.1, 0, Math.PI * 2);
             ctx.fill();
 
-            // Round ear
+            // Rounded lower muzzle & cheeks
             ctx.beginPath();
-            ctx.arc(3.8, -0.5, 2.5, 0, Math.PI * 2);
+            ctx.ellipse(-1.0, 2.4, 5.2, 3.8, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Subtle blinking eyes peeking toward the arena
+            // Subtle smile line & tiny nostrils
+            ctx.strokeStyle = '#5e391e';
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.arc(-1.2, 2.6, 2.6, 0.25, Math.PI - 0.35);
+            ctx.stroke();
+
+            ctx.fillStyle = '#472a16';
+            ctx.beginPath();
+            ctx.arc(-2.3, 1.3, 0.65, 0, Math.PI * 2);
+            ctx.arc(-0.4, 1.3, 0.65, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes (with crisp white catchlight or closed blink arc)
             if (m.blinkTimer > 0) {
-                ctx.fillStyle = 'rgba(170, 225, 180, 0.40)';
-                ctx.beginPath();
-                ctx.arc(-2.6, -0.8, 1.1, 0, Math.PI * 2);
-                ctx.fill();
+                for (const ex of [-3.3, 0.9]) {
+                    ctx.fillStyle = '#140a04';
+                    ctx.beginPath();
+                    ctx.arc(ex, -1.3, 1.35, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(ex - 0.4, -1.7, 0.48, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else {
+                ctx.strokeStyle = '#140a04';
+                ctx.lineWidth = 1.1;
+                for (const ex of [-3.3, 0.9]) {
+                    ctx.beginPath();
+                    ctx.arc(ex, -1.4, 1.2, 0.15, Math.PI - 0.15);
+                    ctx.stroke();
+                }
             }
 
             ctx.restore();
