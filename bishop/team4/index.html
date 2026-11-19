@@ -175,7 +175,7 @@
     </div>
 
     <div class="instructions">
-        <span>TICKET BOOTH OPEN:</span> Click anywhere in the twilight sky to dispatch a rollercoaster train onto the tracks.
+        <span>TICKET BOOTH OPEN:</span> Left-click anywhere in the twilight sky to dispatch a rollercoaster train, or right-click to launch fireworks.
     </div>
 
     <script>
@@ -203,10 +203,23 @@
             { spine: '#10b981', tie: '#065f46', car: '#059669', stripe: '#d1fae5' }  // Viper Green
         ];
 
+        // FIREWORK COLOR PALETTES
+        const FIREWORK_PALETTES = [
+            ['#fde047', '#f59e0b', '#fef9c3'], // Carnival Gold
+            ['#ef4444', '#fb7185', '#fef08a'], // Crimson & Starlight
+            ['#22d3ee', '#38bdf8', '#e0f2fe'], // Electric Cyan
+            ['#e879f9', '#c084fc', '#fae8ff'], // Neon Magenta
+            ['#34d399', '#a3e635', '#ecfccb'], // Emerald Burst
+            ['#fb923c', '#f43f5e', '#38bdf8']  // Grand Finale Multi
+        ];
+
         // STATE VARIABLES
         let balls = [];
         let sparks = [];
         let collisionRings = [];
+        let fireworkRockets = [];
+        let fireworkParticles = [];
+        let fireworkFlashes = [];
         let stars = [];
         let themeIndex = 0;
         let wheelAngle = 0;
@@ -246,13 +259,23 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Dispatch coaster train at click position
+        // Canvas Left-Click Handler: Dispatch coaster train at click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
             launchBall(clickX, clickY);
+        });
+
+        // Canvas Right-Click Handler: Spawn fireworks at cursor position
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            launchFirework(clickX, clickY);
         });
 
         function updateCounter() {
@@ -287,6 +310,101 @@
             updateCounter();
         }
 
+        function launchFirework(targetX, targetY) {
+            const clampedX = Math.max(20, Math.min(canvas.width - 20, targetX));
+            const clampedY = Math.max(20, Math.min(canvas.height - 20, targetY));
+            const palette = FIREWORK_PALETTES[Math.floor(Math.random() * FIREWORK_PALETTES.length)];
+            const groundY = canvas.height - 16;
+
+            // If clicked right near the ground, detonate immediately
+            if (clampedY >= groundY - 35) {
+                detonateFirework(clampedX, clampedY, palette);
+                return;
+            }
+
+            const startX = Math.max(20, Math.min(canvas.width - 20, clampedX + (Math.random() - 0.5) * 36));
+            const flightFrames = 22;
+
+            fireworkRockets.push({
+                x: startX,
+                y: groundY,
+                vx: (clampedX - startX) / flightFrames,
+                vy: (clampedY - groundY) / flightFrames,
+                targetX: clampedX,
+                targetY: clampedY,
+                framesLeft: flightFrames,
+                palette: palette,
+                trail: [{ x: startX, y: groundY }]
+            });
+        }
+
+        function detonateFirework(x, y, palette) {
+            const burstType = Math.floor(Math.random() * 3); // 0: Peony, 1: Dual-Ring, 2: Willow Crackle
+            const particleCount = burstType === 1 ? 64 : 52;
+
+            fireworkFlashes.push({
+                x,
+                y,
+                radius: 55,
+                color: palette[0],
+                life: 1.0
+            });
+
+            for (let i = 0; i < particleCount; i++) {
+                let angle, speed, color, drag, gravity, decay, twinkle, size;
+
+                if (burstType === 1) {
+                    // Dual-ring burst: inner core + outer ring
+                    const isInner = i < 24;
+                    const ringCount = isInner ? 24 : (particleCount - 24);
+                    const ringIdx = isInner ? i : (i - 24);
+                    angle = (ringIdx / ringCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.12;
+                    speed = isInner ? (1.8 + Math.random() * 0.6) : (3.6 + Math.random() * 0.9);
+                    color = isInner ? palette[0] : palette[1];
+                    drag = 0.955;
+                    gravity = 0.042;
+                    decay = 0.017 + Math.random() * 0.008;
+                    twinkle = !isInner && Math.random() < 0.35;
+                    size = isInner ? 2.1 : 2.3;
+                } else if (burstType === 2) {
+                    // Willow crackle with long drooping trails
+                    angle = Math.random() * Math.PI * 2;
+                    speed = 1.4 + Math.random() * 3.4;
+                    color = palette[i % palette.length];
+                    drag = 0.945;
+                    gravity = 0.055;
+                    decay = 0.013 + Math.random() * 0.007;
+                    twinkle = true;
+                    size = 2.0;
+                } else {
+                    // Classic symmetrical peony burst
+                    angle = (i / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.18;
+                    speed = 2.2 + Math.random() * 2.5;
+                    color = palette[i % palette.length];
+                    drag = 0.955;
+                    gravity = 0.045;
+                    decay = 0.016 + Math.random() * 0.008;
+                    twinkle = Math.random() < 0.25;
+                    size = 2.2;
+                }
+
+                fireworkParticles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color,
+                    drag,
+                    gravity,
+                    life: 1.0,
+                    decay,
+                    twinkle,
+                    size,
+                    history: [{ x, y }]
+                });
+            }
+        }
+
         function spawnSparks(x, y, color, count) {
             for (let i = 0; i < count; i++) {
                 const angle = Math.random() * Math.PI * 2;
@@ -315,6 +433,9 @@
             balls = [];
             sparks = [];
             collisionRings = [];
+            fireworkRockets = [];
+            fireworkParticles = [];
+            fireworkFlashes = [];
             updateCounter();
         }
 
@@ -432,8 +553,72 @@
             }
         }
 
+        function updateFireworks() {
+            // Update rising firework rockets
+            for (let i = fireworkRockets.length - 1; i >= 0; i--) {
+                const rocket = fireworkRockets[i];
+                rocket.x += rocket.vx;
+                rocket.y += rocket.vy;
+                rocket.framesLeft--;
+
+                rocket.trail.push({ x: rocket.x, y: rocket.y });
+                if (rocket.trail.length > 8) {
+                    rocket.trail.shift();
+                }
+
+                // Emit subtle golden ascent embers
+                if (Math.random() < 0.65) {
+                    sparks.push({
+                        x: rocket.x + (Math.random() - 0.5) * 2,
+                        y: rocket.y + (Math.random() - 0.5) * 2,
+                        vx: (Math.random() - 0.5) * 0.8,
+                        vy: Math.random() * 1.2 + 0.3,
+                        life: 0.55,
+                        color: '#fde68a'
+                    });
+                }
+
+                if (rocket.framesLeft <= 0) {
+                    detonateFirework(rocket.targetX, rocket.targetY, rocket.palette);
+                    fireworkRockets.splice(i, 1);
+                }
+            }
+
+            // Update firework detonation flashes
+            for (let i = fireworkFlashes.length - 1; i >= 0; i--) {
+                const f = fireworkFlashes[i];
+                f.radius += 2.2;
+                f.life -= 0.075;
+                if (f.life <= 0) {
+                    fireworkFlashes.splice(i, 1);
+                }
+            }
+
+            // Update firework burst particles
+            for (let i = fireworkParticles.length - 1; i >= 0; i--) {
+                const p = fireworkParticles[i];
+                p.vx *= p.drag;
+                p.vy = p.vy * p.drag + p.gravity;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= p.decay;
+
+                p.history.push({ x: p.x, y: p.y });
+                if (p.history.length > 5) {
+                    p.history.shift();
+                }
+
+                if (p.life <= 0) {
+                    fireworkParticles.splice(i, 1);
+                }
+            }
+        }
+
         function updatePhysics() {
             wheelAngle += 0.012;
+
+            // Update fireworks
+            updateFireworks();
 
             // Update celebratory & collision sparks
             for (let i = sparks.length - 1; i >= 0; i--) {
@@ -588,6 +773,68 @@
                 ctx.arc(x, groundY - 2, 1.8, 0, Math.PI * 2);
                 ctx.fill();
             }
+        }
+
+        function drawFireworks() {
+            // Sky illumination flashes on burst
+            for (const f of fireworkFlashes) {
+                const grad = ctx.createRadialGradient(f.x, f.y, 2, f.x, f.y, f.radius);
+                grad.addColorStop(0, f.color);
+                grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.globalAlpha = Math.max(0, f.life * 0.32);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Rising firework rockets
+            for (const rocket of fireworkRockets) {
+                if (rocket.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(rocket.trail[0].x, rocket.trail[0].y);
+                    for (let i = 1; i < rocket.trail.length; i++) {
+                        ctx.lineTo(rocket.trail[i].x, rocket.trail[i].y);
+                    }
+                    ctx.strokeStyle = '#fde68a';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.85;
+                    ctx.stroke();
+                }
+
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(rocket.x, rocket.y, 2.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Exploding firework burst particles & glowing tails
+            for (const p of fireworkParticles) {
+                const twinkleFactor = p.twinkle ? (0.45 + 0.55 * Math.abs(Math.sin(p.life * 26))) : 1;
+                const alpha = Math.max(0, p.life * twinkleFactor);
+
+                if (p.history.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.history[0].x, p.history[0].y);
+                    for (let i = 1; i < p.history.length; i++) {
+                        ctx.lineTo(p.history[i].x, p.history[i].y);
+                    }
+                    ctx.strokeStyle = p.color;
+                    ctx.lineWidth = p.size * 0.85;
+                    ctx.lineCap = 'round';
+                    ctx.globalAlpha = alpha * 0.65;
+                    ctx.stroke();
+                }
+
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.globalAlpha = 1;
         }
 
         function drawCentralFerrisHub() {
@@ -807,10 +1054,13 @@
             // 1. Twilight amusement park background
             drawParkBackground();
 
-            // 2. Central Ferris wheel station
+            // 2. Fireworks in the night sky
+            drawFireworks();
+
+            // 3. Central Ferris wheel station
             drawCentralFerrisHub();
 
-            // 3. Coaster tracks & multi-car trains
+            // 4. Coaster tracks & multi-car trains
             for (const b of balls) {
                 drawCoasterTrack(b);
             }
@@ -818,7 +1068,7 @@
                 drawCoasterTrain(b);
             }
 
-            // 4. Launch, collision & station arrival sparks
+            // 5. Launch, collision & station arrival sparks
             drawSparks();
         }
 
