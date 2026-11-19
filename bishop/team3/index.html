@@ -104,7 +104,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas for an alien spaceship to shoot a full-body alien into orbit.
+        Click anywhere on the canvas for an alien spaceship to shoot a full-body alien into orbit around the Sun.
     </div>
 
     <script>
@@ -150,11 +150,11 @@
             { light: '#9c8f96', mid: '#544950', dark: '#211b1f', glow: 'rgba(176, 142, 165, 0.12)' }  // Dusty carbonaceous
         ];
 
-        // Central Gravity Node Definition
+        // Central Sun Gravity Node Definition
         const centralNode = {
             x: 0,
             y: 0,
-            radius: 12
+            radius: 22
         };
 
         /**
@@ -540,7 +540,7 @@
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
             
-            // Recenter gravity node dynamically
+            // Recenter the Sun dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
 
@@ -747,6 +747,137 @@
                     b.trail.shift();
                 }
             }
+        }
+
+        /**
+         * Renders the central gravity node as a blazing, animated Sun with
+         * a volumetric corona, shimmering solar rays, plasma prominences,
+         * and a convective photosphere.
+         */
+        function drawSun(time) {
+            const cx = centralNode.x;
+            const cy = centralNode.y;
+            const r = centralNode.radius;
+            const pulse = 1 + Math.sin(time * 0.0025) * 0.04;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            // 1. Wide Ambient Solar Halo
+            const outerGlowRadius = r * 5.2 * pulse;
+            const outerGlow = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, outerGlowRadius);
+            outerGlow.addColorStop(0.0, 'rgba(255, 220, 100, 0.52)');
+            outerGlow.addColorStop(0.25, 'rgba(255, 160, 30, 0.26)');
+            outerGlow.addColorStop(0.58, 'rgba(255, 95, 10, 0.09)');
+            outerGlow.addColorStop(1.0, 'rgba(255, 60, 0, 0)');
+            ctx.fillStyle = outerGlow;
+            ctx.beginPath();
+            ctx.arc(0, 0, outerGlowRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Rotating Solar Corona Rays
+            const rayCount = 16;
+            for (let i = 0; i < rayCount; i++) {
+                const baseAngle = (i / rayCount) * Math.PI * 2 + time * 0.00018 * (i % 2 === 0 ? 1 : -0.7);
+                const wave = Math.sin(time * 0.003 + i * 1.7);
+                const rayLen = r * (2.1 + (i % 3) * 0.45 + wave * 0.28);
+                const halfSpread = (i % 2 === 0 ? 0.09 : 0.06);
+
+                const rayGrad = ctx.createLinearGradient(0, 0, Math.cos(baseAngle) * rayLen, Math.sin(baseAngle) * rayLen);
+                rayGrad.addColorStop(0.0, 'rgba(255, 232, 130, 0.42)');
+                rayGrad.addColorStop(0.45, 'rgba(255, 165, 35, 0.14)');
+                rayGrad.addColorStop(1.0, 'rgba(255, 110, 0, 0)');
+
+                ctx.fillStyle = rayGrad;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(baseAngle - halfSpread) * rayLen, Math.sin(baseAngle - halfSpread) * rayLen);
+                ctx.lineTo(Math.cos(baseAngle + halfSpread) * rayLen, Math.sin(baseAngle + halfSpread) * rayLen);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 3. Looping Solar Prominences / Plasma Flares around the limb
+            const flareCount = 6;
+            for (let i = 0; i < flareCount; i++) {
+                const angle = (i / flareCount) * Math.PI * 2 + time * 0.00025;
+                const flarePulse = 0.7 + 0.3 * Math.sin(time * 0.004 + i * 2.1);
+                const span = 0.24;
+                const peakR = r * (1.22 + 0.22 * flarePulse);
+
+                const a1 = angle - span;
+                const a2 = angle + span;
+                const midA = angle + Math.sin(time * 0.003 + i) * 0.06;
+
+                ctx.strokeStyle = `rgba(255, 120, 20, ${(0.55 * flarePulse).toFixed(3)})`;
+                ctx.lineWidth = 2.4;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a1) * (r * 0.96), Math.sin(a1) * (r * 0.96));
+                ctx.quadraticCurveTo(
+                    Math.cos(midA) * peakR,
+                    Math.sin(midA) * peakR,
+                    Math.cos(a2) * (r * 0.96),
+                    Math.sin(a2) * (r * 0.96)
+                );
+                ctx.stroke();
+            }
+
+            // 4. Inner Intense Corona Ring
+            const innerCorona = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r * 1.48);
+            innerCorona.addColorStop(0.0, 'rgba(255, 240, 150, 0.85)');
+            innerCorona.addColorStop(0.5, 'rgba(255, 155, 20, 0.35)');
+            innerCorona.addColorStop(1.0, 'rgba(255, 90, 0, 0)');
+            ctx.fillStyle = innerCorona;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 1.48, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 5. Solar Photosphere Core (with limb darkening)
+            const photoGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.08, 0, 0, r);
+            photoGrad.addColorStop(0.0, '#fffef0');
+            photoGrad.addColorStop(0.32, '#ffe95c');
+            photoGrad.addColorStop(0.72, '#ff9e0d');
+            photoGrad.addColorStop(0.92, '#f25c05');
+            photoGrad.addColorStop(1.0, '#c93400');
+
+            ctx.fillStyle = photoGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 6. Clipped Animated Convection Granules & Bright Active Regions
+            ctx.save();
+            ctx.clip();
+
+            const cellCount = 9;
+            for (let i = 0; i < cellCount; i++) {
+                const cellAngle = (i / cellCount) * Math.PI * 2 + time * 0.00035;
+                const cellDist = r * (0.28 + (i % 3) * 0.22);
+                const gx = Math.cos(cellAngle) * cellDist;
+                const gy = Math.sin(cellAngle) * cellDist;
+                const gr = r * (0.24 + (i % 2) * 0.1);
+                const shimmer = 0.16 + 0.1 * Math.sin(time * 0.0045 + i * 1.9);
+
+                const cellGrad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+                cellGrad.addColorStop(0.0, `rgba(255, 252, 200, ${shimmer.toFixed(3)})`);
+                cellGrad.addColorStop(1.0, 'rgba(255, 180, 40, 0)');
+                ctx.fillStyle = cellGrad;
+                ctx.beginPath();
+                ctx.arc(gx, gy, gr, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+
+            // 7. Crisp Glowing Photosphere Rim
+            ctx.strokeStyle = 'rgba(255, 236, 140, 0.85)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
         }
 
         /**
@@ -1287,17 +1418,8 @@
             // Render floating background meteors behind active simulation objects
             drawBackgroundMeteors();
 
-            // 1. Draw Central Mass Node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
-            ctx.fill();
+            // 1. Draw Central Sun
+            drawSun(timestamp);
 
             // 2. Draw Alien Spaceship (behind the launched alien so it emerges cleanly out of the barrel)
             drawAlienSpaceship(timestamp);
