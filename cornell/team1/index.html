@@ -107,7 +107,7 @@
 
     <!-- Header Section -->
     <div id="header">
-        <h1>Gravity Simulation</h1>
+        <h1 id="headerTitle">Gravity Simulation</h1>
         <div class="header-controls">
             <span id="hitCounter" class="status-counter">Hits: 0/5</span>
             <span id="ballCounter" class="status-counter">Balls: 0</span>
@@ -120,15 +120,17 @@
         <canvas id="simCanvas"></canvas>
     </div>
 
-    <div class="instructions">
+    <div id="instructionsText" class="instructions">
         Click anywhere on the canvas to launch multiple balls.
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const headerTitle = document.getElementById('headerTitle');
         const ballCounter = document.getElementById('ballCounter');
         const hitCounter = document.getElementById('hitCounter');
+        const instructionsText = document.getElementById('instructionsText');
 
         // Offscreen canvas to cache the ducks & rainbows background for smooth 60fps rendering
         const bgCanvas = document.createElement('canvas');
@@ -154,6 +156,9 @@
             '#BF00FF'  // Violet
         ];
 
+        const YELLOW_BATTLE_CRIES = ['QUACK!', 'HOLD THE POND!', 'BREAD BARRAGE!', 'FOR THE FLOCK!', 'INCOMING!'];
+        const RED_BATTLE_CRIES = ['CWASHOUT!', 'VENGEANCE!', 'NO MERCY!', 'QUACK ATTACK!', 'CHARGE!'];
+
         // STATE VARIABLES
         let balls = [];
         let rainbowIndex = 0;
@@ -169,6 +174,16 @@
         let explosionParticles = [];
         let shockwaves = [];
 
+        // Duck War state
+        let duckWarActive = false;
+        let warBannerTimer = 0;
+        let warWave = 1;
+        let yellowKOs = 0;
+        let redKOs = 0;
+        let warDucks = [];
+        let warProjectiles = [];
+        let airstrikes = [];
+
         // Central Gravity Node Definition (radius matches duck visual size)
         const centralNode = {
             x: 0,
@@ -177,11 +192,19 @@
         };
 
         function updateBallCounter() {
-            ballCounter.textContent = `Balls: ${balls.length}`;
+            if (duckWarActive) {
+                ballCounter.textContent = `Ducks: ${warDucks.length}`;
+            } else {
+                ballCounter.textContent = `Balls: ${balls.length}`;
+            }
         }
 
         function updateHitCounter() {
-            hitCounter.textContent = `Hits: ${duckHits}/${MAX_DUCK_HITS}`;
+            if (duckWarActive) {
+                hitCounter.textContent = `YEL ${yellowKOs} : ${redKOs} RED`;
+            } else {
+                hitCounter.textContent = `Hits: ${duckHits}/${MAX_DUCK_HITS}`;
+            }
         }
 
         function resizeCanvas() {
@@ -201,13 +224,17 @@
 
         window.addEventListener('resize', resizeCanvas);
 
-        // Canvas Click Handler: Launch a new ball at click position
+        // Canvas Click Handler: Launch a ball (peace mode) or call an orbital bread-bomb airstrike (Duck War mode)
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchBall(clickX, clickY);
+            if (duckWarActive) {
+                callRainbowAirstrike(clickX, clickY);
+            } else {
+                launchBall(clickX, clickY);
+            }
         });
 
         function launchBall(x, y) {
@@ -251,6 +278,19 @@
             explosionFlash = 0;
             explosionParticles = [];
             shockwaves = [];
+
+            // Reset Duck War state
+            duckWarActive = false;
+            warBannerTimer = 0;
+            warWave = 1;
+            yellowKOs = 0;
+            redKOs = 0;
+            warDucks = [];
+            warProjectiles = [];
+            airstrikes = [];
+
+            headerTitle.textContent = 'Gravity Simulation';
+            instructionsText.textContent = 'Click anywhere on the canvas to launch multiple balls.';
             updateBallCounter();
             updateHitCounter();
         }
@@ -276,29 +316,71 @@
             }
         }
 
+        function spawnExplosion(x, y, primaryColor = '#FFD700', intensity = 1) {
+            const firePalette = ['#FF0000', '#FF3B00', '#FF7F00', '#FFD700', '#FFFFFF'];
+            const count = Math.round(28 * intensity);
+
+            shockwaves.push({
+                x: x,
+                y: y,
+                radius: 6 * intensity,
+                maxRadius: 95 * intensity,
+                alpha: 0.95,
+                lineWidth: 3.5 * intensity,
+                color: primaryColor
+            });
+
+            for (let i = 0; i < count; i++) {
+                if (explosionParticles.length > 260) break;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = (1.2 + Math.random() * 5.8) * Math.sqrt(intensity);
+                const isSmoke = i >= Math.round(count * 0.78);
+                const isFeather = !isSmoke && i % 3 === 0;
+
+                explosionParticles.push({
+                    x: x + (Math.random() - 0.5) * 8,
+                    y: y + (Math.random() - 0.5) * 8,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - (isSmoke ? 0.4 : 0),
+                    size: isSmoke
+                        ? (6 + Math.random() * 8) * Math.sqrt(intensity)
+                        : (isFeather ? (4.5 + Math.random() * 3.5) : (2 + Math.random() * 3.5)),
+                    color: isSmoke
+                        ? 'rgba(55, 65, 81, 0.8)'
+                        : (isFeather ? primaryColor : firePalette[Math.floor(Math.random() * firePalette.length)]),
+                    alpha: 1,
+                    decay: isSmoke ? (0.016 + Math.random() * 0.012) : (0.02 + Math.random() * 0.02),
+                    drag: isSmoke ? 0.95 : 0.96,
+                    gravity: isFeather ? 0.07 : (isSmoke ? -0.03 : 0.04),
+                    rotation: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 0.25,
+                    isFeather: isFeather
+                });
+            }
+        }
+
         function triggerDuckExplosion() {
             duckExploded = true;
             speechText = '';
             speechTimer = 0;
-            screenShakeTimer = 30;
-            explosionFlash = 0.85;
+            screenShakeTimer = 34;
+            explosionFlash = 0.9;
 
             const cx = centralNode.x;
             const cy = centralNode.y;
 
-            // Expanding shockwave rings
+            // Giant initial explosion
             shockwaves.push(
-                { x: cx, y: cy, radius: 10, maxRadius: 210, alpha: 1.0, lineWidth: 6, color: '#FF4500' },
-                { x: cx, y: cy, radius: 5, maxRadius: 140, alpha: 0.9, lineWidth: 4, color: '#FFD700' }
+                { x: cx, y: cy, radius: 12, maxRadius: 240, alpha: 1.0, lineWidth: 7, color: '#FF4500' },
+                { x: cx, y: cy, radius: 6, maxRadius: 165, alpha: 0.95, lineWidth: 4.5, color: '#FFD700' }
             );
 
-            // Explosion fireballs, sparks, smoke, and duck feathers
             const firePalette = ['#FF0000', '#FF3B00', '#FF7F00', '#FFD700', '#FFFFFF'];
-            for (let i = 0; i < 85; i++) {
+            for (let i = 0; i < 95; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const speed = 1.5 + Math.random() * 8.5;
-                const isSmoke = i >= 65;
-                const isFeather = !isSmoke && i % 4 === 0;
+                const speed = 1.5 + Math.random() * 9.0;
+                const isSmoke = i >= 72;
+                const isFeather = !isSmoke && i % 3 === 0;
 
                 explosionParticles.push({
                     x: cx + (Math.random() - 0.5) * 10,
@@ -317,6 +399,370 @@
                     rotSpeed: (Math.random() - 0.5) * 0.25,
                     isFeather: isFeather
                 });
+            }
+
+            startDuckWar();
+        }
+
+        function startDuckWar() {
+            duckWarActive = true;
+            warBannerTimer = 210; // ~3.5 seconds banner announcement
+            warWave = 1;
+            yellowKOs = 0;
+            redKOs = 0;
+            warDucks = [];
+            warProjectiles = [];
+            airstrikes = [];
+
+            headerTitle.textContent = 'DUCK WAR';
+            instructionsText.textContent = 'DUCK WAR! Click anywhere on the battlefield to call down Rainbow Bread-Bomb Airstrikes!';
+            updateHitCounter();
+
+            // Deploy initial opposing squadrons
+            spawnWarSquadron('yellow', 6, false);
+            spawnWarSquadron('red', 6, false);
+            updateBallCounter();
+        }
+
+        function spawnWarSquadron(team, count, includeCommander = false) {
+            const isYellow = team === 'yellow';
+            for (let i = 0; i < count; i++) {
+                if (warDucks.length >= 22) break;
+
+                const isCommander = includeCommander && i === 0;
+                const scale = isCommander ? 1.45 : (0.85 + Math.random() * 0.25);
+                const maxHp = isCommander ? 7 : 3;
+                const weaponRoll = Math.random();
+                const weaponType = isCommander
+                    ? 'egg'
+                    : (weaponRoll < 0.55 ? 'seed' : (weaponRoll < 0.85 ? 'laser' : 'egg'));
+
+                const spawnX = isYellow
+                    ? -25 - Math.random() * 90
+                    : canvas.width + 25 + Math.random() * 90;
+                const spawnY = 60 + Math.random() * Math.max(120, canvas.height - 120);
+
+                const cries = isYellow ? YELLOW_BATTLE_CRIES : RED_BATTLE_CRIES;
+                const cry = (i === 0 && Math.random() < 0.75)
+                    ? cries[Math.floor(Math.random() * cries.length)]
+                    : '';
+
+                warDucks.push({
+                    x: spawnX,
+                    y: spawnY,
+                    vx: isYellow ? (2.2 + Math.random() * 1.4) : -(2.2 + Math.random() * 1.4),
+                    vy: (Math.random() - 0.5) * 1.2,
+                    team: team,
+                    hp: maxHp,
+                    maxHp: maxHp,
+                    scale: scale,
+                    isCommander: isCommander,
+                    facing: isYellow ? 1 : -1,
+                    bobPhase: Math.random() * Math.PI * 2,
+                    fireCooldown: 25 + Math.floor(Math.random() * 45),
+                    weaponType: weaponType,
+                    hitFlash: 0,
+                    battleCry: cry,
+                    cryTimer: cry ? 95 : 0
+                });
+            }
+        }
+
+        function callRainbowAirstrike(targetX, targetY) {
+            const color = RAINBOW_COLORS[rainbowIndex];
+            rainbowIndex = (rainbowIndex + 1) % RAINBOW_COLORS.length;
+
+            airstrikes.push({
+                x: targetX + (Math.random() - 0.5) * 80,
+                y: -30,
+                targetX: targetX,
+                targetY: targetY,
+                speed: 14,
+                color: color,
+                trail: []
+            });
+        }
+
+        function updateDuckWar() {
+            if (!duckWarActive) return;
+
+            if (warBannerTimer > 0) {
+                warBannerTimer--;
+            }
+
+            // Count active ducks per faction and send reinforcements when a side runs low
+            let yellowCount = 0;
+            let redCount = 0;
+            for (const d of warDucks) {
+                if (d.team === 'yellow') yellowCount++;
+                else redCount++;
+            }
+
+            if (yellowCount < 4) {
+                warWave++;
+                spawnWarSquadron('yellow', 4, warWave % 2 === 0);
+                updateBallCounter();
+            }
+            if (redCount < 4) {
+                warWave++;
+                spawnWarSquadron('red', 4, warWave % 2 === 1);
+                updateBallCounter();
+            }
+
+            // Update Warrior Ducks AI, movement, and firing
+            for (let i = warDucks.length - 1; i >= 0; i--) {
+                const d = warDucks[i];
+                d.bobPhase += 0.12;
+                if (d.hitFlash > 0) d.hitFlash--;
+                if (d.cryTimer > 0) {
+                    d.cryTimer--;
+                    if (d.cryTimer === 0) d.battleCry = '';
+                }
+
+                // Find nearest enemy duck
+                let nearestEnemy = null;
+                let nearestDist = Infinity;
+                for (const other of warDucks) {
+                    if (other.team === d.team) continue;
+                    const dx = other.x - d.x;
+                    const dy = other.y - d.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestEnemy = other;
+                    }
+                }
+
+                if (nearestEnemy) {
+                    const dx = nearestEnemy.x - d.x;
+                    const dy = nearestEnemy.y - d.y;
+                    d.facing = dx >= 0 ? 1 : -1;
+
+                    // Desired combat range
+                    const preferredDist = d.weaponType === 'egg' ? 280 : 195;
+                    const dirX = dx / (nearestDist || 1);
+                    const dirY = dy / (nearestDist || 1);
+
+                    let desiredVx = 0;
+                    let desiredVy = dirY * 1.6 + Math.cos(d.bobPhase) * 0.9;
+
+                    if (nearestDist > preferredDist + 40) {
+                        desiredVx = dirX * 2.4;
+                    } else if (nearestDist < preferredDist - 40) {
+                        desiredVx = -dirX * 1.8;
+                    } else {
+                        desiredVx = Math.sin(d.bobPhase * 0.5) * 0.8;
+                    }
+
+                    // Friendly separation so squads spread out cleanly
+                    for (const ally of warDucks) {
+                        if (ally === d || ally.team !== d.team) continue;
+                        const adx = d.x - ally.x;
+                        const ady = d.y - ally.y;
+                        const adist = Math.hypot(adx, ady);
+                        if (adist > 0 && adist < 54) {
+                            desiredVx += (adx / adist) * 1.4;
+                            desiredVy += (ady / adist) * 1.4;
+                        }
+                    }
+
+                    d.vx += (desiredVx - d.vx) * 0.08;
+                    d.vy += (desiredVy - d.vy) * 0.08;
+
+                    // Fire weapon when on screen and cooldown finishes
+                    d.fireCooldown--;
+                    const onScreen = d.x > 15 && d.x < canvas.width - 15;
+                    if (onScreen && d.fireCooldown <= 0) {
+                        fireDuckWeapon(d, nearestEnemy);
+                        d.fireCooldown = d.weaponType === 'seed'
+                            ? (36 + Math.floor(Math.random() * 25))
+                            : (d.weaponType === 'laser' ? 52 : 75);
+                    }
+                }
+
+                d.x += d.vx;
+                d.y += d.vy;
+
+                // Keep ducks within vertical battlefield margins
+                const marginY = 48;
+                if (d.y < marginY) {
+                    d.y = marginY;
+                    d.vy = Math.abs(d.vy) * 0.5;
+                } else if (d.y > canvas.height - marginY) {
+                    d.y = canvas.height - marginY;
+                    d.vy = -Math.abs(d.vy) * 0.5;
+                }
+
+                // Keep ducks inside horizontal bounds once they enter the arena
+                if (d.x > 25 && d.x < canvas.width - 25) {
+                    d.enteredArena = true;
+                }
+                if (d.enteredArena) {
+                    if (d.x < 24) {
+                        d.x = 24;
+                        d.vx = Math.abs(d.vx);
+                    } else if (d.x > canvas.width - 24) {
+                        d.x = canvas.width - 24;
+                        d.vx = -Math.abs(d.vx);
+                    }
+                }
+            }
+
+            // Update War Projectiles
+            for (let i = warProjectiles.length - 1; i >= 0; i--) {
+                const p = warProjectiles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.type === 'egg') {
+                    p.vy += 0.14; // Arcing egg mortar gravity
+                    p.rotation += 0.18;
+                }
+
+                if (p.x < -50 || p.x > canvas.width + 50 || p.y < -50 || p.y > canvas.height + 50) {
+                    warProjectiles.splice(i, 1);
+                    continue;
+                }
+
+                // Check collision against opposing ducks
+                let hitSomething = false;
+                for (let j = warDucks.length - 1; j >= 0; j--) {
+                    const target = warDucks[j];
+                    if (target.team === p.team) continue;
+
+                    const hitRadius = 17 * target.scale + p.radius;
+                    const dist = Math.hypot(target.x - p.x, target.y - p.y);
+                    if (dist < hitRadius) {
+                        hitSomething = true;
+                        damageWarDuck(j, p.damage, p.vx * 0.28, p.vy * 0.28);
+
+                        if (p.type === 'egg') {
+                            spawnExplosion(p.x, p.y, p.team === 'yellow' ? '#FFD700' : '#FF3B00', 0.65);
+                            screenShakeTimer = Math.max(screenShakeTimer, 5);
+                        }
+                        break;
+                    }
+                }
+
+                if (hitSomething) {
+                    warProjectiles.splice(i, 1);
+                }
+            }
+
+            // Update Player Rainbow Bread-Bomb Airstrikes
+            for (let i = airstrikes.length - 1; i >= 0; i--) {
+                const strike = airstrikes[i];
+                const dx = strike.targetX - strike.x;
+                const dy = strike.targetY - strike.y;
+                const dist = Math.hypot(dx, dy);
+
+                strike.trail.push({ x: strike.x, y: strike.y });
+                if (strike.trail.length > 14) strike.trail.shift();
+
+                if (dist <= strike.speed) {
+                    // Detonate Rainbow Airstrike!
+                    spawnExplosion(strike.targetX, strike.targetY, strike.color, 1.25);
+                    screenShakeTimer = Math.max(screenShakeTimer, 12);
+
+                    const blastRadius = 85;
+                    for (let j = warDucks.length - 1; j >= 0; j--) {
+                        const d = warDucks[j];
+                        const bdx = d.x - strike.targetX;
+                        const bdy = d.y - strike.targetY;
+                        const bdist = Math.hypot(bdx, bdy);
+                        if (bdist < blastRadius) {
+                            const push = ((blastRadius - bdist) / blastRadius) * 7;
+                            const nx = bdx / (bdist || 1);
+                            const ny = bdy / (bdist || 1);
+                            damageWarDuck(j, 3, nx * push, ny * push - 1.5);
+                        }
+                    }
+
+                    airstrikes.splice(i, 1);
+                } else {
+                    strike.x += (dx / dist) * strike.speed;
+                    strike.y += (dy / dist) * strike.speed;
+                }
+            }
+        }
+
+        function fireDuckWeapon(shooter, target) {
+            const muzzleX = shooter.x + shooter.facing * (18 * shooter.scale);
+            const muzzleY = shooter.y - 6 * shooter.scale;
+            const dx = target.x - muzzleX;
+            const dy = target.y - muzzleY;
+            const dist = Math.hypot(dx, dy) || 1;
+            const spread = (Math.random() - 0.5) * 0.14;
+            const angle = Math.atan2(dy, dx) + spread;
+
+            if (shooter.weaponType === 'seed') {
+                const speed = 6.8;
+                warProjectiles.push({
+                    x: muzzleX,
+                    y: muzzleY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    team: shooter.team,
+                    type: 'seed',
+                    radius: 3.2,
+                    damage: 1,
+                    color: shooter.team === 'yellow' ? '#FFE600' : '#FF5500'
+                });
+            } else if (shooter.weaponType === 'laser') {
+                const speed = 8.8;
+                warProjectiles.push({
+                    x: muzzleX,
+                    y: muzzleY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    team: shooter.team,
+                    type: 'laser',
+                    radius: 3.5,
+                    damage: 1.5,
+                    color: shooter.team === 'yellow' ? '#00F5D4' : '#FF0055'
+                });
+            } else {
+                // Explosive Egg Mortar
+                const flightFrames = Math.max(28, Math.min(55, dist / 6));
+                const vx = dx / flightFrames;
+                const vy = (dy / flightFrames) - 0.5 * 0.14 * flightFrames;
+                warProjectiles.push({
+                    x: muzzleX,
+                    y: muzzleY,
+                    vx: vx,
+                    vy: vy,
+                    team: shooter.team,
+                    type: 'egg',
+                    radius: 5.5,
+                    damage: 2.5,
+                    rotation: 0,
+                    color: '#FFFFFF'
+                });
+            }
+        }
+
+        function damageWarDuck(index, damage, knockVx, knockVy) {
+            const d = warDucks[index];
+            if (!d) return;
+
+            d.hp -= damage;
+            d.hitFlash = 6;
+            d.vx += knockVx;
+            d.vy += knockVy;
+
+            if (d.hp <= 0) {
+                const featherColor = d.team === 'yellow' ? '#FFD700' : '#E61414';
+                spawnExplosion(d.x, d.y, featherColor, d.isCommander ? 1.25 : 0.85);
+                screenShakeTimer = Math.max(screenShakeTimer, d.isCommander ? 10 : 4);
+
+                if (d.team === 'yellow') {
+                    redKOs++;
+                } else {
+                    yellowKOs++;
+                }
+
+                warDucks.splice(index, 1);
+                updateHitCounter();
+                updateBallCounter();
             }
         }
 
@@ -404,6 +850,22 @@
                     // Update velocity
                     b.vx += ax;
                     b.vy += ay;
+                } else if (duckWarActive) {
+                    // Leftover orbiting rainbow balls can knock out warrior ducks during the war!
+                    let hitWarDuck = false;
+                    for (let j = warDucks.length - 1; j >= 0; j--) {
+                        const d = warDucks[j];
+                        const dist = Math.hypot(d.x - b.x, d.y - b.y);
+                        if (dist < 16 * d.scale + b.radius) {
+                            damageWarDuck(j, 2, b.vx * 0.4, b.vy * 0.4);
+                            spawnExplosion(b.x, b.y, b.color, 0.55);
+                            balls.splice(i, 1);
+                            countChanged = true;
+                            hitWarDuck = true;
+                            break;
+                        }
+                    }
+                    if (hitWarDuck) continue;
                 }
 
                 // Update position
@@ -417,7 +879,7 @@
                 }
             }
 
-            if (countChanged) {
+            if (countChanged && !duckWarActive) {
                 updateBallCounter();
             }
         }
@@ -445,7 +907,7 @@
         }
 
         /**
-         * Renders a cute vector duck on the target 2D context.
+         * Renders a cute vector duck on the target 2D context, with optional war gear.
          */
         function drawDuckSprite(
             targetCtx,
@@ -457,7 +919,8 @@
             showRipples = false,
             bodyColor = '#FFD700',
             wingColor = '#E6AC00',
-            angerLevel = 0
+            angerLevel = 0,
+            warGear = 'none'
         ) {
             targetCtx.save();
             targetCtx.translate(x, y);
@@ -521,7 +984,7 @@
             targetCtx.fillStyle = '#FFFFFF';
             targetCtx.fill();
 
-            // 6. Angry eyebrow as hits build up
+            // 6. Angry eyebrow as hits build up or during Duck War
             if (angerLevel >= 2) {
                 targetCtx.beginPath();
                 targetCtx.moveTo(6.5, -13.2);
@@ -532,30 +995,94 @@
                 targetCtx.stroke();
             }
 
+            // 7. Duck War Helmets & Headbands
+            if (warGear === 'yellow_army' || warGear === 'yellow_commander') {
+                // Olive-navy army helmet
+                targetCtx.beginPath();
+                targetCtx.arc(6.8, -10.2, 7.6, Math.PI * 1.05, Math.PI * 1.98);
+                targetCtx.fillStyle = warGear === 'yellow_commander' ? '#1E3A8A' : '#3F6212';
+                targetCtx.fill();
+                targetCtx.strokeStyle = '#14213d';
+                targetCtx.lineWidth = 1.1;
+                targetCtx.stroke();
+
+                // Helmet rim
+                targetCtx.beginPath();
+                targetCtx.moveTo(-1.5, -10.4);
+                targetCtx.lineTo(15.2, -10.4);
+                targetCtx.strokeStyle = '#14213d';
+                targetCtx.lineWidth = 1.5;
+                targetCtx.stroke();
+
+                // Gold star emblem on commander helmet
+                if (warGear === 'yellow_commander') {
+                    targetCtx.fillStyle = '#FFD700';
+                    targetCtx.beginPath();
+                    targetCtx.arc(8.5, -13.2, 1.8, 0, Math.PI * 2);
+                    targetCtx.fill();
+                }
+            } else if (warGear === 'red_rebel' || warGear === 'red_commander') {
+                // Dark battle bandana / spiked war cap
+                targetCtx.beginPath();
+                targetCtx.arc(6.8, -10.2, 7.6, Math.PI * 1.05, Math.PI * 1.98);
+                targetCtx.fillStyle = '#1F2937';
+                targetCtx.fill();
+
+                // Red war headband with trailing ribbon
+                targetCtx.beginPath();
+                targetCtx.moveTo(-1.0, -11.2);
+                targetCtx.lineTo(14.5, -11.2);
+                targetCtx.strokeStyle = '#DC2626';
+                targetCtx.lineWidth = 2.4;
+                targetCtx.stroke();
+
+                targetCtx.beginPath();
+                targetCtx.moveTo(-1.0, -11.2);
+                targetCtx.lineTo(-6.5, -8.5);
+                targetCtx.moveTo(-1.0, -11.2);
+                targetCtx.lineTo(-6.0, -13.5);
+                targetCtx.strokeStyle = '#DC2626';
+                targetCtx.lineWidth = 1.6;
+                targetCtx.stroke();
+
+                // Horn/spike for Red Commander
+                if (warGear === 'red_commander') {
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(5.0, -17.2);
+                    targetCtx.lineTo(7.2, -22.5);
+                    targetCtx.lineTo(9.4, -17.2);
+                    targetCtx.closePath();
+                    targetCtx.fillStyle = '#FFD700';
+                    targetCtx.fill();
+                }
+            }
+
             targetCtx.restore();
         }
 
         /**
-         * Renders a comic speech bubble above the central duck.
+         * Renders a comic speech bubble above a duck.
          */
-        function drawSpeechBubble(targetCtx, anchorX, anchorY, text, isWarning) {
+        function drawSpeechBubble(targetCtx, anchorX, anchorY, text, isWarning, compact = false) {
             if (!text) return;
 
             targetCtx.save();
-            targetCtx.font = 'bold 14px "Courier New", Courier, monospace';
+            targetCtx.font = compact
+                ? 'bold 11px "Courier New", Courier, monospace'
+                : 'bold 14px "Courier New", Courier, monospace';
             const textMetrics = targetCtx.measureText(text);
-            const paddingX = 14;
+            const paddingX = compact ? 8 : 14;
             const boxWidth = Math.ceil(textMetrics.width + paddingX * 2);
-            const boxHeight = 32;
-            const radius = 8;
+            const boxHeight = compact ? 22 : 32;
+            const radius = compact ? 6 : 8;
 
             // Keep bubble within horizontal canvas bounds
             let boxX = anchorX - boxWidth / 2;
-            boxX = Math.max(10, Math.min(canvas.width - boxWidth - 10, boxX));
-            const boxY = anchorY - 64;
+            boxX = Math.max(8, Math.min(canvas.width - boxWidth - 8, boxX));
+            const boxY = Math.max(8, anchorY - (compact ? 46 : 64));
 
             // Pop-in scale when newly triggered
-            const popScale = hitAnimTimer > 14 ? (1 + (hitAnimTimer - 14) * 0.025) : 1;
+            const popScale = (!compact && hitAnimTimer > 14) ? (1 + (hitAnimTimer - 14) * 0.025) : 1;
             const centerX = boxX + boxWidth / 2;
             const centerY = boxY + boxHeight / 2;
             targetCtx.translate(centerX, centerY);
@@ -567,27 +1094,28 @@
             targetCtx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
             targetCtx.fillStyle = isWarning ? '#FFF1F2' : '#FFFFFF';
             targetCtx.fill();
-            targetCtx.lineWidth = 2;
+            targetCtx.lineWidth = compact ? 1.5 : 2;
             targetCtx.strokeStyle = isWarning ? '#DC2626' : '#14213d';
             targetCtx.stroke();
 
             // Speech bubble pointer tail pointing toward the duck
-            const tailX = Math.max(boxX + 14, Math.min(boxX + boxWidth - 14, anchorX));
+            const tailX = Math.max(boxX + 10, Math.min(boxX + boxWidth - 10, anchorX));
+            const pointerY = anchorY - (compact ? 18 : 22);
             targetCtx.beginPath();
-            targetCtx.moveTo(tailX - 6, boxY + boxHeight - 1);
-            targetCtx.lineTo(anchorX, anchorY - 22);
-            targetCtx.lineTo(tailX + 6, boxY + boxHeight - 1);
+            targetCtx.moveTo(tailX - 5, boxY + boxHeight - 1);
+            targetCtx.lineTo(anchorX, pointerY);
+            targetCtx.lineTo(tailX + 5, boxY + boxHeight - 1);
             targetCtx.closePath();
             targetCtx.fillStyle = isWarning ? '#FFF1F2' : '#FFFFFF';
             targetCtx.fill();
 
             // Outline for the tail sides
             targetCtx.beginPath();
-            targetCtx.moveTo(tailX - 6, boxY + boxHeight);
-            targetCtx.lineTo(anchorX, anchorY - 22);
-            targetCtx.lineTo(tailX + 6, boxY + boxHeight);
+            targetCtx.moveTo(tailX - 5, boxY + boxHeight);
+            targetCtx.lineTo(anchorX, pointerY);
+            targetCtx.lineTo(tailX + 5, boxY + boxHeight);
             targetCtx.strokeStyle = isWarning ? '#DC2626' : '#14213d';
-            targetCtx.lineWidth = 2;
+            targetCtx.lineWidth = compact ? 1.5 : 2;
             targetCtx.stroke();
 
             // Text inside bubble
@@ -759,6 +1287,191 @@
             }
         }
 
+        function drawDuckWar() {
+            if (!duckWarActive) return;
+
+            // Subtle smoky battle tint over the sky
+            ctx.save();
+            ctx.fillStyle = 'rgba(20, 33, 61, 0.14)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            // Draw Airstrike target markers & incoming rainbow bombs
+            for (const strike of airstrikes) {
+                // Ground/sky target crosshair
+                ctx.save();
+                ctx.strokeStyle = strike.color;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(strike.targetX, strike.targetY, 22, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+
+                // Rainbow trail
+                if (strike.trail.length > 1) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(strike.trail[0].x, strike.trail[0].y);
+                    for (let t = 1; t < strike.trail.length; t++) {
+                        ctx.lineTo(strike.trail[t].x, strike.trail[t].y);
+                    }
+                    ctx.strokeStyle = strike.color;
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Bread-bomb payload
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(strike.x, strike.y, 6, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = strike.color;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Draw War Projectiles
+            for (const p of warProjectiles) {
+                ctx.save();
+                if (p.type === 'seed') {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#14213d';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else if (p.type === 'laser') {
+                    const angle = Math.atan2(p.vy, p.vx);
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(angle);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-9, -2, 18, 4);
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(-6, -1, 12, 2);
+                } else if (p.type === 'egg') {
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rotation);
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 6.5, 4.8, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = '#FFFBEB';
+                    ctx.fill();
+                    ctx.strokeStyle = p.team === 'yellow' ? '#D97706' : '#DC2626';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // Draw Warrior Ducks
+            for (const d of warDucks) {
+                const isYellow = d.team === 'yellow';
+                const bobOffset = Math.sin(d.bobPhase) * 3;
+                const tilt = Math.sin(d.bobPhase * 0.8) * 0.08 * d.facing;
+
+                let bodyColor = isYellow ? '#FFD700' : '#E61414';
+                let wingColor = isYellow ? '#E6AC00' : '#9E0808';
+                if (d.hitFlash > 0) {
+                    bodyColor = '#FFFFFF';
+                    wingColor = '#FCA5A5';
+                }
+
+                const gear = isYellow
+                    ? (d.isCommander ? 'yellow_commander' : 'yellow_army')
+                    : (d.isCommander ? 'red_commander' : 'red_rebel');
+
+                drawDuckSprite(
+                    ctx,
+                    d.x,
+                    d.y + bobOffset,
+                    d.scale,
+                    d.facing < 0,
+                    tilt,
+                    false,
+                    bodyColor,
+                    wingColor,
+                    isYellow ? 2 : 4,
+                    gear
+                );
+
+                // Mini health bar above damaged or commander ducks
+                if (d.hp < d.maxHp || d.isCommander) {
+                    const barW = 26 * d.scale;
+                    const barH = 4;
+                    const bx = d.x - barW / 2;
+                    const by = d.y + bobOffset - 22 * d.scale;
+                    const hpRatio = Math.max(0, d.hp / d.maxHp);
+
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(20, 33, 61, 0.75)';
+                    ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
+                    ctx.fillStyle = isYellow ? '#FACC15' : '#EF4444';
+                    ctx.fillRect(bx, by, barW * hpRatio, barH);
+                    ctx.restore();
+                }
+
+                // Battle cry speech bubble
+                if (d.battleCry) {
+                    drawSpeechBubble(ctx, d.x, d.y + bobOffset, d.battleCry, !isYellow, true);
+                }
+            }
+
+            // Compact War Scoreboard HUD at top-center of canvas
+            ctx.save();
+            const hudText = `YELLOW ARMY KOs: ${yellowKOs}   |   WAVE ${warWave}   |   RED REBELS KOs: ${redKOs}`;
+            ctx.font = 'bold 12px "Courier New", Courier, monospace';
+            const hudW = ctx.measureText(hudText).width + 28;
+            const hudH = 26;
+            const hudX = (canvas.width - hudW) / 2;
+            const hudY = 10;
+
+            ctx.beginPath();
+            ctx.roundRect(hudX, hudY, hudW, hudH, 5);
+            ctx.fillStyle = 'rgba(20, 33, 61, 0.85)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(hudText, canvas.width / 2, hudY + hudH / 2 + 1);
+            ctx.restore();
+
+            // Dramatic Duck War start banner (fades out automatically)
+            if (warBannerTimer > 0) {
+                const alpha = Math.min(1, warBannerTimer / 35);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                const msg = 'THE DUCK CWASHED OUT! DUCK WAR BEGINS!';
+                ctx.font = 'bold 16px "Courier New", Courier, monospace';
+                const w = ctx.measureText(msg).width + 36;
+                const h = 42;
+                const bx = (canvas.width - w) / 2;
+                const by = canvas.height / 2 - h / 2;
+
+                ctx.beginPath();
+                ctx.roundRect(bx, by, w, h, 6);
+                ctx.fillStyle = 'rgba(185, 28, 28, 0.92)';
+                ctx.fill();
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(msg, canvas.width / 2, canvas.height / 2 + 1);
+                ctx.restore();
+            }
+        }
+
         function drawExplosionEffects() {
             // Shockwave rings
             for (const sw of shockwaves) {
@@ -799,37 +1512,12 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.restore();
             }
-
-            // Post-explosion status banner once particles settle
-            if (duckExploded && explosionParticles.length < 25) {
-                ctx.save();
-                const msg = 'THE DUCK CWASHED OUT! CLICK RESET TO RESTORE.';
-                ctx.font = 'bold 14px "Courier New", Courier, monospace';
-                const w = ctx.measureText(msg).width + 32;
-                const h = 36;
-                const bx = (canvas.width - w) / 2;
-                const by = canvas.height / 2 - h / 2;
-
-                ctx.beginPath();
-                ctx.roundRect(bx, by, w, h, 6);
-                ctx.fillStyle = 'rgba(20, 33, 61, 0.88)';
-                ctx.fill();
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-
-                ctx.fillStyle = '#FFFFFF';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(msg, canvas.width / 2, canvas.height / 2 + 1);
-                ctx.restore();
-            }
         }
 
         function draw() {
             ctx.save();
 
-            // Apply screen shake on impact or explosion
+            // Apply screen shake on impact, explosion, or airstrike
             if (screenShakeTimer > 0) {
                 const intensity = duckExploded ? (screenShakeTimer * 0.45) : (screenShakeTimer * 0.35);
                 const sx = (Math.random() - 0.5) * intensity;
@@ -871,7 +1559,10 @@
                 ctx.stroke();
             }
 
-            // 4. Draw explosion shockwaves, particles, and post-explosion banner
+            // 4. Draw Duck War battle if active
+            drawDuckWar();
+
+            // 5. Draw explosion shockwaves, particles, and screen flash
             drawExplosionEffects();
 
             ctx.restore();
@@ -879,6 +1570,7 @@
 
         function animate() {
             updatePhysics();
+            updateDuckWar();
             updateEffects();
             draw();
             requestAnimationFrame(animate);
