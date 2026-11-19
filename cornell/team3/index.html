@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Simulation - Mouse Hunt</title>
     <style>
         * {
             box-sizing: border-box;
@@ -35,6 +35,8 @@
             margin-bottom: 12px;
             padding-bottom: 8px;
             border-bottom: 1px solid #ffffff;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         h1 {
@@ -47,21 +49,30 @@
         .header-controls {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
-        .score-box {
-            font-size: 16px;
+        .stat-box {
+            font-size: 14px;
             font-weight: bold;
-            letter-spacing: 1.5px;
+            letter-spacing: 1.2px;
             text-transform: uppercase;
-            padding: 5px 14px;
+            padding: 5px 12px;
             border: 1px solid rgba(255, 255, 255, 0.5);
             background-color: rgba(255, 255, 255, 0.06);
         }
 
-        .score-box span {
+        .stat-box span {
             color: #eeff54;
+        }
+
+        .stat-box.level-box span {
+            color: #6ee7ff;
+        }
+
+        .stat-box.mice-box span {
+            color: #ff8fa3;
         }
 
         .btn-reset {
@@ -102,10 +113,66 @@
             height: 100%;
         }
 
+        /* Modal Overlay for Game Over / Out of Balls */
+        #overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(11, 14, 20, 0.84);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            z-index: 10;
+        }
+
+        #overlay.visible {
+            display: flex;
+        }
+
+        #overlay h2 {
+            font-size: 28px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #ff8fa3;
+            margin-bottom: 10px;
+        }
+
+        #overlay p {
+            font-size: 15px;
+            color: #d8dee9;
+            margin-bottom: 22px;
+            line-height: 1.6;
+        }
+
+        .overlay-actions {
+            display: flex;
+            gap: 16px;
+        }
+
+        .btn-primary {
+            background: #eeff54;
+            color: #0b0e14;
+            border: 1px solid #eeff54;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-primary:hover {
+            background: #ffffff;
+            border-color: #ffffff;
+        }
+
         .instructions {
             margin-top: 8px;
             font-size: 11px;
-            color: #888888;
+            color: #9aa4b2;
             text-align: center;
         }
     </style>
@@ -116,7 +183,10 @@
     <div id="header">
         <h1>Gravity Simulation</h1>
         <div class="header-controls">
-            <div class="score-box">Points: <span id="scoreValue">0</span></div>
+            <div class="stat-box level-box">Level: <span id="levelValue">1</span></div>
+            <div class="stat-box mice-box">Mice: <span id="miceValue">0/1</span></div>
+            <div class="stat-box">Balls: <span id="ballsValue">6</span></div>
+            <div class="stat-box">Points: <span id="scoreValue">0</span></div>
             <button class="btn-reset" onclick="resetSimulation()">Reset</button>
         </div>
     </div>
@@ -124,30 +194,68 @@
     <!-- Canvas Container -->
     <div id="canvas-wrapper">
         <canvas id="simCanvas"></canvas>
+
+        <!-- Out of Balls Overlay -->
+        <div id="overlay">
+            <h2 id="overlayTitle">Out of Tennis Balls!</h2>
+            <p id="overlayText">Level 1 • Score: 0</p>
+            <div class="overlay-actions">
+                <button class="btn-primary" onclick="retryCurrentLevel()">Retry Level</button>
+                <button class="btn-reset" onclick="resetSimulation()">Restart Level 1</button>
+            </div>
+        </div>
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a tennis ball. Hit the center yarn ball to score a point!
+        Click anywhere to launch a tennis ball rightward around the yarn ball's gravity. Hit all mice to advance—each level gets harder!
     </div>
 
     <script>
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+
+        const levelValueEl = document.getElementById('levelValue');
+        const miceValueEl = document.getElementById('miceValue');
+        const ballsValueEl = document.getElementById('ballsValue');
         const scoreValueEl = document.getElementById('scoreValue');
+        const overlayEl = document.getElementById('overlay');
+        const overlayTextEl = document.getElementById('overlayText');
 
         // SIMULATION CONSTANTS
-        const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
-        const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
-        const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;          // Number of historic trail points stored
-        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
+        const BASE_GRAVITY_CONSTANT = 1800; // Base strength of gravitational pull (G)
+        const LAUNCH_VELOCITY = 5;          // Fixed velocity on click
+        const FIXED_LAUNCH_ANGLE = 90;      // Fixed direction in degrees (90° = straight right)
+        const TRAIL_LENGTH = 300;           // Number of historic trail points stored
+        const SOFTENING_FACTOR = 400;       // Prevents infinite velocity near center
 
-        // STATE VARIABLES
+        // GAME STATE VARIABLES
         let balls = [];
+        let mice = [];
         let bgPattern = null;
         let score = 0;
+        let level = 1;
+        let totalLevelMice = 1;
+        let miceCaughtInLevel = 0;
+        let maxBallsForLevel = 6;
+        let ballsRemaining = 6;
+        let currentGravity = BASE_GRAVITY_CONSTANT;
+
         let hitEffects = [];
+        let particles = [];
         let centerPulse = 0;
+        let frameTick = 0;
+
+        // Level transition banner state
+        let levelBanner = {
+            active: false,
+            timer: 0,
+            duration: 115,
+            title: '',
+            subtitle: ''
+        };
+
+        // Mouse hover position for trajectory preview
+        let hoverPos = null;
 
         // Central Gravity Node Definition (Yarn Ball)
         const centralNode = {
@@ -156,7 +264,10 @@
             radius: 20
         };
 
-        function updateScoreDisplay() {
+        function updateHUD() {
+            levelValueEl.textContent = level;
+            miceValueEl.textContent = `${miceCaughtInLevel}/${totalLevelMice}`;
+            ballsValueEl.textContent = ballsRemaining;
             scoreValueEl.textContent = score;
         }
 
@@ -168,11 +279,9 @@
             tile.height = size;
             const pctx = tile.getContext('2d');
 
-            // Deep midnight backdrop so foreground elements stay sharp
             pctx.fillStyle = '#121722';
             pctx.fillRect(0, 0, size, size);
 
-            // Helper: Draw a small paw print
             function drawPaw(x, y, angle, scale) {
                 pctx.save();
                 pctx.translate(x, y);
@@ -180,12 +289,10 @@
                 pctx.scale(scale, scale);
                 pctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
 
-                // Main pad
                 pctx.beginPath();
                 pctx.ellipse(0, 4, 8, 6, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Four toes
                 const toes = [
                     { x: -9, y: -4, r: 3.2 },
                     { x: -3.5, y: -8, r: 3.5 },
@@ -200,13 +307,11 @@
                 pctx.restore();
             }
 
-            // Helper: Draw Ginger Tabby Cat Face
             function drawGingerCat(x, y) {
                 pctx.save();
                 pctx.translate(x, y);
                 pctx.globalAlpha = 0.82;
 
-                // Pointed ears
                 pctx.fillStyle = '#c97538';
                 pctx.beginPath();
                 pctx.moveTo(-26, -12);
@@ -222,7 +327,6 @@
                 pctx.closePath();
                 pctx.fill();
 
-                // Pink inner ears
                 pctx.fillStyle = '#c46d7a';
                 pctx.beginPath();
                 pctx.moveTo(-23, -15);
@@ -238,13 +342,11 @@
                 pctx.closePath();
                 pctx.fill();
 
-                // Head
                 pctx.fillStyle = '#c97538';
                 pctx.beginPath();
                 pctx.ellipse(0, 0, 32, 26, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Tabby forehead stripes
                 pctx.strokeStyle = '#8a4619';
                 pctx.lineWidth = 2.5;
                 pctx.lineCap = 'round';
@@ -255,7 +357,6 @@
                     pctx.stroke();
                 }
 
-                // Eyes
                 pctx.fillStyle = '#181412';
                 pctx.beginPath();
                 pctx.arc(-11, -3, 3.8, 0, Math.PI * 2);
@@ -268,7 +369,6 @@
                 pctx.arc(10, -4.2, 1.3, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Pink triangle nose
                 pctx.fillStyle = '#d97a86';
                 pctx.beginPath();
                 pctx.moveTo(-3.5, 4);
@@ -277,7 +377,6 @@
                 pctx.closePath();
                 pctx.fill();
 
-                // Cat mouth ("w")
                 pctx.strokeStyle = '#3b1e0c';
                 pctx.lineWidth = 1.8;
                 pctx.beginPath();
@@ -286,7 +385,6 @@
                 pctx.quadraticCurveTo(3, 13, 6, 10);
                 pctx.stroke();
 
-                // Whiskers
                 pctx.strokeStyle = 'rgba(255, 245, 235, 0.7)';
                 pctx.lineWidth = 1.3;
                 for (const side of [-1, 1]) {
@@ -301,13 +399,11 @@
                 pctx.restore();
             }
 
-            // Helper: Draw Golden Floppy-Eared Dog Face
             function drawGoldenDog(x, y) {
                 pctx.save();
                 pctx.translate(x, y);
                 pctx.globalAlpha = 0.82;
 
-                // Floppy ears
                 pctx.fillStyle = '#8c5830';
                 pctx.beginPath();
                 pctx.ellipse(-30, 5, 10, 23, 0.24, 0, Math.PI * 2);
@@ -317,19 +413,16 @@
                 pctx.ellipse(30, 5, 10, 23, -0.24, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Head
                 pctx.fillStyle = '#cfa063';
                 pctx.beginPath();
                 pctx.ellipse(0, 0, 29, 27, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Cream muzzle
                 pctx.fillStyle = '#e6cfa8';
                 pctx.beginPath();
                 pctx.ellipse(0, 9, 17, 13, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Eyes
                 pctx.fillStyle = '#1c140e';
                 pctx.beginPath();
                 pctx.arc(-11, -6, 3.8, 0, Math.PI * 2);
@@ -342,19 +435,16 @@
                 pctx.arc(10, -7.2, 1.3, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Happy pink tongue
                 pctx.fillStyle = '#d46a7a';
                 pctx.beginPath();
                 pctx.ellipse(0, 17, 5, 6.5, 0, 0, Math.PI);
                 pctx.fill();
 
-                // Dog nose
                 pctx.fillStyle = '#241811';
                 pctx.beginPath();
                 pctx.ellipse(0, 3.5, 6.5, 4.8, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Smile lines
                 pctx.strokeStyle = '#3b2618';
                 pctx.lineWidth = 1.8;
                 pctx.beginPath();
@@ -367,13 +457,11 @@
                 pctx.restore();
             }
 
-            // Helper: Draw Sitting Grey Tuxedo Cat
             function drawSittingCat(x, y) {
                 pctx.save();
                 pctx.translate(x, y);
                 pctx.globalAlpha = 0.82;
 
-                // Curled tail
                 pctx.strokeStyle = '#636f82';
                 pctx.lineWidth = 7;
                 pctx.lineCap = 'round';
@@ -382,19 +470,16 @@
                 pctx.bezierCurveTo(42, 34, 44, 6, 28, 2);
                 pctx.stroke();
 
-                // Body
                 pctx.fillStyle = '#636f82';
                 pctx.beginPath();
                 pctx.ellipse(0, 17, 21, 25, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // White chest patch
                 pctx.fillStyle = '#dce2ea';
                 pctx.beginPath();
                 pctx.ellipse(0, 15, 10, 15, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Ears
                 pctx.fillStyle = '#636f82';
                 pctx.beginPath();
                 pctx.moveTo(-20, -18);
@@ -410,12 +495,10 @@
                 pctx.closePath();
                 pctx.fill();
 
-                // Head
                 pctx.beginPath();
                 pctx.ellipse(0, -13, 23, 19, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Eyes
                 pctx.fillStyle = '#e6c86e';
                 pctx.beginPath();
                 pctx.arc(-8, -14, 3.5, 0, Math.PI * 2);
@@ -428,7 +511,6 @@
                 pctx.ellipse(8, -14, 1.4, 3, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Nose & Whiskers
                 pctx.fillStyle = '#d97a86';
                 pctx.beginPath();
                 pctx.arc(0, -8, 2.4, 0, Math.PI * 2);
@@ -448,13 +530,11 @@
                 pctx.restore();
             }
 
-            // Helper: Draw Spotted Beagle Pup
             function drawSpottedDog(x, y) {
                 pctx.save();
                 pctx.translate(x, y);
                 pctx.globalAlpha = 0.82;
 
-                // Folded ears
                 pctx.fillStyle = '#6e452b';
                 pctx.beginPath();
                 pctx.ellipse(-26, -6, 9, 19, 0.35, 0, Math.PI * 2);
@@ -464,19 +544,16 @@
                 pctx.ellipse(26, -6, 9, 19, -0.35, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Cream head
                 pctx.fillStyle = '#dfd5c5';
                 pctx.beginPath();
                 pctx.ellipse(0, 0, 27, 25, 0, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Brown eye patch
                 pctx.fillStyle = '#7c4d2f';
                 pctx.beginPath();
                 pctx.ellipse(-11, -5, 11, 10, -0.2, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Eyes
                 pctx.fillStyle = '#1a1410';
                 pctx.beginPath();
                 pctx.arc(-11, -5, 3.6, 0, Math.PI * 2);
@@ -489,7 +566,6 @@
                 pctx.arc(10, -6.2, 1.2, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Collar & Gold Tag
                 pctx.strokeStyle = '#b84a4a';
                 pctx.lineWidth = 4.5;
                 pctx.lineCap = 'round';
@@ -502,7 +578,6 @@
                 pctx.arc(0, 30, 4, 0, Math.PI * 2);
                 pctx.fill();
 
-                // Nose & Mouth
                 pctx.fillStyle = '#241811';
                 pctx.beginPath();
                 pctx.ellipse(0, 5, 6, 4.5, 0, 0, Math.PI * 2);
@@ -520,7 +595,6 @@
                 pctx.restore();
             }
 
-            // Populate tile with cats, dogs, and paw prints
             drawGingerCat(85, 85);
             drawGoldenDog(265, 95);
             drawSpottedDog(85, 265);
@@ -535,22 +609,153 @@
             return ctx.createPattern(tile, 'repeat');
         }
 
+        // Generate mice for a given level with progressively harder traits
+        function setupLevel(lvl) {
+            level = lvl;
+            balls = [];
+            mice = [];
+            miceCaughtInLevel = 0;
+            overlayEl.classList.remove('visible');
+
+            // Escalate gravity pull gently with each level (capped at 2.1x base)
+            const gravityMultiplier = Math.min(2.1, 1 + (lvl - 1) * 0.09);
+            currentGravity = BASE_GRAVITY_CONSTANT * gravityMultiplier;
+
+            // Number of mice scales up with level
+            const count = lvl === 1 ? 1 : Math.min(7, 1 + Math.floor(lvl * 0.85));
+            totalLevelMice = count;
+
+            // Generous ball supply that tightens relative to mouse count as levels rise
+            maxBallsForLevel = Math.max(4, count + 4 - Math.floor((lvl - 1) / 3));
+            ballsRemaining = maxBallsForLevel;
+
+            // Scale down size and scale up speed with level
+            const baseScale = Math.max(0.76, 1.15 - (lvl - 1) * 0.045);
+            const baseSpeed = lvl === 1 ? 0.65 : Math.min(3.3, 0.95 + (lvl - 1) * 0.24);
+
+            const minDim = Math.min(canvas.width || 900, canvas.height || 600);
+            const minOrbit = 95;
+            const maxOrbit = Math.max(160, minDim * 0.40);
+
+            for (let i = 0; i < count; i++) {
+                // Distribute spawn angles evenly around the center yarn ball
+                const angleOffset = (lvl * 0.7) + (i * (Math.PI * 2)) / count;
+                const orbitRadius = count === 1
+                    ? Math.min(155, maxOrbit * 0.75)
+                    : minOrbit + ((i % 3) / 2) * (maxOrbit - minOrbit);
+
+                // Determine mouse archetype based on level & index
+                let variant = 'classic'; // Grey mouse: steady patrol/orbit
+                let hp = 1;
+                let speed = baseSpeed;
+                let scale = baseScale;
+
+                if (lvl >= 5 && i === 0) {
+                    variant = 'armored'; // Thimble-helmet mouse: takes 2 hits!
+                    hp = 2;
+                    speed = baseSpeed * 0.95;
+                    scale = baseScale * 1.06;
+                } else if (lvl >= 4 && i % 3 === 1) {
+                    variant = 'evasive'; // White ninja mouse: dodges nearby tennis balls
+                    speed = baseSpeed * 1.1;
+                    scale = baseScale * 0.95;
+                } else if (lvl >= 3 && i % 2 === 1) {
+                    variant = 'speedy'; // Brown field mouse: sprints in bursts
+                    speed = baseSpeed * 1.28;
+                    scale = baseScale * 0.94;
+                }
+
+                // Movement pattern variety
+                const patterns = ['orbit', 'patrol', 'figure8', 'weave'];
+                const pattern = lvl === 1
+                    ? 'patrol'
+                    : patterns[(i + lvl) % patterns.length];
+
+                const direction = i % 2 === 0 ? 1 : -1;
+                const startX = centralNode.x + Math.cos(angleOffset) * orbitRadius;
+                const startY = centralNode.y + Math.sin(angleOffset) * orbitRadius;
+
+                mice.push({
+                    x: startX,
+                    y: startY,
+                    anchorX: startX,
+                    anchorY: startY,
+                    orbitRadius: orbitRadius,
+                    angle: angleOffset,
+                    direction: direction,
+                    speed: speed,
+                    scale: scale,
+                    hitRadius: 19 * scale,
+                    variant: variant,
+                    pattern: pattern,
+                    hp: hp,
+                    maxHp: hp,
+                    facing: angleOffset + (direction > 0 ? Math.PI / 2 : -Math.PI / 2),
+                    phase: i * 1.7,
+                    dodgeCooldown: 0,
+                    dodgeTimer: 0,
+                    dodgeVx: 0,
+                    dodgeVy: 0,
+                    hitCooldown: 0
+                });
+            }
+
+            updateHUD();
+        }
+
+        function triggerLevelBanner(title, subtitle) {
+            levelBanner.active = true;
+            levelBanner.timer = levelBanner.duration;
+            levelBanner.title = title;
+            levelBanner.subtitle = subtitle;
+        }
+
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
+            const prevCenterX = centralNode.x || wrapper.clientWidth / 2;
+            const prevCenterY = centralNode.y || wrapper.clientHeight / 2;
+
             canvas.width = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
-            
-            // Recenter gravity node dynamically
+
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            const dx = centralNode.x - prevCenterX;
+            const dy = centralNode.y - prevCenterY;
+
+            // Keep existing mice aligned relative to center on resize
+            for (const m of mice) {
+                m.x += dx;
+                m.y += dy;
+                m.anchorX += dx;
+                m.anchorY += dy;
+            }
         }
 
         window.addEventListener('resize', resizeCanvas);
         bgPattern = createCatsAndDogsPattern();
         resizeCanvas();
+        setupLevel(1);
 
-        // Canvas Click Handler: Directly launch ball at click position
+        // Track hover position for trajectory preview
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            hoverPos = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoverPos = null;
+        });
+
+        // Canvas Click Handler: Launch tennis ball from click position
         canvas.addEventListener('click', (e) => {
+            if (levelBanner.active || overlayEl.classList.contains('visible')) return;
+            if (ballsRemaining <= 0) return;
+
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
@@ -559,12 +764,13 @@
         });
 
         function launchBall(x, y) {
-            // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
-            const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
-            const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
-            const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
+            ballsRemaining -= 1;
+            updateHUD();
 
-            // Overwrite existing array to strictly maintain a single ball on screen
+            const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
+            const vx = LAUNCH_VELOCITY * Math.sin(rad);  // Straight right: vx = 5
+            const vy = -LAUNCH_VELOCITY * Math.cos(rad); // vy = 0
+
             balls = [{
                 x: x,
                 y: y,
@@ -572,87 +778,464 @@
                 vy: vy,
                 radius: 10,
                 rotation: 0,
-                trail: [] // Stores history of past {x, y} coordinates
+                combo: 0,
+                trail: []
             }];
         }
 
+        function retryCurrentLevel() {
+            setupLevel(level);
+        }
+
         function resetSimulation() {
-            balls = [];
-            hitEffects = [];
-            centerPulse = 0;
             score = 0;
-            updateScoreDisplay();
+            hitEffects = [];
+            particles = [];
+            centerPulse = 0;
+            levelBanner.active = false;
+            setupLevel(1);
+        }
+
+        function spawnBurst(x, y, color, count = 14) {
+            for (let i = 0; i < count; i++) {
+                const ang = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+                const spd = 1.5 + Math.random() * 3.5;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd,
+                    radius: 2 + Math.random() * 2.5,
+                    color: color,
+                    alpha: 1
+                });
+            }
+        }
+
+        function addFloatingText(x, y, text, color = '#eeff54', ringRadius = 16) {
+            hitEffects.push({
+                x: x,
+                y: y,
+                text: text,
+                color: color,
+                ringRadius: ringRadius,
+                alpha: 1
+            });
+        }
+
+        function updateMice() {
+            const margin = 44;
+
+            for (const m of mice) {
+                if (m.hitCooldown > 0) m.hitCooldown--;
+                if (m.dodgeCooldown > 0) m.dodgeCooldown--;
+
+                const prevX = m.x;
+                const prevY = m.y;
+
+                // Speed modulation for speedy mice
+                let effectiveSpeed = m.speed;
+                if (m.variant === 'speedy') {
+                    effectiveSpeed *= 1 + 0.55 * Math.sin(frameTick * 0.08 + m.phase);
+                }
+
+                // Evasive mouse checks if an active tennis ball is approaching
+                if (m.variant === 'evasive' && m.dodgeCooldown === 0 && balls.length > 0) {
+                    const b = balls[0];
+                    const distToBall = Math.hypot(b.x - m.x, b.y - m.y);
+                    if (distToBall < 125) {
+                        // Sidestep perpendicular to the incoming ball's velocity
+                        const perpAngle = Math.atan2(b.vy, b.vx) + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+                        m.dodgeVx = Math.cos(perpAngle) * 5.2;
+                        m.dodgeVy = Math.sin(perpAngle) * 5.2;
+                        m.dodgeTimer = 14;
+                        m.dodgeCooldown = 95;
+                        addFloatingText(m.x, m.y - 18, 'DODGE!', '#6ee7ff', 10);
+                    }
+                }
+
+                if (m.dodgeTimer > 0) {
+                    m.x += m.dodgeVx;
+                    m.y += m.dodgeVy;
+                    m.dodgeTimer--;
+                } else {
+                    // Standard pattern movement
+                    const angularVel = (effectiveSpeed / Math.max(90, m.orbitRadius)) * m.direction;
+
+                    if (m.pattern === 'orbit') {
+                        m.angle += angularVel;
+                        m.x = centralNode.x + Math.cos(m.angle) * m.orbitRadius;
+                        m.y = centralNode.y + Math.sin(m.angle) * m.orbitRadius;
+                    } else if (m.pattern === 'weave') {
+                        m.angle += angularVel;
+                        const radialWave = Math.sin(frameTick * 0.04 + m.phase) * 34;
+                        const r = Math.max(75, m.orbitRadius + radialWave);
+                        m.x = centralNode.x + Math.cos(m.angle) * r;
+                        m.y = centralNode.y + Math.sin(m.angle) * r;
+                    } else if (m.pattern === 'figure8') {
+                        m.angle += angularVel * 1.15;
+                        const rx = Math.min(canvas.width * 0.36, m.orbitRadius * 1.25);
+                        const ry = Math.min(canvas.height * 0.34, m.orbitRadius * 0.85);
+                        m.x = centralNode.x + Math.cos(m.angle) * rx;
+                        m.y = centralNode.y + Math.sin(m.angle * 2) * ry * 0.65;
+                    } else {
+                        // Gentle patrol arc around anchor point
+                        const t = frameTick * 0.025 * effectiveSpeed + m.phase;
+                        const span = level === 1 ? 42 : 75;
+                        m.x = m.anchorX + Math.cos(t) * span * 0.65;
+                        m.y = m.anchorY + Math.sin(t) * span;
+                    }
+                }
+
+                // Keep mouse safely inside canvas bounds and away from center yarn ball
+                m.x = Math.max(margin, Math.min(canvas.width - margin, m.x));
+                m.y = Math.max(margin, Math.min(canvas.height - margin, m.y));
+
+                const cdx = m.x - centralNode.x;
+                const cdy = m.y - centralNode.y;
+                const cDist = Math.hypot(cdx, cdy);
+                const minSafeCenter = centralNode.radius + m.hitRadius + 28;
+                if (cDist < minSafeCenter && cDist > 0.01) {
+                    m.x = centralNode.x + (cdx / cDist) * minSafeCenter;
+                    m.y = centralNode.y + (cdy / cDist) * minSafeCenter;
+                }
+
+                // Smoothly orient mouse toward movement direction
+                const moveDx = m.x - prevX;
+                const moveDy = m.y - prevY;
+                if (Math.hypot(moveDx, moveDy) > 0.05) {
+                    m.facing = Math.atan2(moveDy, moveDx);
+                }
+            }
         }
 
         function updatePhysics() {
-            // Decay center node hit pulse
+            frameTick++;
+
             if (centerPulse > 0) {
                 centerPulse = Math.max(0, centerPulse - 0.06);
             }
 
-            // Update floating +1 point effects
+            // Handle level-up banner countdown
+            if (levelBanner.active) {
+                levelBanner.timer--;
+                if (levelBanner.timer <= 0) {
+                    levelBanner.active = false;
+                    setupLevel(level + 1);
+                }
+            }
+
+            // Update floating popups
             for (let i = hitEffects.length - 1; i >= 0; i--) {
                 const fx = hitEffects[i];
-                fx.y -= 1.1;
-                fx.ringRadius += 1.6;
-                fx.alpha -= 0.025;
+                fx.y -= 1.05;
+                fx.ringRadius += 1.5;
+                fx.alpha -= 0.022;
                 if (fx.alpha <= 0) {
                     hitEffects.splice(i, 1);
                 }
             }
 
+            // Update burst particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.94;
+                p.vy *= 0.94;
+                p.alpha -= 0.03;
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            if (!levelBanner.active) {
+                updateMice();
+            }
+
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
-                const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
+                // Off-screen removal check
+                const margin = 350;
+                if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
                     balls.splice(i, 1);
                     continue;
                 }
 
-                // Distance vector to central gravity node
+                // Distance vector to central gravity yarn ball
                 const dx = centralNode.x - b.x;
                 const dy = centralNode.y - b.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass -> score 1 point
+                // Central yarn ball traps/tangles the tennis ball if hit directly
                 if (dist < centralNode.radius + b.radius) {
-                    score += 1;
-                    updateScoreDisplay();
                     centerPulse = 1;
-                    hitEffects.push({
-                        x: centralNode.x,
-                        y: centralNode.y - centralNode.radius - 10,
-                        ringRadius: centralNode.radius,
-                        alpha: 1
-                    });
+                    spawnBurst(b.x, b.y, '#f06878', 10);
+                    addFloatingText(centralNode.x, centralNode.y - centralNode.radius - 12, 'TANGLED!', '#ff8fa3', centralNode.radius);
                     balls.splice(i, 1);
                     continue;
                 }
 
                 // Inverse square law gravity acceleration
-                const acceleration = GRAVITY_CONSTANT / (distSq + SOFTENING_FACTOR);
-
-                // Acceleration vector components
+                const acceleration = currentGravity / (distSq + SOFTENING_FACTOR);
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
 
-                // Update velocity, position, and ball spin
                 b.vx += ax;
                 b.vy += ay;
                 b.x += b.vx;
                 b.y += b.vy;
                 b.rotation += Math.hypot(b.vx, b.vy) * 0.03;
 
-                // Record position history for line trail
                 b.trail.push({ x: b.x, y: b.y });
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
                 }
+
+                // Check collisions against active mice
+                for (let j = mice.length - 1; j >= 0; j--) {
+                    const m = mice[j];
+                    if (m.hitCooldown > 0) continue;
+
+                    const mDist = Math.hypot(b.x - m.x, b.y - m.y);
+                    if (mDist < b.radius + m.hitRadius) {
+                        m.hp -= 1;
+                        m.hitCooldown = 16;
+
+                        if (m.hp > 0) {
+                            // Armored mouse lost its helmet!
+                            m.speed *= 1.3;
+                            spawnBurst(m.x, m.y, '#cbd5e1', 14);
+                            addFloatingText(m.x, m.y - 18, 'HELMET OFF!', '#6ee7ff', 18);
+                            // Slight deflection
+                            b.vx *= 0.88;
+                            b.vy = -b.vy * 0.8;
+                        } else {
+                            // Mouse caught!
+                            b.combo += 1;
+                            const pts = 100 * level * b.combo;
+                            score += pts;
+                            miceCaughtInLevel += 1;
+
+                            // Refund +1 ball on hit (up to level cap) to reward accuracy
+                            if (ballsRemaining < maxBallsForLevel) {
+                                ballsRemaining += 1;
+                            }
+                            updateHUD();
+
+                            const label = b.combo > 1
+                                ? `COMBO x${b.combo}! +${pts}`
+                                : `SQUEAK! +${pts}`;
+
+                            spawnBurst(m.x, m.y, '#eeff54', 18);
+                            addFloatingText(m.x, m.y - 16, label, '#eeff54', 20);
+                            mice.splice(j, 1);
+
+                            // Slight velocity retention so trick shots can hit multiple mice
+                            b.vx *= 0.92;
+                            b.vy *= 0.92;
+                        }
+                    }
+                }
+
+                // Check if all mice in the level have been cleared
+                if (mice.length === 0 && !levelBanner.active) {
+                    const ballBonus = ballsRemaining * 50;
+                    if (ballBonus > 0) {
+                        score += ballBonus;
+                        updateHUD();
+                    }
+                    const nextLvl = level + 1;
+                    let nextHint = 'Faster Mice & Stronger Gravity!';
+                    if (nextLvl === 3) nextHint = 'Watch out for Speedy Brown Mice!';
+                    else if (nextLvl === 4) nextHint = 'Evasive White Mice will dodge close shots!';
+                    else if (nextLvl === 5) nextHint = 'Armored Helmet Mice take 2 hits!';
+
+                    triggerLevelBanner(
+                        `LEVEL ${level} CLEARED!`,
+                        ballBonus > 0
+                            ? `Ball Bonus +${ballBonus} • Next: ${nextHint}`
+                            : `Next: ${nextHint}`
+                    );
+                    break;
+                }
             }
+
+            // Check Out-of-Balls condition once no tennis balls are flying
+            if (balls.length === 0 && ballsRemaining === 0 && mice.length > 0 && !levelBanner.active) {
+                const remaining = mice.length;
+                overlayTextEl.textContent = `Level ${level} • ${remaining} ${remaining === 1 ? 'mouse' : 'mice'} escaped • Score: ${score}`;
+                overlayEl.classList.add('visible');
+            }
+        }
+
+        // Draw subtle dotted gravity trajectory preview from hover point
+        function drawTrajectoryPreview() {
+            if (!hoverPos || levelBanner.active || overlayEl.classList.contains('visible') || ballsRemaining <= 0) {
+                return;
+            }
+
+            let px = hoverPos.x;
+            let py = hoverPos.y;
+            const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
+            let pvx = LAUNCH_VELOCITY * Math.sin(rad);
+            let pvy = -LAUNCH_VELOCITY * Math.cos(rad);
+
+            ctx.save();
+            // Aim reticle at cursor
+            ctx.strokeStyle = 'rgba(238, 255, 84, 0.7)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(px, py, 10, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Simulate 28 preview steps
+            for (let step = 0; step < 28; step++) {
+                const dx = centralNode.x - px;
+                const dy = centralNode.y - py;
+                const distSq = dx * dx + dy * dy;
+                const dist = Math.sqrt(distSq);
+                if (dist < centralNode.radius + 8) break;
+
+                const acc = currentGravity / (distSq + SOFTENING_FACTOR);
+                pvx += acc * (dx / dist);
+                pvy += acc * (dy / dist);
+                px += pvx;
+                py += pvy;
+
+                if (step % 2 === 0) {
+                    const alpha = (1 - step / 28) * 0.55;
+                    ctx.fillStyle = `rgba(238, 255, 84, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        // Draw animated scurrying mouse target
+        function drawMouse(m) {
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            ctx.scale(m.scale, m.scale);
+            ctx.rotate(m.facing);
+
+            // Color palette by mouse variant
+            let bodyMain = '#8d99ae';
+            let bodyDark = '#5c677d';
+            let earInner = '#f497a9';
+
+            if (m.variant === 'speedy') {
+                bodyMain = '#b07d4f';
+                bodyDark = '#7a5230';
+                earInner = '#e5989b';
+            } else if (m.variant === 'evasive') {
+                bodyMain = '#f1f5f9';
+                bodyDark = '#cbd5e1';
+                earInner = '#ff8fa3';
+            } else if (m.variant === 'armored') {
+                bodyMain = '#64748b';
+                bodyDark = '#334155';
+                earInner = '#f497a9';
+            }
+
+            // 1. Wiggling pink tail
+            const wag = Math.sin(frameTick * 0.24 + m.phase) * 7;
+            ctx.strokeStyle = '#f2849b';
+            ctx.lineWidth = 2.4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-14, 0);
+            ctx.bezierCurveTo(-24, wag, -30, -wag, -37, wag * 0.6);
+            ctx.stroke();
+
+            // 2. Little scurrying pink paws
+            const stride = Math.sin(frameTick * 0.32 + m.phase) * 3;
+            ctx.fillStyle = '#f497a9';
+            ctx.beginPath();
+            ctx.ellipse(6 + stride, -11, 3.2, 2, 0.2, 0, Math.PI * 2);
+            ctx.ellipse(6 - stride, 11, 3.2, 2, -0.2, 0, Math.PI * 2);
+            ctx.ellipse(-7 - stride, -11, 3.5, 2.2, 0, 0, Math.PI * 2);
+            ctx.ellipse(-7 + stride, 11, 3.5, 2.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Teardrop mouse body
+            const bodyGrad = ctx.createRadialGradient(2, -3, 2, 0, 0, 18);
+            bodyGrad.addColorStop(0, bodyMain);
+            bodyGrad.addColorStop(1, bodyDark);
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.moveTo(18, 0);
+            ctx.bezierCurveTo(14, -12, -12, -14, -16, 0);
+            ctx.bezierCurveTo(-12, 14, 14, 12, 18, 0);
+            ctx.fill();
+
+            // 4. Round ears
+            ctx.fillStyle = bodyDark;
+            ctx.beginPath();
+            ctx.arc(3, -10, 6.2, 0, Math.PI * 2);
+            ctx.arc(3, 10, 6.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = earInner;
+            ctx.beginPath();
+            ctx.arc(3.5, -10, 3.6, 0, Math.PI * 2);
+            ctx.arc(3.5, 10, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 5. Eyes
+            ctx.fillStyle = m.variant === 'evasive' ? '#e11d48' : '#111827';
+            ctx.beginPath();
+            ctx.arc(10, -4.5, 2.2, 0, Math.PI * 2);
+            ctx.arc(10, 4.5, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(10.7, -5.1, 0.8, 0, Math.PI * 2);
+            ctx.arc(10.7, 3.9, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 6. Pink nose & whiskers
+            ctx.fillStyle = '#ff758f';
+            ctx.beginPath();
+            ctx.arc(18.5, 0, 2.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.lineWidth = 1;
+            for (const side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.moveTo(15, side * 3);
+                ctx.lineTo(22, side * 8);
+                ctx.moveTo(14, side * 4.5);
+                ctx.lineTo(19, side * 10.5);
+                ctx.stroke();
+            }
+
+            // 7. Thimble armor helmet if Armored Mouse still has HP > 1
+            if (m.hp > 1) {
+                ctx.fillStyle = '#cbd5e1';
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 1.4;
+                ctx.beginPath();
+                ctx.arc(6, 0, 9.5, -Math.PI * 0.55, Math.PI * 0.55);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Metallic rivet glint
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(9, -3, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
         }
 
         // Draw the moving projectile as a tennis ball
@@ -661,17 +1244,14 @@
             ctx.translate(x, y);
             ctx.rotate(rotation);
 
-            // Base sphere fill so outer drop shadow renders around the ball
             ctx.beginPath();
             ctx.arc(0, 0, r, 0, Math.PI * 2);
             ctx.fillStyle = '#c8e619';
             ctx.fill();
 
-            // Disable outer shadow for crisp interior shading & seams
             ctx.shadowColor = 'transparent';
             ctx.clip();
 
-            // 1. Optic-yellow felt radial gradient
             const feltGrad = ctx.createRadialGradient(-r * 0.32, -r * 0.32, r * 0.1, 0, 0, r);
             feltGrad.addColorStop(0, '#eeff54');
             feltGrad.addColorStop(0.55, '#c6e317');
@@ -679,7 +1259,6 @@
             ctx.fillStyle = feltGrad;
             ctx.fillRect(-r, -r, r * 2, r * 2);
 
-            // 2. Subtle fuzzy felt texture specks
             ctx.fillStyle = 'rgba(255, 255, 225, 0.24)';
             const fuzzPoints = [
                 [-0.45, -0.2], [0.3, -0.45], [-0.15, 0.45], [0.45, 0.25],
@@ -691,10 +1270,7 @@
                 ctx.fill();
             }
 
-            // 3. Classic curved white tennis ball seams
             ctx.lineCap = 'round';
-
-            // Dark seam groove underneath white rubber
             ctx.strokeStyle = 'rgba(72, 88, 4, 0.48)';
             ctx.lineWidth = r * 0.25;
             ctx.beginPath();
@@ -704,7 +1280,6 @@
             ctx.arc(r * 1.15, 0, r * 0.92, Math.PI - Math.PI * 0.42, Math.PI + Math.PI * 0.42);
             ctx.stroke();
 
-            // Crisp off-white seam lines
             ctx.strokeStyle = '#f7f9f0';
             ctx.lineWidth = r * 0.16;
             ctx.beginPath();
@@ -716,7 +1291,6 @@
 
             ctx.restore();
 
-            // 4. Subtle outer rim highlight
             ctx.save();
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -730,7 +1304,6 @@
         function drawYarnBall(cx, cy, r) {
             ctx.save();
 
-            // 1. Loose trailing yarn strand curling out from the bottom-right
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(cx + r * 0.45, cy + r * 0.72);
@@ -743,10 +1316,8 @@
             ctx.lineWidth = 2.6;
             ctx.stroke();
 
-            // Disable outer drop shadow for crisp internal strand rendering
             ctx.shadowColor = 'transparent';
 
-            // Subtle highlight along the loose strand
             ctx.beginPath();
             ctx.moveTo(cx + r * 0.45, cy + r * 0.72 - 0.5);
             ctx.bezierCurveTo(
@@ -758,12 +1329,10 @@
             ctx.lineWidth = 0.9;
             ctx.stroke();
 
-            // 2. Clip to main yarn ball sphere
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
             ctx.clip();
 
-            // Base spherical gradient
             const baseGrad = ctx.createRadialGradient(
                 cx - r * 0.3, cy - r * 0.3, r * 0.1,
                 cx, cy, r
@@ -774,13 +1343,11 @@
             ctx.fillStyle = baseGrad;
             ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-            // Helper to draw a wrapped bundle of parallel yarn strands at an angle
             function drawYarnBand(angle, offsetY, bandWidth, curveAmount, strandCount) {
                 ctx.save();
                 ctx.translate(cx, cy);
                 ctx.rotate(angle);
 
-                // Band base fill so overlapping bundles layer naturally
                 ctx.beginPath();
                 ctx.moveTo(-r * 1.2, offsetY - bandWidth / 2);
                 ctx.quadraticCurveTo(0, offsetY - bandWidth / 2 + curveAmount, r * 1.2, offsetY - bandWidth / 2);
@@ -790,17 +1357,14 @@
                 ctx.fillStyle = '#cf3a4b';
                 ctx.fill();
 
-                // Band edge crease
                 ctx.strokeStyle = 'rgba(75, 12, 20, 0.65)';
                 ctx.lineWidth = 1.2;
                 ctx.stroke();
 
-                // Individual parallel yarn threads within the bundle
                 for (let i = 0; i < strandCount; i++) {
                     const frac = (i + 0.5) / strandCount - 0.5;
                     const yPos = offsetY + frac * bandWidth;
 
-                    // Dark thread groove
                     ctx.beginPath();
                     ctx.moveTo(-r * 1.2, yPos);
                     ctx.quadraticCurveTo(0, yPos + curveAmount, r * 1.2, yPos);
@@ -808,7 +1372,6 @@
                     ctx.lineWidth = 1.1;
                     ctx.stroke();
 
-                    // Soft yarn fiber highlight
                     ctx.beginPath();
                     ctx.moveTo(-r * 1.2, yPos - 0.8);
                     ctx.quadraticCurveTo(0, yPos + curveAmount - 0.8, r * 1.2, yPos - 0.8);
@@ -820,14 +1383,12 @@
                 ctx.restore();
             }
 
-            // Layer crisscrossing yarn bundles to create the wound-ball texture
             drawYarnBand(-0.55, -r * 0.35, r * 0.68, r * 0.25, 4);
             drawYarnBand(0.75, -r * 0.25, r * 0.72, -r * 0.22, 4);
             drawYarnBand(-0.15, r * 0.28, r * 0.75, r * 0.28, 4);
             drawYarnBand(1.15, r * 0.22, r * 0.65, -r * 0.25, 4);
             drawYarnBand(-0.85, r * 0.05, r * 0.58, r * 0.18, 3);
 
-            // 3. Spherical 3D shading overlay
             const shadeGrad = ctx.createRadialGradient(
                 cx - r * 0.35, cy - r * 0.35, r * 0.05,
                 cx, cy, r
@@ -840,7 +1401,6 @@
 
             ctx.restore();
 
-            // 4. Crisp outer rim
             ctx.save();
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -855,12 +1415,26 @@
             ctx.fillStyle = bgPattern || '#121722';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Subtle shadow so foreground elements stay crisp over the background
+            // Subtle gravity field rings around center yarn ball
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 6]);
+            for (const ringR of [95, 175, 255]) {
+                ctx.beginPath();
+                ctx.arc(centralNode.x, centralNode.y, ringR, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Draw aim preview dots when hovering
+            drawTrajectoryPreview();
+
             ctx.save();
             ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
             ctx.shadowBlur = 5;
 
-            // 1. Draw Central Yarn Ball Node (with subtle bounce pulse on score)
+            // 1. Draw Central Yarn Ball Node
             const pulseScale = 1 + centerPulse * 0.22;
             ctx.save();
             ctx.translate(centralNode.x, centralNode.y);
@@ -869,9 +1443,13 @@
             drawYarnBall(centralNode.x, centralNode.y, centralNode.radius);
             ctx.restore();
 
-            // 2. Draw Tennis Ball & Trail
+            // 2. Draw Active Mice
+            for (const m of mice) {
+                drawMouse(m);
+            }
+
+            // 3. Draw Tennis Ball & Trail
             for (const b of balls) {
-                // Draw path line
                 if (b.trail.length > 1) {
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
@@ -883,27 +1461,67 @@
                     ctx.stroke();
                 }
 
-                // Draw tennis ball object
                 drawTennisBall(b.x, b.y, b.radius, b.rotation);
             }
 
-            // 3. Draw Score Hit Effects (+1 popup & expanding ring)
+            // 4. Draw Burst Particles
+            for (const p of particles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 5. Draw Score & Hit Popups
             for (const fx of hitEffects) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(centralNode.x, centralNode.y, fx.ringRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(238, 255, 84, ${fx.alpha * 0.75})`;
+                ctx.arc(fx.x, fx.y + 16, fx.ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = fx.color;
+                ctx.globalAlpha = Math.max(0, fx.alpha * 0.65);
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                ctx.font = 'bold 18px "Courier New", Courier, monospace';
+                ctx.globalAlpha = Math.max(0, fx.alpha);
+                ctx.font = 'bold 16px "Courier New", Courier, monospace';
                 ctx.textAlign = 'center';
-                ctx.fillStyle = `rgba(238, 255, 84, ${fx.alpha})`;
-                ctx.fillText('+1', fx.x, fx.y);
+                ctx.fillStyle = fx.color;
+                ctx.fillText(fx.text, fx.x, fx.y);
                 ctx.restore();
             }
 
             ctx.restore();
+
+            // 6. Draw Level Cleared Banner Overlay
+            if (levelBanner.active) {
+                const fade = Math.min(1, levelBanner.timer / 20, (levelBanner.duration - levelBanner.timer + 10) / 15);
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, fade);
+                ctx.fillStyle = 'rgba(11, 14, 20, 0.82)';
+                ctx.fillRect(0, canvas.height / 2 - 58, canvas.width, 116);
+
+                ctx.strokeStyle = '#6ee7ff';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(0, canvas.height / 2 - 58);
+                ctx.lineTo(canvas.width, canvas.height / 2 - 58);
+                ctx.moveTo(0, canvas.height / 2 + 58);
+                ctx.lineTo(canvas.width, canvas.height / 2 + 58);
+                ctx.stroke();
+
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 28px "Courier New", Courier, monospace';
+                ctx.fillStyle = '#eeff54';
+                ctx.fillText(levelBanner.title, canvas.width / 2, canvas.height / 2 - 10);
+
+                ctx.font = 'bold 14px "Courier New", Courier, monospace';
+                ctx.fillStyle = '#6ee7ff';
+                ctx.fillText(levelBanner.subtitle, canvas.width / 2, canvas.height / 2 + 24);
+                ctx.restore();
+            }
         }
 
         function animate() {
