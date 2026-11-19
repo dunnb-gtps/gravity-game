@@ -175,7 +175,7 @@
     </div>
 
     <div class="instructions">
-        <span>TICKET BOOTH OPEN:</span> Left-click anywhere in the twilight sky to dispatch a rollercoaster train, or right-click to launch fireworks.
+        <span>TICKET BOOTH OPEN:</span> Left-click anywhere in the twilight sky to dispatch a rollercoaster train, or right-click to launch fireworks whose blasts redirect nearby trains.
     </div>
 
     <script>
@@ -184,15 +184,18 @@
         const trainCounterEl = document.getElementById('trainCounter');
 
         // SIMULATION CONSTANTS
-        const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
-        const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
-        const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;          // Number of historic track points stored
-        const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
-        const BALL_RADIUS = 4;             // Coaster lead car boundary radius in pixels
-        const LEAD_COLLISION_RADIUS = 5.5; // Lead car hitbox radius for train-to-train collisions
-        const CAR_COLLISION_RADIUS = 4.5;  // Trailing car hitbox radius for train-to-train collisions
-        const TRAIN_RESTITUTION = 0.95;    // Elasticity of train-to-train collisions
+        const GRAVITY_CONSTANT = 1800;     // Strength of gravitational pull (G)
+        const LAUNCH_VELOCITY = 5;          // Fixed velocity on click
+        const FIXED_LAUNCH_ANGLE = 90;      // Fixed direction in degrees (90° = straight right)
+        const TRAIL_LENGTH = 300;           // Number of historic track points stored
+        const SOFTENING_FACTOR = 400;       // Prevents infinite velocity near center
+        const BALL_RADIUS = 4;              // Coaster lead car boundary radius in pixels
+        const LEAD_COLLISION_RADIUS = 5.5;  // Lead car hitbox radius for train-to-train collisions
+        const CAR_COLLISION_RADIUS = 4.5;   // Trailing car hitbox radius for train-to-train collisions
+        const TRAIN_RESTITUTION = 0.95;     // Elasticity of train-to-train collisions
+        const FIREWORK_BLAST_RADIUS = 240;  // Radius within which firework explosions deflect trains
+        const FIREWORK_BLAST_FORCE = 6.2;   // Peak velocity impulse applied at explosion epicenter
+        const MAX_TRAIN_SPEED = 14;         // Upper speed clamp after blast impulses
 
         // COASTER COLOR PALETTE
         const COASTER_THEMES = [
@@ -220,6 +223,7 @@
         let fireworkRockets = [];
         let fireworkParticles = [];
         let fireworkFlashes = [];
+        let fireworkShockwaves = [];
         let stars = [];
         let themeIndex = 0;
         let wheelAngle = 0;
@@ -338,6 +342,58 @@
             });
         }
 
+        function applyFireworkBlast(blastX, blastY, palette) {
+            for (const b of balls) {
+                const cars = getTrainCars(b);
+
+                // Find the closest car on this train to the explosion epicenter
+                let closestCar = cars[0];
+                let minDist = Math.hypot(closestCar.x - blastX, closestCar.y - blastY);
+
+                for (let c = 1; c < cars.length; c++) {
+                    const d = Math.hypot(cars[c].x - blastX, cars[c].y - blastY);
+                    if (d < minDist) {
+                        minDist = d;
+                        closestCar = cars[c];
+                    }
+                }
+
+                if (minDist < FIREWORK_BLAST_RADIUS) {
+                    const dx = closestCar.x - blastX;
+                    const dy = closestCar.y - blastY;
+                    let nx, ny;
+
+                    if (minDist > 0.5) {
+                        nx = dx / minDist;
+                        ny = dy / minDist;
+                    } else {
+                        // Direct hit on a car: deflect perpendicular to current velocity
+                        const speed = Math.hypot(b.vx, b.vy) || 1;
+                        nx = -b.vy / speed;
+                        ny = b.vx / speed;
+                    }
+
+                    const falloff = Math.pow(1 - minDist / FIREWORK_BLAST_RADIUS, 1.25);
+                    const impulse = FIREWORK_BLAST_FORCE * falloff;
+
+                    b.vx += nx * impulse;
+                    b.vy += ny * impulse;
+
+                    // Prevent extreme speed spikes from stacked blasts
+                    const newSpeed = Math.hypot(b.vx, b.vy);
+                    if (newSpeed > MAX_TRAIN_SPEED) {
+                        const scale = MAX_TRAIN_SPEED / newSpeed;
+                        b.vx *= scale;
+                        b.vy *= scale;
+                    }
+
+                    const sparkCount = Math.ceil(6 + 10 * falloff);
+                    spawnSparks(closestCar.x, closestCar.y, palette[0], sparkCount);
+                    spawnSparks(closestCar.x, closestCar.y, b.theme.stripe, Math.ceil(sparkCount * 0.5));
+                }
+            }
+        }
+
         function detonateFirework(x, y, palette) {
             const burstType = Math.floor(Math.random() * 3); // 0: Peony, 1: Dual-Ring, 2: Willow Crackle
             const particleCount = burstType === 1 ? 64 : 52;
@@ -349,6 +405,19 @@
                 color: palette[0],
                 life: 1.0
             });
+
+            fireworkShockwaves.push({
+                x,
+                y,
+                radius: 8,
+                maxRadius: FIREWORK_BLAST_RADIUS,
+                color: palette[0],
+                secondaryColor: palette[1] || palette[0],
+                life: 1.0
+            });
+
+            // Redirect nearby rollercoaster trains with the concussive blast
+            applyFireworkBlast(x, y, palette);
 
             for (let i = 0; i < particleCount; i++) {
                 let angle, speed, color, drag, gravity, decay, twinkle, size;
@@ -436,6 +505,7 @@
             fireworkRockets = [];
             fireworkParticles = [];
             fireworkFlashes = [];
+            fireworkShockwaves = [];
             updateCounter();
         }
 
@@ -594,6 +664,16 @@
                 }
             }
 
+            // Update expanding firework concussive shockwaves
+            for (let i = fireworkShockwaves.length - 1; i >= 0; i--) {
+                const sw = fireworkShockwaves[i];
+                sw.radius += (sw.maxRadius - sw.radius) * 0.22 + 3.5;
+                sw.life -= 0.048;
+                if (sw.life <= 0 || sw.radius >= sw.maxRadius) {
+                    fireworkShockwaves.splice(i, 1);
+                }
+            }
+
             // Update firework burst particles
             for (let i = fireworkParticles.length - 1; i >= 0; i--) {
                 const p = fireworkParticles[i];
@@ -617,7 +697,7 @@
         function updatePhysics() {
             wheelAngle += 0.012;
 
-            // Update fireworks
+            // Update fireworks (and apply blast impulses on detonation)
             updateFireworks();
 
             // Update celebratory & collision sparks
@@ -786,6 +866,25 @@
                 ctx.beginPath();
                 ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
                 ctx.fill();
+            }
+
+            // Expanding concussive shockwave rings
+            for (const sw of fireworkShockwaves) {
+                ctx.strokeStyle = sw.color;
+                ctx.lineWidth = 2.2;
+                ctx.globalAlpha = Math.max(0, sw.life * 0.55);
+                ctx.beginPath();
+                ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                if (sw.radius > 18) {
+                    ctx.strokeStyle = sw.secondaryColor;
+                    ctx.lineWidth = 1.1;
+                    ctx.globalAlpha = Math.max(0, sw.life * 0.3);
+                    ctx.beginPath();
+                    ctx.arc(sw.x, sw.y, sw.radius * 0.72, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
             }
 
             // Rising firework rockets
@@ -1054,7 +1153,7 @@
             // 1. Twilight amusement park background
             drawParkBackground();
 
-            // 2. Fireworks in the night sky
+            // 2. Fireworks & concussive shockwaves in the night sky
             drawFireworks();
 
             // 3. Central Ferris wheel station
