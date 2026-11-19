@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline</title>
+    <title>Gravity Physics Baseline - Dancing Astronaut</title>
     <style>
         * {
             box-sizing: border-box;
@@ -44,6 +44,30 @@
             font-weight: bold;
             color: #f0f6ff;
             text-shadow: 0 0 12px rgba(125, 211, 252, 0.35);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .dance-badge {
+            background: rgba(147, 51, 234, 0.25);
+            border: 1px solid rgba(192, 132, 252, 0.5);
+            color: #e9d5ff;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            text-shadow: 0 0 8px rgba(192, 132, 252, 0.5);
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { border-color: rgba(192, 132, 252, 0.5); box-shadow: 0 0 6px rgba(192, 132, 252, 0.3); }
+            50% { border-color: rgba(236, 72, 153, 0.8); box-shadow: 0 0 14px rgba(236, 72, 153, 0.6); }
         }
 
         .btn-reset {
@@ -103,7 +127,10 @@
     <!-- Header Section -->
     <div id="header">
         <h1>Gravity Simulation</h1>
-        <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        <div class="header-controls">
+            <div id="danceBadge" class="dance-badge">DANCE: DISCO INFERNO</div>
+            <button class="btn-reset" onclick="resetSimulation()">Reset</button>
+        </div>
     </div>
 
     <!-- Canvas Container -->
@@ -112,7 +139,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch an astronaut.
+        Click anywhere on the canvas to launch a dancing astronaut into orbit!
     </div>
 
     <script>
@@ -139,6 +166,14 @@
             '#bfdbfe', // Cool blue-white
             '#fef3c7', // Warm pale gold
             '#fde68a'  // Soft amber starlight
+        ];
+
+        // DANCE ROUTINE DEFINITIONS
+        const DANCE_MOVES = [
+            { name: "DISCO INFERNO", duration: 240 },
+            { name: "FUNKY HIGH-KNEE PUMP", duration: 240 },
+            { name: "ZERO-G TWIRL & WAVE", duration: 240 },
+            { name: "COSMIC MOONWALK SHUFFLE", duration: 240 }
         ];
 
         // EARTH CONTINENT & CLOUD DATA (Longitude, Latitude in degrees)
@@ -212,8 +247,10 @@
         let astronauts = [];
         let stars = [];
         let shootingStars = [];
+        let musicNotes = [];
         let nextShootingStarTimer = 180;
         let animationTime = 0;
+        let noteSpawnTimer = 0;
 
         // Central Gravity Node Definition (Earth)
         const centralNode = {
@@ -445,18 +482,47 @@
                 vy: vy,
                 radius: 4, // Preserved exact baseline collision radius
                 hue: 0,
-                angle: -0.2,
-                angularVelocity: 0.025,
+                angle: -0.15,
+                angularVelocity: 0.015,
                 trail: [{ x: x, y: y, hue: 0 }]
             }];
         }
 
         function resetSimulation() {
             astronauts = [];
+            musicNotes = [];
+        }
+
+        function spawnMusicNote(x, y, hue) {
+            const symbols = ['♪', '♫', '♩', '♬'];
+            const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.8 + Math.random() * 1.4;
+
+            musicNotes.push({
+                x: x + (Math.random() - 0.5) * 12,
+                y: y - 10 + (Math.random() - 0.5) * 8,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 0.8,
+                symbol: symbol,
+                hue: hue,
+                size: 14 + Math.random() * 8,
+                rotation: (Math.random() - 0.5) * 0.4,
+                rotSpeed: (Math.random() - 0.5) * 0.05,
+                life: 0,
+                maxLife: 50 + Math.floor(Math.random() * 25)
+            });
         }
 
         function updateBackgroundEffects() {
             animationTime += 1;
+
+            // Update Dance move HUD indicator
+            const currentMoveIdx = Math.floor(animationTime / 240) % DANCE_MOVES.length;
+            const badge = document.getElementById('danceBadge');
+            if (badge) {
+                badge.textContent = `DANCE: ${DANCE_MOVES[currentMoveIdx].name}`;
+            }
 
             // Periodic subtle shooting star spawn
             nextShootingStarTimer--;
@@ -487,6 +553,18 @@
                 s.life++;
                 if (s.life >= s.maxLife) {
                     shootingStars.splice(i, 1);
+                }
+            }
+
+            // Update active musical notes
+            for (let i = musicNotes.length - 1; i >= 0; i--) {
+                const n = musicNotes[i];
+                n.x += n.vx;
+                n.y += n.vy;
+                n.rotation += n.rotSpeed;
+                n.life++;
+                if (n.life >= n.maxLife) {
+                    musicNotes.splice(i, 1);
                 }
             }
         }
@@ -535,6 +613,12 @@
                 if (astro.trail.length > TRAIL_LENGTH) {
                     astro.trail.shift();
                 }
+
+                // Spawn dance musical notes periodically from astronaut
+                noteSpawnTimer++;
+                if (noteSpawnTimer % 12 === 0) {
+                    spawnMusicNote(astro.x, astro.y, astro.hue);
+                }
             }
         }
 
@@ -553,102 +637,221 @@
         }
 
         /**
-         * Renders a detailed zero-gravity astronaut with a PLSS backpack,
-         * spacesuit limbs, chest control module, and gold-tinted visor.
+         * Renders an articulated, beat-synced dancing astronaut in zero gravity.
+         * Smoothly cycles through disco pointing, funky arm pumping with high knees,
+         * hands-up zero-G twirling, and moonwalk shuffles with body bounce & head bobbing.
          */
         function drawAstronaut(astro) {
             ctx.save();
             ctx.translate(astro.x, astro.y);
-            ctx.rotate(astro.angle);
 
-            // 1. Subtle rainbow aura matching the orbital trail
-            const auraGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 20);
-            auraGrad.addColorStop(0, `hsla(${astro.hue}, 100%, 70%, 0.42)`);
+            // Compute Beat & Dance Choreography Angles
+            const beatRate = 0.22; // Rhythmic tempo
+            const danceTime = animationTime * beatRate;
+            const moveIdx = Math.floor(animationTime / 240) % 4;
+            
+            // Continuous grooving rhythms
+            const beatBounce = Math.sin(danceTime * 2) * 2.2;
+            const headBob = Math.cos(danceTime * 2) * 0.18;
+            const hipSway = Math.sin(danceTime) * 3;
+
+            // Articulated joint rotation variables
+            let torsoRoll = Math.sin(danceTime) * 0.1;
+            let headTilt = headBob;
+
+            // Left & Right Arm joint parameters: { upperArmAngle, forearmAngle }
+            let leftArm = { upper: 0.8, forearm: -0.4 };
+            let rightArm = { upper: -0.8, forearm: 0.4 };
+
+            // Left & Right Leg joint parameters: { thighAngle, kneeAngle }
+            let leftLeg = { thigh: 0.3, knee: 0.2 };
+            let rightLeg = { thigh: -0.3, knee: 0.4 };
+
+            if (moveIdx === 0) {
+                // MOVE 0: DISCO INFERNO (Diagonal High Point & Low Stance)
+                const pointCycle = Math.sin(danceTime * 2);
+                rightArm.upper = -2.2 + pointCycle * 0.25; // Pointing high right!
+                rightArm.forearm = -0.1;
+
+                leftArm.upper = 0.9 + Math.cos(danceTime * 2) * 0.2; // Left hand on hip/side
+                leftArm.forearm = -1.2;
+
+                torsoRoll = pointCycle * 0.15;
+                headTilt = -0.35 + Math.sin(danceTime * 2) * 0.12;
+
+                leftLeg.thigh = 0.6 + Math.sin(danceTime * 2) * 0.2;
+                leftLeg.knee = 0.5;
+                rightLeg.thigh = -0.4 - Math.cos(danceTime * 2) * 0.15;
+                rightLeg.knee = 0.3;
+
+            } else if (moveIdx === 1) {
+                // MOVE 1: FUNKY HIGH-KNEE ARM PUMP
+                const pump = Math.sin(danceTime * 2.5);
+                rightArm.upper = -1.4 + pump * 0.9;
+                rightArm.forearm = -0.8;
+
+                leftArm.upper = -1.4 - pump * 0.9;
+                leftArm.forearm = -0.8;
+
+                // Alternating high knee steps
+                rightLeg.thigh = 0.2 - pump * 0.8;
+                rightLeg.knee = 0.9;
+                leftLeg.thigh = 0.2 + pump * 0.8;
+                leftLeg.knee = 0.9;
+
+                headTilt = pump * 0.2;
+                torsoRoll = -pump * 0.12;
+
+            } else if (moveIdx === 2) {
+                // MOVE 2: ZERO-G TWIRL & HANDS-UP CELEBRATION WAVE
+                const waveLeft = Math.sin(danceTime * 3) * 0.5;
+                const waveRight = Math.cos(danceTime * 3) * 0.5;
+
+                leftArm.upper = -2.4 + waveLeft;
+                leftArm.forearm = -0.4;
+
+                rightArm.upper = -2.4 - waveRight;
+                rightArm.forearm = -0.4;
+
+                // Floating loose zero-G legs
+                leftLeg.thigh = 0.5 + Math.sin(danceTime) * 0.3;
+                leftLeg.knee = 0.6;
+                rightLeg.thigh = -0.5 - Math.cos(danceTime) * 0.3;
+                rightLeg.knee = 0.4;
+
+                torsoRoll = Math.sin(danceTime * 1.5) * 0.28;
+                headTilt = Math.cos(danceTime * 2) * 0.22;
+
+            } else if (moveIdx === 3) {
+                // MOVE 3: COSMIC MOONWALK SHUFFLE
+                const shuffle = Math.sin(danceTime * 2.2);
+
+                // Arms grooving smoothly back and forth
+                leftArm.upper = 0.4 + shuffle * 0.5;
+                leftArm.forearm = -0.5;
+                rightArm.upper = -0.4 - shuffle * 0.5;
+                rightArm.forearm = -0.5;
+
+                // Moonwalk sliding legs
+                leftLeg.thigh = -0.2 - shuffle * 0.6;
+                leftLeg.knee = shuffle > 0 ? 0.9 : 0.1;
+                rightLeg.thigh = -0.2 + shuffle * 0.6;
+                rightLeg.knee = shuffle <= 0 ? 0.9 : 0.1;
+
+                torsoRoll = -0.2; // Leaning back moonwalk style
+                headTilt = 0.18 + Math.sin(danceTime * 2) * 0.1;
+            }
+
+            // Apply base orbital rotation plus body dance bounce & roll
+            ctx.rotate(astro.angle + torsoRoll);
+            ctx.translate(hipSway * 0.5, beatBounce);
+
+            // 1. Luminous Rainbow Aura matching trajectory trail
+            const auraGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 24);
+            auraGrad.addColorStop(0, `hsla(${astro.hue}, 100%, 70%, 0.45)`);
             auraGrad.addColorStop(1, `hsla(${astro.hue}, 100%, 55%, 0)`);
             ctx.fillStyle = auraGrad;
             ctx.beginPath();
-            ctx.arc(0, 0, 20, 0, Math.PI * 2);
+            ctx.arc(0, 0, 24, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // 2. Back Leg (shaded slightly for depth)
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 5.4;
-            ctx.beginPath();
-            ctx.moveTo(-2, 4.5);
-            ctx.lineTo(-4.8, 9.8);
-            ctx.lineTo(-3, 14);
-            ctx.stroke();
+            // Helper function to draw articulated 2-segment limbs (arm or leg)
+            function drawArticulatedLimb(startX, startY, angle1, length1, angle2, length2, thickness, baseColor, jointColor, isGloveOrBoot) {
+                const elbowX = startX + Math.cos(angle1) * length1;
+                const elbowY = startY + Math.sin(angle1) * length1;
+                const endX = elbowX + Math.cos(angle1 + angle2) * length2;
+                const endY = elbowY + Math.sin(angle1 + angle2) * length2;
 
-            ctx.strokeStyle = '#cbd5e1';
-            ctx.lineWidth = 3.8;
-            ctx.beginPath();
-            ctx.moveTo(-2, 4.5);
-            ctx.lineTo(-4.8, 9.8);
-            ctx.lineTo(-3, 14);
-            ctx.stroke();
+                // Limb shadow / outline
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = thickness + 1.6;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(elbowX, elbowY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
 
-            // Back Boot
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 4.2;
-            ctx.beginPath();
-            ctx.moveTo(-3.2, 14);
-            ctx.lineTo(-0.4, 14.6);
-            ctx.stroke();
+                // Limb primary suit fabric
+                ctx.strokeStyle = baseColor;
+                ctx.lineWidth = thickness;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(elbowX, elbowY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
 
-            // 3. Back Arm (reaching slightly forward in zero-G)
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 4.8;
-            ctx.beginPath();
-            ctx.moveTo(2.5, -3);
-            ctx.lineTo(7.5, -5.2);
-            ctx.lineTo(9.8, -3.2);
-            ctx.stroke();
+                // Joint patch ring
+                ctx.fillStyle = '#64748b';
+                ctx.beginPath();
+                ctx.arc(elbowX, elbowY, thickness * 0.55, 0, Math.PI * 2);
+                ctx.fill();
 
-            ctx.strokeStyle = '#cbd5e1';
-            ctx.lineWidth = 3.3;
-            ctx.beginPath();
-            ctx.moveTo(2.5, -3);
-            ctx.lineTo(7.5, -5.2);
-            ctx.lineTo(9.8, -3.2);
-            ctx.stroke();
+                // Boot or Glove Tip
+                if (isGloveOrBoot === 'boot') {
+                    ctx.strokeStyle = '#475569';
+                    ctx.lineWidth = thickness * 1.1;
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX + Math.cos(angle1 + angle2) * 3.5, endY + Math.sin(angle1 + angle2) * 3.5);
+                    ctx.stroke();
+                } else if (isGloveOrBoot === 'glove') {
+                    ctx.fillStyle = jointColor || '#475569';
+                    ctx.beginPath();
+                    ctx.arc(endX, endY, thickness * 0.65, 0, Math.PI * 2);
+                    ctx.fill();
+                }
 
-            // Back Glove
-            ctx.fillStyle = '#475569';
-            ctx.beginPath();
-            ctx.arc(10, -3, 1.9, 0, Math.PI * 2);
-            ctx.fill();
+                return { endX, endY };
+            }
 
-            // 4. PLSS Life-Support Backpack
-            // Antenna
+            // 2. BACK LEG (Layered behind torso)
+            drawArticulatedLimb(
+                -2, 4.5,
+                Math.PI / 2 + leftLeg.thigh, 7.5,
+                leftLeg.knee, 7.5,
+                4.2, '#cbd5e1', '#475569', 'boot'
+            );
+
+            // 3. BACK ARM (Layered behind torso)
+            drawArticulatedLimb(
+                -3.5, -3,
+                leftArm.upper, 6.5,
+                leftArm.forearm, 6.5,
+                3.6, '#cbd5e1', '#38bdf8', 'glove'
+            );
+
+            // 4. PLSS Life-Support Backpack & Telemetry Antenna
+            // Antenna with pulsing LED
             ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 1.1;
             ctx.beginPath();
             ctx.moveTo(-8.5, -6.5);
-            ctx.lineTo(-8.5, -11);
+            ctx.lineTo(-8.5, -12);
             ctx.stroke();
 
-            ctx.fillStyle = '#38bdf8';
+            const ledPulse = Math.sin(danceTime * 4) > 0 ? '#38bdf8' : '#ef4444';
+            ctx.fillStyle = ledPulse;
             ctx.beginPath();
-            ctx.arc(-8.5, -11.3, 1.1, 0, Math.PI * 2);
+            ctx.arc(-8.5, -12.3, 1.3, 0, Math.PI * 2);
             ctx.fill();
 
             // Backpack body
-            drawRoundedRect(ctx, -10.8, -6.5, 6.5, 13, 2);
+            drawRoundedRect(ctx, -11, -6.5, 6.5, 13, 2);
             ctx.fillStyle = '#e2e8f0';
             ctx.fill();
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 0.9;
             ctx.stroke();
 
-            // Backpack telemetry light
+            // Backpack telemetry status light
             ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(-8.8, -4, 2.2, 1.4);
+            ctx.fillRect(-9, -4, 2.4, 1.5);
 
             // 5. Spacesuit Torso
-            drawRoundedRect(ctx, -5, -5.5, 9.8, 11.8, 3.8);
+            drawRoundedRect(ctx, -5, -5.5, 10, 12, 4);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
             ctx.strokeStyle = '#334155';
@@ -660,112 +863,86 @@
             ctx.lineWidth = 1.3;
             ctx.beginPath();
             ctx.moveTo(-4.5, 3.4);
-            ctx.lineTo(4.3, 3.4);
+            ctx.lineTo(4.5, 3.4);
             ctx.stroke();
 
-            // Chest Control Module (DCM)
-            drawRoundedRect(ctx, -0.3, -3.2, 4.2, 4.6, 1);
+            // Chest Control Module (DCM) with rhythmically blinking buttons
+            drawRoundedRect(ctx, -0.3, -3.2, 4.5, 4.8, 1);
             ctx.fillStyle = '#cbd5e1';
             ctx.fill();
             ctx.strokeStyle = '#475569';
             ctx.lineWidth = 0.7;
             ctx.stroke();
 
-            // Tiny control buttons
-            ctx.fillStyle = '#ef4444';
-            ctx.fillRect(0.6, -2.1, 1.2, 1.2);
-            ctx.fillStyle = '#0ea5e9';
-            ctx.fillRect(2.1, -2.1, 1.2, 1.2);
+            // Tiny control buttons (Blinking on beat)
+            ctx.fillStyle = Math.sin(danceTime * 3) > 0 ? '#ef4444' : '#991b1b';
+            ctx.fillRect(0.6, -2.1, 1.3, 1.3);
+            ctx.fillStyle = Math.sin(danceTime * 3) <= 0 ? '#0ea5e9' : '#0369a1';
+            ctx.fillRect(2.3, -2.1, 1.3, 1.3);
 
-            // 6. Front Leg & Space Boot
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 5.6;
-            ctx.beginPath();
-            ctx.moveTo(0.8, 4.8);
-            ctx.lineTo(3.4, 9.8);
-            ctx.lineTo(1.4, 14.3);
-            ctx.stroke();
+            // 6. FRONT LEG & SPACE BOOT (Layered in front of torso)
+            drawArticulatedLimb(
+                1.5, 4.8,
+                Math.PI / 2 + rightLeg.thigh, 8,
+                rightLeg.knee, 8,
+                4.6, '#ffffff', '#334155', 'boot'
+            );
 
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(0.8, 4.8);
-            ctx.lineTo(3.4, 9.8);
-            ctx.lineTo(1.4, 14.3);
-            ctx.stroke();
+            // 7. Helmet & Gold Reflective Visor (with head bobbing/tilt)
+            ctx.save();
+            ctx.translate(0.4, -11);
+            ctx.rotate(headTilt);
 
-            // Front Boot
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 4.4;
-            ctx.beginPath();
-            ctx.moveTo(1.2, 14.3);
-            ctx.lineTo(4.5, 14.7);
-            ctx.stroke();
-
-            // 7. Helmet & Gold Reflective Visor
             // Neck ring
             ctx.fillStyle = '#64748b';
             ctx.beginPath();
-            ctx.ellipse(0.2, -5.6, 4.5, 1.3, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 5.4, 4.6, 1.3, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Helmet shell
-            const helmetGrad = ctx.createRadialGradient(-1.5, -13, 1.5, 0.5, -11, 7.5);
+            // Helmet shell gradient
+            const helmetGrad = ctx.createRadialGradient(-1.8, -2, 1.5, 0, 0, 7.5);
             helmetGrad.addColorStop(0, '#ffffff');
             helmetGrad.addColorStop(0.75, '#f1f5f9');
             helmetGrad.addColorStop(1, '#cbd5e1');
 
             ctx.fillStyle = helmetGrad;
             ctx.beginPath();
-            ctx.arc(0.4, -11, 7.2, 0, Math.PI * 2);
+            ctx.arc(0, 0, 7.4, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 0.9;
             ctx.stroke();
 
             // Gold-tinted reflective visor
-            const visorGrad = ctx.createLinearGradient(0, -15.5, 6.5, -6.5);
+            const visorGrad = ctx.createLinearGradient(-1, -4.5, 5.5, 4.5);
             visorGrad.addColorStop(0, '#fde047');
             visorGrad.addColorStop(0.45, '#f59e0b');
             visorGrad.addColorStop(1, '#78350f');
 
             ctx.fillStyle = visorGrad;
             ctx.beginPath();
-            ctx.ellipse(2.5, -11, 4.5, 4.8, -0.1, 0, Math.PI * 2);
+            ctx.ellipse(2.1, 0, 4.6, 4.9, -0.1, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#451a03';
             ctx.lineWidth = 0.7;
             ctx.stroke();
 
             // Visor specular glass reflection
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+            ctx.lineWidth = 1.3;
             ctx.beginPath();
-            ctx.arc(2.3, -11.2, 3.1, -2.3, -1.15);
+            ctx.arc(1.9, -0.2, 3.2, -2.3, -1.15);
             ctx.stroke();
 
-            // 8. Front Arm & Glove (layered in front for 3D depth)
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 4.9;
-            ctx.beginPath();
-            ctx.moveTo(-1.8, -2.5);
-            ctx.lineTo(-2.6, 2.2);
-            ctx.lineTo(2.6, 3.3);
-            ctx.stroke();
+            ctx.restore(); // Restore helmet tilt transform
 
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 3.4;
-            ctx.beginPath();
-            ctx.moveTo(-1.8, -2.5);
-            ctx.lineTo(-2.6, 2.2);
-            ctx.lineTo(2.6, 3.3);
-            ctx.stroke();
-
-            // Wrist cuff & front glove
-            ctx.fillStyle = '#475569';
-            ctx.beginPath();
-            ctx.arc(3.3, 3.4, 2, 0, Math.PI * 2);
-            ctx.fill();
+            // 8. FRONT ARM & GLOVE (Layered in front for depth)
+            drawArticulatedLimb(
+                -0.5, -2.8,
+                rightArm.upper, 7,
+                rightArm.forearm, 7,
+                4.2, '#ffffff', '#38bdf8', 'glove'
+            );
 
             ctx.restore();
         }
@@ -823,6 +1000,24 @@
                 ctx.moveTo(s.x, s.y);
                 ctx.lineTo(tailX, tailY);
                 ctx.stroke();
+                ctx.restore();
+            }
+
+            // Render floating musical notes particle effect
+            for (const n of musicNotes) {
+                const progress = n.life / n.maxLife;
+                const alpha = Math.sin((1 - progress) * Math.PI);
+
+                ctx.save();
+                ctx.translate(n.x, n.y);
+                ctx.rotate(n.rotation);
+                ctx.font = `bold ${n.size}px sans-serif`;
+                ctx.fillStyle = `hsla(${n.hue}, 100%, 75%, ${alpha})`;
+                ctx.shadowColor = `hsl(${n.hue}, 100%, 60%)`;
+                ctx.shadowBlur = 8;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(n.symbol, 0, 0);
                 ctx.restore();
             }
         }
@@ -960,13 +1155,13 @@
         }
 
         function draw() {
-            // 0. Draw Deep Space Background, Nebulae, Stars & Shooting Stars
+            // 0. Draw Deep Space Background, Nebulae, Stars, Shooting Stars & Musical Notes
             drawSpaceEnvironment();
 
             // 1. Draw Central Gravity Node as Planet Earth
             drawEarth();
 
-            // 2. Draw Astronaut & Luminous Rainbow Trajectory Trail
+            // 2. Draw Dancing Astronaut & Luminous Rainbow Trajectory Trail
             for (const astro of astronauts) {
                 if (astro.trail.length > 1) {
                     ctx.save();
@@ -1000,7 +1195,7 @@
                     ctx.restore();
                 }
 
-                // Draw astronaut at current orbital position
+                // Draw articulated dancing astronaut at current orbital position
                 drawAstronaut(astro);
             }
         }
