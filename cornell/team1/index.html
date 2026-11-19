@@ -158,6 +158,8 @@
 
         const YELLOW_BATTLE_CRIES = ['QUACK!', 'HOLD THE POND!', 'BREAD BARRAGE!', 'FOR THE FLOCK!', 'INCOMING!'];
         const RED_BATTLE_CRIES = ['CWASHOUT!', 'VENGEANCE!', 'NO MERCY!', 'QUACK ATTACK!', 'CHARGE!'];
+        const YELLOW_BOSS_CRIES = ['BOW TO THE GOLDEN FLOCK!', 'UNLEASH THE QUACKEN!', 'FEATHER FURY!', 'GOLDEN SUPREMACY!'];
+        const RED_BOSS_CRIES = ['TOTAL CWASHOUT!', 'BURN THE POND!', 'NO SURVIVORS!', 'CRIMSON WRATH!'];
 
         // STATE VARIABLES
         let balls = [];
@@ -177,9 +179,13 @@
         // Duck War state
         let duckWarActive = false;
         let warBannerTimer = 0;
+        let bossBannerText = '';
+        let bossBannerTimer = 0;
         let warWave = 1;
         let yellowKOs = 0;
         let redKOs = 0;
+        let yellowBossRespawnTimer = 0;
+        let redBossRespawnTimer = 0;
         let warDucks = [];
         let warProjectiles = [];
         let airstrikes = [];
@@ -282,9 +288,13 @@
             // Reset Duck War state
             duckWarActive = false;
             warBannerTimer = 0;
+            bossBannerText = '';
+            bossBannerTimer = 0;
             warWave = 1;
             yellowKOs = 0;
             redKOs = 0;
+            yellowBossRespawnTimer = 0;
+            redBossRespawnTimer = 0;
             warDucks = [];
             warProjectiles = [];
             airstrikes = [];
@@ -331,7 +341,7 @@
             });
 
             for (let i = 0; i < count; i++) {
-                if (explosionParticles.length > 260) break;
+                if (explosionParticles.length > 320) break;
                 const angle = Math.random() * Math.PI * 2;
                 const speed = (1.2 + Math.random() * 5.8) * Math.sqrt(intensity);
                 const isSmoke = i >= Math.round(count * 0.78);
@@ -407,27 +417,67 @@
         function startDuckWar() {
             duckWarActive = true;
             warBannerTimer = 210; // ~3.5 seconds banner announcement
+            bossBannerText = '';
+            bossBannerTimer = 0;
             warWave = 1;
             yellowKOs = 0;
             redKOs = 0;
+            yellowBossRespawnTimer = 0;
+            redBossRespawnTimer = 0;
             warDucks = [];
             warProjectiles = [];
             airstrikes = [];
 
             headerTitle.textContent = 'DUCK WAR';
-            instructionsText.textContent = 'DUCK WAR! Click anywhere on the battlefield to call down Rainbow Bread-Bomb Airstrikes!';
+            instructionsText.textContent = 'DUCK WAR! Yellow Boss vs Red Boss! Click anywhere to call Rainbow Bread-Bomb Airstrikes!';
             updateHitCounter();
 
-            // Deploy initial opposing squadrons
-            spawnWarSquadron('yellow', 6, false);
-            spawnWarSquadron('red', 6, false);
+            // Deploy the Yellow Boss and Red Boss alongside their opposing squadrons
+            spawnWarBoss('yellow');
+            spawnWarBoss('red');
+            spawnWarSquadron('yellow', 5, false);
+            spawnWarSquadron('red', 5, false);
             updateBallCounter();
+        }
+
+        function spawnWarBoss(team) {
+            if (warDucks.some(d => d.isBoss && d.team === team)) return;
+
+            const isYellow = team === 'yellow';
+            const maxHp = 45;
+            const scale = 2.35;
+            const spawnX = isYellow ? -55 : canvas.width + 55;
+            const spawnY = Math.max(95, Math.min(canvas.height - 95, canvas.height * (isYellow ? 0.36 : 0.64)));
+            const cries = isYellow ? YELLOW_BOSS_CRIES : RED_BOSS_CRIES;
+            const cry = cries[Math.floor(Math.random() * cries.length)];
+
+            warDucks.push({
+                x: spawnX,
+                y: spawnY,
+                vx: isYellow ? 2.4 : -2.4,
+                vy: 0,
+                team: team,
+                hp: maxHp,
+                maxHp: maxHp,
+                scale: scale,
+                isCommander: true,
+                isBoss: true,
+                bossName: isYellow ? 'YELLOW BOSS' : 'RED BOSS',
+                facing: isYellow ? 1 : -1,
+                bobPhase: Math.random() * Math.PI * 2,
+                fireCooldown: 55,
+                attackPattern: 0,
+                weaponType: 'boss',
+                hitFlash: 0,
+                battleCry: cry,
+                cryTimer: 145
+            });
         }
 
         function spawnWarSquadron(team, count, includeCommander = false) {
             const isYellow = team === 'yellow';
             for (let i = 0; i < count; i++) {
-                if (warDucks.length >= 22) break;
+                if (warDucks.length >= 24) break;
 
                 const isCommander = includeCommander && i === 0;
                 const scale = isCommander ? 1.45 : (0.85 + Math.random() * 0.25);
@@ -457,6 +507,7 @@
                     maxHp: maxHp,
                     scale: scale,
                     isCommander: isCommander,
+                    isBoss: false,
                     facing: isYellow ? 1 : -1,
                     bobPhase: Math.random() * Math.PI * 2,
                     fireCooldown: 25 + Math.floor(Math.random() * 45),
@@ -489,15 +540,58 @@
             if (warBannerTimer > 0) {
                 warBannerTimer--;
             }
-
-            // Count active ducks per faction and send reinforcements when a side runs low
-            let yellowCount = 0;
-            let redCount = 0;
-            for (const d of warDucks) {
-                if (d.team === 'yellow') yellowCount++;
-                else redCount++;
+            if (bossBannerTimer > 0) {
+                bossBannerTimer--;
+                if (bossBannerTimer === 0) bossBannerText = '';
             }
 
+            // Count active ducks & check whether the Yellow Boss and Red Boss are present
+            let yellowCount = 0;
+            let redCount = 0;
+            let hasYellowBoss = false;
+            let hasRedBoss = false;
+
+            for (const d of warDucks) {
+                if (d.team === 'yellow') {
+                    yellowCount++;
+                    if (d.isBoss) hasYellowBoss = true;
+                } else {
+                    redCount++;
+                    if (d.isBoss) hasRedBoss = true;
+                }
+            }
+
+            // Respawn Yellow Boss if defeated
+            if (!hasYellowBoss) {
+                if (yellowBossRespawnTimer <= 0) {
+                    yellowBossRespawnTimer = 360;
+                } else {
+                    yellowBossRespawnTimer--;
+                    if (yellowBossRespawnTimer === 0) {
+                        spawnWarBoss('yellow');
+                        bossBannerText = 'THE YELLOW BOSS HAS RETURNED!';
+                        bossBannerTimer = 140;
+                        updateBallCounter();
+                    }
+                }
+            }
+
+            // Respawn Red Boss if defeated
+            if (!hasRedBoss) {
+                if (redBossRespawnTimer <= 0) {
+                    redBossRespawnTimer = 360;
+                } else {
+                    redBossRespawnTimer--;
+                    if (redBossRespawnTimer === 0) {
+                        spawnWarBoss('red');
+                        bossBannerText = 'THE RED BOSS HAS RETURNED!';
+                        bossBannerTimer = 140;
+                        updateBallCounter();
+                    }
+                }
+            }
+
+            // Send troop reinforcements when a side runs low
             if (yellowCount < 4) {
                 warWave++;
                 spawnWarSquadron('yellow', 4, warWave % 2 === 0);
@@ -509,10 +603,10 @@
                 updateBallCounter();
             }
 
-            // Update Warrior Ducks AI, movement, and firing
+            // Update Warrior Ducks & Bosses AI, movement, and firing
             for (let i = warDucks.length - 1; i >= 0; i--) {
                 const d = warDucks[i];
-                d.bobPhase += 0.12;
+                d.bobPhase += d.isBoss ? 0.08 : 0.12;
                 if (d.hitFlash > 0) d.hitFlash--;
                 if (d.cryTimer > 0) {
                     d.cryTimer--;
@@ -539,19 +633,19 @@
                     d.facing = dx >= 0 ? 1 : -1;
 
                     // Desired combat range
-                    const preferredDist = d.weaponType === 'egg' ? 280 : 195;
+                    const preferredDist = d.isBoss ? 255 : (d.weaponType === 'egg' ? 280 : 195);
                     const dirX = dx / (nearestDist || 1);
                     const dirY = dy / (nearestDist || 1);
 
                     let desiredVx = 0;
-                    let desiredVy = dirY * 1.6 + Math.cos(d.bobPhase) * 0.9;
+                    let desiredVy = dirY * (d.isBoss ? 1.25 : 1.6) + Math.cos(d.bobPhase) * (d.isBoss ? 0.75 : 0.9);
 
-                    if (nearestDist > preferredDist + 40) {
-                        desiredVx = dirX * 2.4;
-                    } else if (nearestDist < preferredDist - 40) {
-                        desiredVx = -dirX * 1.8;
+                    if (nearestDist > preferredDist + 45) {
+                        desiredVx = dirX * (d.isBoss ? 1.9 : 2.4);
+                    } else if (nearestDist < preferredDist - 45) {
+                        desiredVx = -dirX * (d.isBoss ? 1.4 : 1.8);
                     } else {
-                        desiredVx = Math.sin(d.bobPhase * 0.5) * 0.8;
+                        desiredVx = Math.sin(d.bobPhase * 0.5) * (d.isBoss ? 0.65 : 0.8);
                     }
 
                     // Friendly separation so squads spread out cleanly
@@ -560,7 +654,8 @@
                         const adx = d.x - ally.x;
                         const ady = d.y - ally.y;
                         const adist = Math.hypot(adx, ady);
-                        if (adist > 0 && adist < 54) {
+                        const minSep = (d.isBoss || ally.isBoss) ? 80 : 54;
+                        if (adist > 0 && adist < minSep) {
                             desiredVx += (adx / adist) * 1.4;
                             desiredVy += (ady / adist) * 1.4;
                         }
@@ -571,12 +666,22 @@
 
                     // Fire weapon when on screen and cooldown finishes
                     d.fireCooldown--;
-                    const onScreen = d.x > 15 && d.x < canvas.width - 15;
+                    const onScreen = d.x > 25 && d.x < canvas.width - 25;
                     if (onScreen && d.fireCooldown <= 0) {
-                        fireDuckWeapon(d, nearestEnemy);
-                        d.fireCooldown = d.weaponType === 'seed'
-                            ? (36 + Math.floor(Math.random() * 25))
-                            : (d.weaponType === 'laser' ? 52 : 75);
+                        if (d.isBoss) {
+                            fireBossWeapon(d, nearestEnemy);
+                            d.fireCooldown = 68;
+                            if (Math.random() < 0.25 && !d.battleCry) {
+                                const cries = d.team === 'yellow' ? YELLOW_BOSS_CRIES : RED_BOSS_CRIES;
+                                d.battleCry = cries[Math.floor(Math.random() * cries.length)];
+                                d.cryTimer = 110;
+                            }
+                        } else {
+                            fireDuckWeapon(d, nearestEnemy);
+                            d.fireCooldown = d.weaponType === 'seed'
+                                ? (36 + Math.floor(Math.random() * 25))
+                                : (d.weaponType === 'laser' ? 52 : 75);
+                        }
                     }
                 }
 
@@ -584,7 +689,7 @@
                 d.y += d.vy;
 
                 // Keep ducks within vertical battlefield margins
-                const marginY = 48;
+                const marginY = d.isBoss ? 72 : 48;
                 if (d.y < marginY) {
                     d.y = marginY;
                     d.vy = Math.abs(d.vy) * 0.5;
@@ -594,15 +699,16 @@
                 }
 
                 // Keep ducks inside horizontal bounds once they enter the arena
-                if (d.x > 25 && d.x < canvas.width - 25) {
+                const enterMargin = d.isBoss ? 52 : 25;
+                if (d.x > enterMargin && d.x < canvas.width - enterMargin) {
                     d.enteredArena = true;
                 }
                 if (d.enteredArena) {
-                    if (d.x < 24) {
-                        d.x = 24;
+                    if (d.x < enterMargin) {
+                        d.x = enterMargin;
                         d.vx = Math.abs(d.vx);
-                    } else if (d.x > canvas.width - 24) {
-                        d.x = canvas.width - 24;
+                    } else if (d.x > canvas.width - enterMargin) {
+                        d.x = canvas.width - enterMargin;
                         d.vx = -Math.abs(d.vx);
                     }
                 }
@@ -663,17 +769,18 @@
                     spawnExplosion(strike.targetX, strike.targetY, strike.color, 1.25);
                     screenShakeTimer = Math.max(screenShakeTimer, 12);
 
-                    const blastRadius = 85;
+                    const blastRadius = 90;
                     for (let j = warDucks.length - 1; j >= 0; j--) {
                         const d = warDucks[j];
                         const bdx = d.x - strike.targetX;
                         const bdy = d.y - strike.targetY;
                         const bdist = Math.hypot(bdx, bdy);
-                        if (bdist < blastRadius) {
-                            const push = ((blastRadius - bdist) / blastRadius) * 7;
+                        if (bdist < blastRadius + (d.isBoss ? 18 : 0)) {
+                            const push = ((blastRadius - Math.min(blastRadius, bdist)) / blastRadius) * 7;
                             const nx = bdx / (bdist || 1);
                             const ny = bdy / (bdist || 1);
-                            damageWarDuck(j, 3, nx * push, ny * push - 1.5);
+                            const dmg = d.isBoss ? 5 : 3;
+                            damageWarDuck(j, dmg, nx * push, ny * push - 1.5);
                         }
                     }
 
@@ -681,6 +788,77 @@
                 } else {
                     strike.x += (dx / dist) * strike.speed;
                     strike.y += (dy / dist) * strike.speed;
+                }
+            }
+        }
+
+        function fireBossWeapon(boss, target) {
+            const muzzleX = boss.x + boss.facing * (18 * boss.scale);
+            const muzzleY = boss.y - 6 * boss.scale;
+            const dx = target.x - muzzleX;
+            const dy = target.y - muzzleY;
+            const dist = Math.hypot(dx, dy) || 1;
+            const baseAngle = Math.atan2(dy, dx);
+
+            const pattern = boss.attackPattern;
+            boss.attackPattern = (boss.attackPattern + 1) % 3;
+
+            if (pattern === 0) {
+                // 5-Way Plasma Laser Fan
+                const offsets = [-0.32, -0.16, 0, 0.16, 0.32];
+                const speed = 9.4;
+                for (const offset of offsets) {
+                    const angle = baseAngle + offset;
+                    warProjectiles.push({
+                        x: muzzleX,
+                        y: muzzleY,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        team: boss.team,
+                        type: 'laser',
+                        radius: 4.2,
+                        damage: 1.75,
+                        color: boss.team === 'yellow' ? '#00F5D4' : '#FF0055'
+                    });
+                }
+            } else if (pattern === 1) {
+                // Triple Explosive Egg Mortar Volley
+                const spreads = [-45, 0, 45];
+                for (const spreadX of spreads) {
+                    const targetX = target.x + spreadX;
+                    const flightFrames = Math.max(30, Math.min(54, dist / 6));
+                    const vx = (targetX - muzzleX) / flightFrames;
+                    const vy = (dy / flightFrames) - 0.5 * 0.14 * flightFrames;
+                    warProjectiles.push({
+                        x: muzzleX,
+                        y: muzzleY,
+                        vx: vx,
+                        vy: vy,
+                        team: boss.team,
+                        type: 'egg',
+                        radius: 6.5,
+                        damage: 3,
+                        rotation: 0,
+                        color: '#FFFFFF'
+                    });
+                }
+            } else {
+                // Heavy 4-Shot Seed Gatling Spread
+                const offsets = [-0.18, -0.06, 0.06, 0.18];
+                const speed = 7.8;
+                for (const offset of offsets) {
+                    const angle = baseAngle + offset;
+                    warProjectiles.push({
+                        x: muzzleX,
+                        y: muzzleY,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        team: boss.team,
+                        type: 'seed',
+                        radius: 4.2,
+                        damage: 1.4,
+                        color: boss.team === 'yellow' ? '#FFE600' : '#FF5500'
+                    });
                 }
             }
         }
@@ -746,18 +924,38 @@
 
             d.hp -= damage;
             d.hitFlash = 6;
-            d.vx += knockVx;
-            d.vy += knockVy;
+            const knockScale = d.isBoss ? 0.22 : 1;
+            d.vx += knockVx * knockScale;
+            d.vy += knockVy * knockScale;
 
             if (d.hp <= 0) {
                 const featherColor = d.team === 'yellow' ? '#FFD700' : '#E61414';
-                spawnExplosion(d.x, d.y, featherColor, d.isCommander ? 1.25 : 0.85);
-                screenShakeTimer = Math.max(screenShakeTimer, d.isCommander ? 10 : 4);
 
-                if (d.team === 'yellow') {
-                    redKOs++;
+                if (d.isBoss) {
+                    spawnExplosion(d.x, d.y, featherColor, 2.2);
+                    spawnExplosion(d.x - 18, d.y - 12, '#FFFFFF', 1.2);
+                    spawnExplosion(d.x + 18, d.y + 10, featherColor, 1.3);
+                    screenShakeTimer = Math.max(screenShakeTimer, 24);
+
+                    if (d.team === 'yellow') {
+                        redKOs += 5;
+                        yellowBossRespawnTimer = 360;
+                    } else {
+                        yellowKOs += 5;
+                        redBossRespawnTimer = 360;
+                    }
+
+                    bossBannerText = `${d.bossName} DEFEATED! (+5 KOs)`;
+                    bossBannerTimer = 150;
                 } else {
-                    yellowKOs++;
+                    spawnExplosion(d.x, d.y, featherColor, d.isCommander ? 1.25 : 0.85);
+                    screenShakeTimer = Math.max(screenShakeTimer, d.isCommander ? 10 : 4);
+
+                    if (d.team === 'yellow') {
+                        redKOs++;
+                    } else {
+                        yellowKOs++;
+                    }
                 }
 
                 warDucks.splice(index, 1);
@@ -851,7 +1049,7 @@
                     b.vx += ax;
                     b.vy += ay;
                 } else if (duckWarActive) {
-                    // Leftover orbiting rainbow balls can knock out warrior ducks during the war!
+                    // Leftover orbiting rainbow balls can damage warrior ducks & bosses during the war!
                     let hitWarDuck = false;
                     for (let j = warDucks.length - 1; j >= 0; j--) {
                         const d = warDucks[j];
@@ -907,7 +1105,7 @@
         }
 
         /**
-         * Renders a cute vector duck on the target 2D context, with optional war gear.
+         * Renders a cute vector duck on the target 2D context, with optional war & boss gear.
          */
         function drawDuckSprite(
             targetCtx,
@@ -958,6 +1156,21 @@
             targetCtx.fillStyle = bodyColor;
             targetCtx.fill();
 
+            // Boss chest armor plate
+            if (warGear === 'yellow_boss' || warGear === 'red_boss') {
+                targetCtx.beginPath();
+                targetCtx.moveTo(11.2, 0.0);
+                targetCtx.quadraticCurveTo(13.8, 6.0, 11.0, 11.5);
+                targetCtx.lineTo(3.5, 11.5);
+                targetCtx.quadraticCurveTo(5.5, 5.5, 4.0, 0.0);
+                targetCtx.closePath();
+                targetCtx.fillStyle = warGear === 'yellow_boss' ? '#1E3A8A' : '#1F2937';
+                targetCtx.fill();
+                targetCtx.strokeStyle = warGear === 'yellow_boss' ? '#FFD700' : '#EF4444';
+                targetCtx.lineWidth = 1.2;
+                targetCtx.stroke();
+            }
+
             // 3. Head
             targetCtx.beginPath();
             targetCtx.arc(7.0, -8.0, 7.5, 0, Math.PI * 2);
@@ -995,12 +1208,12 @@
                 targetCtx.stroke();
             }
 
-            // 7. Duck War Helmets & Headbands
-            if (warGear === 'yellow_army' || warGear === 'yellow_commander') {
+            // 7. Duck War Helmets, Headbands & Boss Crowns
+            if (warGear === 'yellow_army' || warGear === 'yellow_commander' || warGear === 'yellow_boss') {
                 // Olive-navy army helmet
                 targetCtx.beginPath();
                 targetCtx.arc(6.8, -10.2, 7.6, Math.PI * 1.05, Math.PI * 1.98);
-                targetCtx.fillStyle = warGear === 'yellow_commander' ? '#1E3A8A' : '#3F6212';
+                targetCtx.fillStyle = (warGear === 'yellow_commander' || warGear === 'yellow_boss') ? '#1E3A8A' : '#3F6212';
                 targetCtx.fill();
                 targetCtx.strokeStyle = '#14213d';
                 targetCtx.lineWidth = 1.1;
@@ -1010,8 +1223,8 @@
                 targetCtx.beginPath();
                 targetCtx.moveTo(-1.5, -10.4);
                 targetCtx.lineTo(15.2, -10.4);
-                targetCtx.strokeStyle = '#14213d';
-                targetCtx.lineWidth = 1.5;
+                targetCtx.strokeStyle = warGear === 'yellow_boss' ? '#FFD700' : '#14213d';
+                targetCtx.lineWidth = warGear === 'yellow_boss' ? 2.0 : 1.5;
                 targetCtx.stroke();
 
                 // Gold star emblem on commander helmet
@@ -1021,11 +1234,29 @@
                     targetCtx.arc(8.5, -13.2, 1.8, 0, Math.PI * 2);
                     targetCtx.fill();
                 }
-            } else if (warGear === 'red_rebel' || warGear === 'red_commander') {
+
+                // Royal golden war crown on Yellow Boss
+                if (warGear === 'yellow_boss') {
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(1.8, -16.8);
+                    targetCtx.lineTo(3.2, -23.0);
+                    targetCtx.lineTo(5.6, -18.5);
+                    targetCtx.lineTo(7.5, -24.5);
+                    targetCtx.lineTo(9.4, -18.5);
+                    targetCtx.lineTo(11.8, -23.0);
+                    targetCtx.lineTo(12.8, -16.8);
+                    targetCtx.closePath();
+                    targetCtx.fillStyle = '#FFD700';
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = '#14213d';
+                    targetCtx.lineWidth = 1.1;
+                    targetCtx.stroke();
+                }
+            } else if (warGear === 'red_rebel' || warGear === 'red_commander' || warGear === 'red_boss') {
                 // Dark battle bandana / spiked war cap
                 targetCtx.beginPath();
                 targetCtx.arc(6.8, -10.2, 7.6, Math.PI * 1.05, Math.PI * 1.98);
-                targetCtx.fillStyle = '#1F2937';
+                targetCtx.fillStyle = warGear === 'red_boss' ? '#111827' : '#1F2937';
                 targetCtx.fill();
 
                 // Red war headband with trailing ribbon
@@ -1045,7 +1276,7 @@
                 targetCtx.lineWidth = 1.6;
                 targetCtx.stroke();
 
-                // Horn/spike for Red Commander
+                // Single horn/spike for Red Commander
                 if (warGear === 'red_commander') {
                     targetCtx.beginPath();
                     targetCtx.moveTo(5.0, -17.2);
@@ -1053,6 +1284,42 @@
                     targetCtx.lineTo(9.4, -17.2);
                     targetCtx.closePath();
                     targetCtx.fillStyle = '#FFD700';
+                    targetCtx.fill();
+                }
+
+                // Twin curved warlord horns + center crest for Red Boss
+                if (warGear === 'red_boss') {
+                    // Left horn
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(1.5, -15.5);
+                    targetCtx.quadraticCurveTo(-2.5, -21.5, 0.5, -24.5);
+                    targetCtx.quadraticCurveTo(2.5, -20.5, 4.5, -16.8);
+                    targetCtx.closePath();
+                    targetCtx.fillStyle = '#FFD700';
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = '#7F1D1D';
+                    targetCtx.lineWidth = 1.0;
+                    targetCtx.stroke();
+
+                    // Right horn
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(9.5, -16.8);
+                    targetCtx.quadraticCurveTo(11.5, -20.5, 13.5, -24.5);
+                    targetCtx.quadraticCurveTo(16.5, -21.5, 12.5, -15.5);
+                    targetCtx.closePath();
+                    targetCtx.fillStyle = '#FFD700';
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = '#7F1D1D';
+                    targetCtx.lineWidth = 1.0;
+                    targetCtx.stroke();
+
+                    // Center crimson crest
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(5.4, -17.2);
+                    targetCtx.lineTo(7.2, -22.2);
+                    targetCtx.lineTo(9.0, -17.2);
+                    targetCtx.closePath();
+                    targetCtx.fillStyle = '#EF4444';
                     targetCtx.fill();
                 }
             }
@@ -1063,7 +1330,7 @@
         /**
          * Renders a comic speech bubble above a duck.
          */
-        function drawSpeechBubble(targetCtx, anchorX, anchorY, text, isWarning, compact = false) {
+        function drawSpeechBubble(targetCtx, anchorX, anchorY, text, isWarning, compact = false, topOffset = 0) {
             if (!text) return;
 
             targetCtx.save();
@@ -1079,7 +1346,7 @@
             // Keep bubble within horizontal canvas bounds
             let boxX = anchorX - boxWidth / 2;
             boxX = Math.max(8, Math.min(canvas.width - boxWidth - 8, boxX));
-            const boxY = Math.max(8, anchorY - (compact ? 46 : 64));
+            const boxY = Math.max(8, anchorY - (compact ? 46 : 64) - topOffset);
 
             // Pop-in scale when newly triggered
             const popScale = (!compact && hitAnimTimer > 14) ? (1 + (hitAnimTimer - 14) * 0.025) : 1;
@@ -1100,7 +1367,7 @@
 
             // Speech bubble pointer tail pointing toward the duck
             const tailX = Math.max(boxX + 10, Math.min(boxX + boxWidth - 10, anchorX));
-            const pointerY = anchorY - (compact ? 18 : 22);
+            const pointerY = anchorY - (compact ? 18 : 22) - topOffset;
             targetCtx.beginPath();
             targetCtx.moveTo(tailX - 5, boxY + boxHeight - 1);
             targetCtx.lineTo(anchorX, pointerY);
@@ -1368,11 +1635,32 @@
                 ctx.restore();
             }
 
-            // Draw Warrior Ducks
+            // Draw Warrior Ducks & Bosses
             for (const d of warDucks) {
                 const isYellow = d.team === 'yellow';
-                const bobOffset = Math.sin(d.bobPhase) * 3;
-                const tilt = Math.sin(d.bobPhase * 0.8) * 0.08 * d.facing;
+                const bobOffset = Math.sin(d.bobPhase) * (d.isBoss ? 4 : 3);
+                const tilt = Math.sin(d.bobPhase * 0.8) * (d.isBoss ? 0.05 : 0.08) * d.facing;
+
+                // Pulsing aura behind Yellow Boss & Red Boss
+                if (d.isBoss) {
+                    const auraRadius = 56 + Math.sin(d.bobPhase * 2) * 5;
+                    ctx.save();
+                    const aura = ctx.createRadialGradient(d.x, d.y + bobOffset, 8, d.x, d.y + bobOffset, auraRadius);
+                    if (isYellow) {
+                        aura.addColorStop(0, 'rgba(255, 215, 0, 0.55)');
+                        aura.addColorStop(0.65, 'rgba(250, 204, 21, 0.22)');
+                        aura.addColorStop(1, 'rgba(255, 215, 0, 0)');
+                    } else {
+                        aura.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
+                        aura.addColorStop(0.65, 'rgba(220, 38, 38, 0.22)');
+                        aura.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                    }
+                    ctx.fillStyle = aura;
+                    ctx.beginPath();
+                    ctx.arc(d.x, d.y + bobOffset, auraRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
 
                 let bodyColor = isYellow ? '#FFD700' : '#E61414';
                 let wingColor = isYellow ? '#E6AC00' : '#9E0808';
@@ -1381,9 +1669,11 @@
                     wingColor = '#FCA5A5';
                 }
 
-                const gear = isYellow
-                    ? (d.isCommander ? 'yellow_commander' : 'yellow_army')
-                    : (d.isCommander ? 'red_commander' : 'red_rebel');
+                const gear = d.isBoss
+                    ? (isYellow ? 'yellow_boss' : 'red_boss')
+                    : (isYellow
+                        ? (d.isCommander ? 'yellow_commander' : 'yellow_army')
+                        : (d.isCommander ? 'red_commander' : 'red_rebel'));
 
                 drawDuckSprite(
                     ctx,
@@ -1395,12 +1685,40 @@
                     false,
                     bodyColor,
                     wingColor,
-                    isYellow ? 2 : 4,
+                    isYellow ? (d.isBoss ? 4 : 2) : 4,
                     gear
                 );
 
-                // Mini health bar above damaged or commander ducks
-                if (d.hp < d.maxHp || d.isCommander) {
+                // Boss Nameplate + Boss Health Bar vs Regular Unit Health Bar
+                if (d.isBoss) {
+                    const barW = 94;
+                    const barH = 8;
+                    const bx = Math.max(12, Math.min(canvas.width - barW - 12, d.x - barW / 2));
+                    const by = Math.max(46, d.y + bobOffset - 26 * d.scale);
+                    const hpRatio = Math.max(0, d.hp / d.maxHp);
+
+                    ctx.save();
+                    // Boss Nameplate
+                    ctx.font = 'bold 11px "Courier New", Courier, monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#14213d';
+                    ctx.strokeText(d.bossName, bx + barW / 2, by - 3);
+                    ctx.fillStyle = isYellow ? '#FDE047' : '#FCA5A5';
+                    ctx.fillText(d.bossName, bx + barW / 2, by - 3);
+
+                    // Boss HP Bar
+                    ctx.fillStyle = 'rgba(20, 33, 61, 0.88)';
+                    ctx.fillRect(bx - 1.5, by - 1.5, barW + 3, barH + 3);
+                    ctx.strokeStyle = isYellow ? '#FFD700' : '#EF4444';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(bx - 1.5, by - 1.5, barW + 3, barH + 3);
+
+                    ctx.fillStyle = isYellow ? '#FACC15' : '#EF4444';
+                    ctx.fillRect(bx, by, barW * hpRatio, barH);
+                    ctx.restore();
+                } else if (d.hp < d.maxHp || d.isCommander) {
                     const barW = 26 * d.scale;
                     const barH = 4;
                     const bx = d.x - barW / 2;
@@ -1417,7 +1735,7 @@
 
                 // Battle cry speech bubble
                 if (d.battleCry) {
-                    drawSpeechBubble(ctx, d.x, d.y + bobOffset, d.battleCry, !isYellow, true);
+                    drawSpeechBubble(ctx, d.x, d.y + bobOffset, d.battleCry, !isYellow, true, d.isBoss ? 34 : 0);
                 }
             }
 
@@ -1444,13 +1762,39 @@
             ctx.fillText(hudText, canvas.width / 2, hudY + hudH / 2 + 1);
             ctx.restore();
 
+            // Boss Defeat / Return Banner
+            if (bossBannerTimer > 0 && bossBannerText && warBannerTimer <= 0) {
+                const alpha = Math.min(1, bossBannerTimer / 25);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.font = 'bold 13px "Courier New", Courier, monospace';
+                const bw = ctx.measureText(bossBannerText).width + 28;
+                const bh = 28;
+                const bx = (canvas.width - bw) / 2;
+                const by = 44;
+
+                ctx.beginPath();
+                ctx.roundRect(bx, by, bw, bh, 5);
+                ctx.fillStyle = 'rgba(20, 33, 61, 0.9)';
+                ctx.fill();
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 1.6;
+                ctx.stroke();
+
+                ctx.fillStyle = '#FFD700';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(bossBannerText, canvas.width / 2, by + bh / 2 + 1);
+                ctx.restore();
+            }
+
             // Dramatic Duck War start banner (fades out automatically)
             if (warBannerTimer > 0) {
                 const alpha = Math.min(1, warBannerTimer / 35);
                 ctx.save();
                 ctx.globalAlpha = alpha;
-                const msg = 'THE DUCK CWASHED OUT! DUCK WAR BEGINS!';
-                ctx.font = 'bold 16px "Courier New", Courier, monospace';
+                const msg = 'THE DUCK CWASHED OUT! YELLOW BOSS VS RED BOSS!';
+                ctx.font = 'bold 15px "Courier New", Courier, monospace';
                 const w = ctx.measureText(msg).width + 36;
                 const h = 42;
                 const bx = (canvas.width - w) / 2;
