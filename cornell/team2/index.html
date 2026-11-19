@@ -123,6 +123,7 @@
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
         const EARTH_RADIUS = 9;           // Visual and collision radius of planet Earth
         const ASTRONAUT_HEIGHT_CM = 8;    // Physical target height of background astronaut (8 cm)
+        const SUN_SLOW_MOTION_SPEED = 0.005; // Slow-motion phase increment for solar corona & surface rotation
 
         // STATE VARIABLES
         let bodies = [];
@@ -491,14 +492,14 @@
 
         /**
          * Updates space background animations, background astronaut zero-gravity drift,
-         * solar animation, orbital kinematics, gravity acceleration, and Earth's spin.
+         * slow-motion solar animation, orbital kinematics, gravity acceleration, and Earth's spin.
          */
         function updatePhysics() {
             // Update twinkling star phases and shooting stars
             updateSpaceBackground();
 
-            // Advance solar corona & surface animation phase
-            centralNode.phase += 0.03;
+            // Advance solar corona & surface animation phase in slow motion
+            centralNode.phase += SUN_SLOW_MOTION_SPEED;
 
             // Update background astronaut zero-gravity drift
             astronaut.phase += 0.018;
