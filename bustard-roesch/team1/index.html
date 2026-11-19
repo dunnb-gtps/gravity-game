@@ -248,6 +248,15 @@
         let jungleVines = [];
         let jungleFireflies = [];
 
+        // Background Jungle Wildlife Collections
+        let canopyBranches = [];
+        let jungleToucans = [];
+        let jungleSloth = null;
+        let jungleMonkey = null;
+        let jungleFlyingBirds = [];
+        let jungleButterflies = [];
+        let jungleFrogs = [];
+
         // Keyboard input tracking for optional manual steering
         const activeKeys = new Set();
         let manualTimer = 0;
@@ -284,6 +293,14 @@
 
         function lerp(a, b, t) {
             return a + (b - a) * t;
+        }
+
+        function evalQuadBezier(p0, p1, p2, t) {
+            const invT = 1 - t;
+            return {
+                x: invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x,
+                y: invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y
+            };
         }
 
         // Seeded PRNG so jungle foliage & silhouettes remain coherent across resizes
@@ -508,6 +525,64 @@
             targetCtx.restore();
         }
 
+        function drawCanopyBranch(targetCtx, branch, scale) {
+            const { p0, p1, p2, baseThickness } = branch;
+            targetCtx.save();
+            targetCtx.fillStyle = '#04190d';
+            targetCtx.strokeStyle = '#0a2f1a';
+            targetCtx.lineWidth = 1.2;
+
+            // Tapered quadratic branch polygon
+            const steps = 16;
+            const upperPts = [];
+            const lowerPts = [];
+
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const pt = evalQuadBezier(p0, p1, p2, t);
+                const halfT = Math.max(1.5, baseThickness * (1 - t * 0.72) * 0.5);
+                upperPts.push({ x: pt.x, y: pt.y - halfT });
+                lowerPts.unshift({ x: pt.x, y: pt.y + halfT });
+            }
+
+            targetCtx.beginPath();
+            targetCtx.moveTo(upperPts[0].x, upperPts[0].y);
+            for (let i = 1; i < upperPts.length; i++) {
+                targetCtx.lineTo(upperPts[i].x, upperPts[i].y);
+            }
+            for (let i = 0; i < lowerPts.length; i++) {
+                targetCtx.lineTo(lowerPts[i].x, lowerPts[i].y);
+            }
+            targetCtx.closePath();
+            targetCtx.fill();
+
+            // Subtle mossy top highlight along branch upper edge
+            targetCtx.beginPath();
+            targetCtx.moveTo(upperPts[0].x, upperPts[0].y);
+            for (let i = 1; i < upperPts.length; i++) {
+                targetCtx.lineTo(upperPts[i].x, upperPts[i].y);
+            }
+            targetCtx.stroke();
+
+            // Small offshoot twig near branch tip
+            const twigAnchor = evalQuadBezier(p0, p1, p2, 0.78);
+            const dir = p2.x > p0.x ? 1 : -1;
+            targetCtx.strokeStyle = '#04190d';
+            targetCtx.lineWidth = 2.2 * scale;
+            targetCtx.lineCap = 'round';
+            targetCtx.beginPath();
+            targetCtx.moveTo(twigAnchor.x, twigAnchor.y);
+            targetCtx.quadraticCurveTo(
+                twigAnchor.x + dir * 18 * scale,
+                twigAnchor.y - 12 * scale,
+                twigAnchor.x + dir * 32 * scale,
+                twigAnchor.y - 18 * scale
+            );
+            targetCtx.stroke();
+
+            targetCtx.restore();
+        }
+
         function buildStaticJungleCache() {
             const w = canvas.width;
             const h = canvas.height;
@@ -578,10 +653,30 @@
             bgCacheCtx.fillStyle = mistGrad;
             bgCacheCtx.fillRect(0, h * 0.72, w, h * 0.28);
 
-            // 4. Corner & Perimeter Tropical Foliage (Framing edges without obstructing play area)
+            // 4. Upper Canopy Mossy Branches (Anchors for Background Wildlife)
             const scale = Math.max(0.65, Math.min(1.25, Math.min(w, h) / 680));
+            canopyBranches = [
+                // Upper-left bough (hosts perched toucan & hanging sloth)
+                {
+                    p0: { x: -12, y: h * 0.19 },
+                    p1: { x: w * 0.12, y: h * 0.16 },
+                    p2: { x: w * 0.24, y: h * 0.20 },
+                    baseThickness: 15 * scale
+                },
+                // Upper-right bough (hosts perched toucan & swinging/peeking monkey)
+                {
+                    p0: { x: w + 12, y: h * 0.17 },
+                    p1: { x: w * 0.88, y: h * 0.14 },
+                    p2: { x: w * 0.75, y: h * 0.18 },
+                    baseThickness: 15 * scale
+                }
+            ];
 
-            // Back layer (deeper shadow emerald)
+            for (const branch of canopyBranches) {
+                drawCanopyBranch(bgCacheCtx, branch, scale);
+            }
+
+            // 5. Corner & Perimeter Tropical Foliage (Framing edges without obstructing play area)
             // Bottom-Left Corner Cluster
             drawPalmFrond(bgCacheCtx, -10, h + 10, -0.58, 175 * scale, -24 * scale, 13, '#04190e');
             drawPalmFrond(bgCacheCtx, -12, h - 25, -0.24, 155 * scale, 18 * scale, 11, '#051f11');
@@ -632,6 +727,646 @@
             bgCacheCtx.fillRect(0, 0, w, h);
         }
 
+        // =========================================================================
+        // BACKGROUND JUNGLE WILDLIFE INITIALIZATION & RENDERING
+        // =========================================================================
+        function initJungleAnimals(w, h, rand) {
+            const scale = Math.max(0.65, Math.min(1.25, Math.min(w, h) / 680));
+
+            // 1. Perched Canopy Toucans on upper left & right branches
+            jungleToucans = [];
+            if (canopyBranches.length >= 2) {
+                const leftAnchor = evalQuadBezier(canopyBranches[0].p0, canopyBranches[0].p1, canopyBranches[0].p2, 0.34);
+                const rightAnchor = evalQuadBezier(canopyBranches[1].p0, canopyBranches[1].p1, canopyBranches[1].p2, 0.30);
+
+                jungleToucans.push({
+                    x: leftAnchor.x,
+                    y: leftAnchor.y - 3 * scale,
+                    facing: 1,
+                    scale: scale * 0.95,
+                    phase: rand() * Math.PI * 2,
+                    lookTimer: 120 + Math.floor(rand() * 140),
+                    headTilt: 0,
+                    targetHeadTilt: 0,
+                    blinkTimer: 90
+                });
+
+                jungleToucans.push({
+                    x: rightAnchor.x,
+                    y: rightAnchor.y - 3 * scale,
+                    facing: -1,
+                    scale: scale * 0.9,
+                    phase: rand() * Math.PI * 2,
+                    lookTimer: 180 + Math.floor(rand() * 140),
+                    headTilt: 0,
+                    targetHeadTilt: 0,
+                    blinkTimer: 150
+                });
+            }
+
+            // 2. Hanging Canopy Sloth on the upper-left bough
+            if (canopyBranches.length >= 1) {
+                const slothAnchor = evalQuadBezier(canopyBranches[0].p0, canopyBranches[0].p1, canopyBranches[0].p2, 0.72);
+                jungleSloth = {
+                    x: slothAnchor.x,
+                    y: slothAnchor.y + 3 * scale,
+                    scale: scale * 0.95,
+                    phase: rand() * Math.PI * 2
+                };
+            }
+
+            // 3. Curious Jungle Monkey on the upper-right bough
+            if (canopyBranches.length >= 2) {
+                const monkeyAnchor = evalQuadBezier(canopyBranches[1].p0, canopyBranches[1].p1, canopyBranches[1].p2, 0.74);
+                jungleMonkey = {
+                    x: monkeyAnchor.x,
+                    y: monkeyAnchor.y - 2 * scale,
+                    scale: scale * 0.92,
+                    phase: rand() * Math.PI * 2,
+                    blinkTimer: 110
+                };
+            }
+
+            // 4. Gliding / Flapping Rainforest Canopy Birds
+            jungleFlyingBirds = [];
+            const birdCount = 3;
+            for (let i = 0; i < birdCount; i++) {
+                const dir = i % 2 === 0 ? 1 : -1;
+                const depthScale = (0.55 + i * 0.16) * scale;
+                jungleFlyingBirds.push({
+                    x: rand() * w,
+                    y: h * (0.12 + i * 0.085) + (rand() - 0.5) * 18,
+                    baseY: h * (0.12 + i * 0.085),
+                    dir: dir,
+                    speed: (0.48 + i * 0.16) * (0.85 + rand() * 0.3),
+                    scale: depthScale,
+                    flapSpeed: 0.11 + rand() * 0.04,
+                    phase: rand() * Math.PI * 2,
+                    glideCooldown: Math.floor(rand() * 180),
+                    isGliding: false
+                });
+            }
+
+            // 5. Iridescent Rainforest Butterflies (Morpho / Swallowtail silhouettes)
+            jungleButterflies = [];
+            const butterflyCount = Math.max(5, Math.floor(w / 180));
+            const palettes = [
+                { wing: 'rgba(56, 178, 145, 0.32)', trim: 'rgba(145, 240, 195, 0.45)' },
+                { wing: 'rgba(65, 165, 190, 0.30)', trim: 'rgba(155, 225, 245, 0.42)' },
+                { wing: 'rgba(155, 185, 72, 0.28)', trim: 'rgba(220, 242, 130, 0.40)' }
+            ];
+            for (let i = 0; i < butterflyCount; i++) {
+                const pal = palettes[i % palettes.length];
+                // Keep butterflies primarily in upper/outer canopy zones so center stays clean
+                const edgeBiasX = i % 2 === 0 ? w * (0.12 + rand() * 0.25) : w * (0.63 + rand() * 0.25);
+                jungleButterflies.push({
+                    x: edgeBiasX,
+                    y: h * (0.18 + rand() * 0.58),
+                    vx: (rand() - 0.5) * 0.55,
+                    vy: (rand() - 0.5) * 0.35,
+                    size: (6.5 + rand() * 3.5) * scale,
+                    flapSpeed: 0.22 + rand() * 0.08,
+                    phase: rand() * Math.PI * 2,
+                    wanderTimer: 40 + Math.floor(rand() * 90),
+                    palette: pal
+                });
+            }
+
+            // 6. Rainforest Tree Frogs perched on lower corner monstera & fern leaves
+            jungleFrogs = [];
+            const leftPerches = [
+                { x: 58 * scale, y: h - 38 * scale, facing: 1 },
+                { x: 96 * scale, y: h - 54 * scale, facing: 1 }
+            ];
+            const rightPerches = [
+                { x: w - 60 * scale, y: h - 40 * scale, facing: -1 },
+                { x: w - 98 * scale, y: h - 56 * scale, facing: -1 }
+            ];
+
+            jungleFrogs.push({
+                perches: leftPerches,
+                perchIdx: 0,
+                x: leftPerches[0].x,
+                y: leftPerches[0].y,
+                startX: leftPerches[0].x,
+                startY: leftPerches[0].y,
+                targetX: leftPerches[0].x,
+                targetY: leftPerches[0].y,
+                facing: 1,
+                scale: scale * 0.9,
+                hopProgress: 0,
+                isHopping: false,
+                hopCooldown: 180 + Math.floor(rand() * 180),
+                phase: rand() * Math.PI * 2,
+                blinkTimer: 100
+            });
+
+            jungleFrogs.push({
+                perches: rightPerches,
+                perchIdx: 0,
+                x: rightPerches[0].x,
+                y: rightPerches[0].y,
+                startX: rightPerches[0].x,
+                startY: rightPerches[0].y,
+                targetX: rightPerches[0].x,
+                targetY: rightPerches[0].y,
+                facing: -1,
+                scale: scale * 0.9,
+                hopProgress: 0,
+                isHopping: false,
+                hopCooldown: 260 + Math.floor(rand() * 180),
+                phase: rand() * Math.PI * 2,
+                blinkTimer: 140
+            });
+        }
+
+        function drawJungleToucans() {
+            for (const t of jungleToucans) {
+                t.lookTimer--;
+                if (t.lookTimer <= 0) {
+                    t.lookTimer = 140 + ((frameTick * 17) % 160);
+                    t.targetHeadTilt = t.targetHeadTilt === 0 ? (Math.sin(frameTick) > 0 ? 0.16 : -0.14) : 0;
+                }
+                t.headTilt = lerp(t.headTilt, t.targetHeadTilt, 0.06);
+
+                if (t.blinkTimer > 0) {
+                    t.blinkTimer--;
+                } else if (t.blinkTimer <= -8) {
+                    t.blinkTimer = 150 + ((frameTick * 13) % 140);
+                } else {
+                    t.blinkTimer--;
+                }
+
+                const breathe = Math.sin(frameTick * 0.045 + t.phase) * 0.8;
+                const s = t.scale;
+
+                ctx.save();
+                ctx.translate(t.x, t.y + breathe * 0.35);
+                ctx.scale(t.facing * s, s);
+
+                // Tail feathers extending downward behind branch
+                ctx.fillStyle = '#03150b';
+                ctx.beginPath();
+                ctx.moveTo(-6, -2);
+                ctx.lineTo(-17, 18);
+                ctx.lineTo(-11, 20);
+                ctx.lineTo(-2, 0);
+                ctx.closePath();
+                ctx.fill();
+
+                // Perched body silhouette
+                ctx.fillStyle = '#041a0e';
+                ctx.strokeStyle = '#0e3b22';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.ellipse(-2, -9, 8.5, 11.5, -0.25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Subtle folded wing contour
+                ctx.strokeStyle = '#0c351e';
+                ctx.beginPath();
+                ctx.arc(-3, -8, 6.5, 0.3, Math.PI * 1.15);
+                ctx.stroke();
+
+                // Head & iconic curved toucan bill (articulated tilt)
+                ctx.save();
+                ctx.translate(2, -18);
+                ctx.rotate(t.headTilt);
+
+                // Subtle muted yellow-green throat bib
+                ctx.fillStyle = 'rgba(135, 185, 92, 0.22)';
+                ctx.beginPath();
+                ctx.arc(1.5, 3.5, 4.8, -0.4, Math.PI * 0.85);
+                ctx.fill();
+
+                // Head
+                ctx.fillStyle = '#041a0e';
+                ctx.beginPath();
+                ctx.arc(0, 0, 6.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Iconic large curved toucan beak in muted twilight amber-gold
+                ctx.fillStyle = 'rgba(182, 146, 56, 0.34)';
+                ctx.beginPath();
+                ctx.moveTo(4.5, -3.5);
+                ctx.quadraticCurveTo(18, -4.5, 22, 1.5);
+                ctx.quadraticCurveTo(14, 2.5, 4.5, 2.2);
+                ctx.closePath();
+                ctx.fill();
+
+                // Dark tip on beak
+                ctx.fillStyle = '#03130a';
+                ctx.beginPath();
+                ctx.arc(20.2, 0.6, 2.1, -0.8, 1.2);
+                ctx.fill();
+
+                // Eye (blinks periodically)
+                if (t.blinkTimer > 0) {
+                    ctx.fillStyle = 'rgba(175, 225, 185, 0.45)';
+                    ctx.beginPath();
+                    ctx.arc(1.8, -1.2, 1.4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+                ctx.restore();
+            }
+        }
+
+        function drawJungleSloth() {
+            if (!jungleSloth) return;
+            const s = jungleSloth.scale;
+            const sway = Math.sin(frameTick * 0.022 + jungleSloth.phase) * 0.065;
+            const headTurn = Math.sin(frameTick * 0.015 + jungleSloth.phase * 1.7) * 0.14;
+
+            ctx.save();
+            ctx.translate(jungleSloth.x, jungleSloth.y);
+            ctx.rotate(sway);
+            ctx.scale(s, s);
+
+            ctx.fillStyle = '#04190d';
+            ctx.strokeStyle = '#0c341d';
+            ctx.lineWidth = 1.1;
+
+            // Back hanging arm gripping branch
+            ctx.lineWidth = 4.2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#03150b';
+            ctx.beginPath();
+            ctx.moveTo(-11, 14);
+            ctx.quadraticCurveTo(-13, 6, -9, -1);
+            ctx.stroke();
+
+            // Front hanging arm gripping branch
+            ctx.strokeStyle = '#051d10';
+            ctx.beginPath();
+            ctx.moveTo(8, 14);
+            ctx.quadraticCurveTo(11, 6, 8, -1);
+            ctx.stroke();
+
+            // Curved hammock torso suspended under branch
+            ctx.fillStyle = '#041a0e';
+            ctx.strokeStyle = '#0d3920';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(-1, 16, 13, 7.5, -0.08, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Round sloth head nestled near front shoulder
+            ctx.save();
+            ctx.translate(11, 13);
+            ctx.rotate(headTurn);
+            ctx.fillStyle = '#051e10';
+            ctx.beginPath();
+            ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Soft pale-moss face mask
+            ctx.fillStyle = 'rgba(130, 185, 145, 0.20)';
+            ctx.beginPath();
+            ctx.arc(1.2, 0.3, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        function drawJungleMonkey() {
+            if (!jungleMonkey) return;
+            const m = jungleMonkey;
+            const s = m.scale;
+            const bounce = Math.sin(frameTick * 0.05 + m.phase) * 1.1;
+            const tailWave = Math.sin(frameTick * 0.04 + m.phase) * 0.25;
+
+            if (m.blinkTimer > 0) {
+                m.blinkTimer--;
+            } else if (m.blinkTimer <= -7) {
+                m.blinkTimer = 130 + ((frameTick * 19) % 150);
+            } else {
+                m.blinkTimer--;
+            }
+
+            ctx.save();
+            ctx.translate(m.x, m.y + bounce * 0.4);
+            ctx.scale(s, s);
+
+            // Long curled prehensile tail swaying gracefully
+            ctx.strokeStyle = '#041a0e';
+            ctx.lineWidth = 2.6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(6, -5);
+            ctx.bezierCurveTo(
+                18, -12 + tailWave * 12,
+                22, -26 + tailWave * 8,
+                14, -30 + tailWave * 10
+            );
+            ctx.stroke();
+
+            // Crouched torso silhouette
+            ctx.fillStyle = '#041a0e';
+            ctx.strokeStyle = '#0d3920';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(0, -9, 7.5, 9.5, 0.22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Forearm resting on knee/branch
+            ctx.strokeStyle = '#041a0e';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-4, -12);
+            ctx.quadraticCurveTo(-9, -6, -6, 0);
+            ctx.stroke();
+
+            // Head & round monkey ear facing inward (left)
+            const headLook = Math.sin(frameTick * 0.025 + m.phase) * 0.15;
+            ctx.save();
+            ctx.translate(-3, -19);
+            ctx.rotate(headLook);
+
+            ctx.fillStyle = '#041a0e';
+            ctx.beginPath();
+            ctx.arc(0, 0, 5.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Round ear
+            ctx.beginPath();
+            ctx.arc(3.8, -0.5, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Subtle blinking eyes peeking toward the arena
+            if (m.blinkTimer > 0) {
+                ctx.fillStyle = 'rgba(170, 225, 180, 0.40)';
+                ctx.beginPath();
+                ctx.arc(-2.6, -0.8, 1.1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+            ctx.restore();
+        }
+
+        function drawJungleFlyingBirds() {
+            const w = canvas.width;
+            for (const b of jungleFlyingBirds) {
+                b.x += b.speed * b.dir;
+
+                // Alternate between active flapping and serene soaring glides
+                if (b.glideCooldown > 0) {
+                    b.glideCooldown--;
+                } else {
+                    b.isGliding = !b.isGliding;
+                    b.glideCooldown = b.isGliding ? 75 : 130;
+                }
+
+                const bob = Math.sin(frameTick * 0.03 + b.phase) * 6;
+                b.y = b.baseY + bob;
+
+                // Wrap smoothly across horizontal screen edges
+                if (b.dir === 1 && b.x > w + 50) {
+                    b.x = -50;
+                } else if (b.dir === -1 && b.x < -50) {
+                    b.x = w + 50;
+                }
+
+                const flapRaw = b.isGliding
+                    ? 0.22
+                    : Math.sin(frameTick * b.flapSpeed + b.phase);
+                const wingTipY = -flapRaw * 13;
+                const wingMidY = -flapRaw * 7;
+
+                ctx.save();
+                ctx.translate(b.x, b.y);
+                ctx.scale(b.dir * b.scale, b.scale);
+
+                // Far wing (slightly darker for depth)
+                ctx.strokeStyle = '#03140a';
+                ctx.lineWidth = 2.2;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(1, -1);
+                ctx.quadraticCurveTo(-2, wingMidY * 0.85 - 2, -9, wingTipY * 0.85 - 2);
+                ctx.stroke();
+
+                // Streamlined bird body & tail
+                ctx.fillStyle = '#041c0f';
+                ctx.beginPath();
+                ctx.moveTo(10, 0); // beak tip
+                ctx.quadraticCurveTo(4, -3.5, -4, -2);
+                ctx.lineTo(-14, -4); // tail upper
+                ctx.lineTo(-12, 1);  // tail lower
+                ctx.lineTo(-4, 2);
+                ctx.quadraticCurveTo(3, 3, 10, 0);
+                ctx.closePath();
+                ctx.fill();
+
+                // Near articulated wing
+                ctx.strokeStyle = '#0b381f';
+                ctx.fillStyle = '#052212';
+                ctx.lineWidth = 2.4;
+                ctx.beginPath();
+                ctx.moveTo(2, 0);
+                ctx.quadraticCurveTo(-2, wingMidY, -11, wingTipY);
+                ctx.quadraticCurveTo(-5, wingMidY * 0.45 + 1.5, -2, 1);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        function drawJungleButterflies() {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            for (const bf of jungleButterflies) {
+                bf.wanderTimer--;
+                if (bf.wanderTimer <= 0) {
+                    bf.wanderTimer = 55 + ((frameTick * 11) % 95);
+                    bf.vx += (Math.sin(frameTick * 0.13 + bf.phase) * 0.32);
+                    bf.vy += (Math.cos(frameTick * 0.17 + bf.phase) * 0.25);
+
+                    // Clamp velocity for delicate, unhurried flutter
+                    bf.vx = Math.max(-0.65, Math.min(0.65, bf.vx));
+                    bf.vy = Math.max(-0.45, Math.min(0.45, bf.vy));
+                }
+
+                // Gentle attraction away from dead-center arena so butterflies stay atmospheric
+                const dxCenter = bf.x - centralNode.x;
+                const dyCenter = bf.y - centralNode.y;
+                const distCenter = Math.hypot(dxCenter, dyCenter) || 1;
+                const avoidR = Math.min(w, h) * 0.26;
+                if (distCenter < avoidR) {
+                    bf.vx += (dxCenter / distCenter) * 0.025;
+                    bf.vy += (dyCenter / distCenter) * 0.025;
+                }
+
+                bf.x += bf.vx;
+                bf.y += bf.vy + Math.sin(frameTick * bf.flapSpeed + bf.phase) * 0.32;
+
+                // Keep comfortably within canopy bounds
+                if (bf.x < 24) bf.vx = Math.abs(bf.vx) + 0.1;
+                if (bf.x > w - 24) bf.vx = -Math.abs(bf.vx) - 0.1;
+                if (bf.y < 24) bf.vy = Math.abs(bf.vy) + 0.08;
+                if (bf.y > h * 0.85) bf.vy = -Math.abs(bf.vy) - 0.08;
+
+                // 3D wing-beat foreshortening factor
+                const flapScale = 0.22 + 0.78 * Math.abs(Math.cos(frameTick * bf.flapSpeed + bf.phase));
+                const heading = Math.atan2(bf.vy, bf.vx) * 0.25;
+                const sz = bf.size;
+
+                ctx.save();
+                ctx.translate(bf.x, bf.y);
+                ctx.rotate(heading);
+
+                // Paired upper & lower wings
+                for (const side of [-1, 1]) {
+                    ctx.save();
+                    ctx.scale(side * flapScale, 1);
+
+                    // Forewing
+                    ctx.fillStyle = bf.palette.wing;
+                    ctx.strokeStyle = bf.palette.trim;
+                    ctx.lineWidth = 0.8;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.bezierCurveTo(sz * 0.4, -sz * 0.95, sz * 1.15, -sz * 0.75, sz * 0.95, -sz * 0.05);
+                    ctx.quadraticCurveTo(sz * 0.45, sz * 0.12, 0, 0);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Hindwing
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.bezierCurveTo(sz * 0.75, sz * 0.05, sz * 0.85, sz * 0.75, sz * 0.25, sz * 0.82);
+                    ctx.quadraticCurveTo(sz * 0.05, sz * 0.45, 0, 0);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+
+                // Tiny thorax body
+                ctx.fillStyle = '#041a0e';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 0.9, sz * 0.36, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        function drawJungleFrogs() {
+            for (const frog of jungleFrogs) {
+                if (frog.isHopping) {
+                    frog.hopProgress += 0.042;
+                    if (frog.hopProgress >= 1) {
+                        frog.hopProgress = 0;
+                        frog.isHopping = false;
+                        frog.x = frog.targetX;
+                        frog.y = frog.targetY;
+                        frog.hopCooldown = 220 + ((frameTick * 23) % 240);
+                    } else {
+                        const t = frog.hopProgress;
+                        const arcHeight = Math.sin(t * Math.PI) * 18 * frog.scale;
+                        frog.x = lerp(frog.startX, frog.targetX, t);
+                        frog.y = lerp(frog.startY, frog.targetY, t) - arcHeight;
+                    }
+                } else {
+                    frog.hopCooldown--;
+                    if (frog.hopCooldown <= 0 && frog.perches.length > 1) {
+                        const nextIdx = (frog.perchIdx + 1) % frog.perches.length;
+                        const dest = frog.perches[nextIdx];
+                        frog.startX = frog.x;
+                        frog.startY = frog.y;
+                        frog.targetX = dest.x;
+                        frog.targetY = dest.y;
+                        frog.perchIdx = nextIdx;
+                        frog.isHopping = true;
+                        frog.hopProgress = 0;
+                    }
+                }
+
+                if (frog.blinkTimer > 0) {
+                    frog.blinkTimer--;
+                } else if (frog.blinkTimer <= -6) {
+                    frog.blinkTimer = 120 + ((frameTick * 13) % 130);
+                } else {
+                    frog.blinkTimer--;
+                }
+
+                const throatPulse = Math.max(0, Math.sin(frameTick * 0.11 + frog.phase)) * 1.4;
+                const s = frog.scale;
+
+                ctx.save();
+                ctx.translate(frog.x, frog.y);
+                ctx.scale(frog.facing * s, s);
+
+                // Folded hind leg
+                ctx.fillStyle = '#062614';
+                ctx.strokeStyle = '#114528';
+                ctx.lineWidth = 0.9;
+                ctx.beginPath();
+                ctx.ellipse(-4, -2.5, 4.5, 2.6, -0.45, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Tree frog body
+                ctx.fillStyle = '#08301a';
+                ctx.beginPath();
+                ctx.ellipse(0, -4.5, 6.2, 3.8, -0.22, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Vocal throat sac breathing pulse
+                if (!frog.isHopping) {
+                    ctx.fillStyle = 'rgba(90, 175, 115, 0.25)';
+                    ctx.beginPath();
+                    ctx.arc(4.2, -3.5 + throatPulse * 0.4, 2.0 + throatPulse * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Front leg supporting posture
+                ctx.strokeStyle = '#0d3d22';
+                ctx.lineWidth = 1.5;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(3.5, -3.5);
+                ctx.lineTo(5.5, 0);
+                ctx.stroke();
+
+                // Prominent tree-frog eye bulge with muted ruby-amber iris
+                ctx.fillStyle = '#08301a';
+                ctx.beginPath();
+                ctx.arc(4.5, -7.5, 2.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (frog.blinkTimer > 0) {
+                    ctx.fillStyle = 'rgba(205, 115, 75, 0.52)';
+                    ctx.beginPath();
+                    ctx.arc(4.8, -7.5, 1.3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        function drawJungleAnimals() {
+            drawJungleFlyingBirds();
+            drawJungleToucans();
+            drawJungleSloth();
+            drawJungleMonkey();
+            drawJungleButterflies();
+            drawJungleFrogs();
+        }
+
         function initJungleEnvironment() {
             const w = canvas.width;
             const h = canvas.height;
@@ -640,6 +1375,9 @@
             buildStaticJungleCache();
 
             const rand = createSeededRandom(9081);
+
+            // Populate background rainforest animals
+            initJungleAnimals(w, h, rand);
 
             // 1. Dappled Sunlight Rays filtering diagonally from top canopy
             jungleSunRays = [];
@@ -717,7 +1455,7 @@
             const w = canvas.width;
             const h = canvas.height;
 
-            // 1. Blit cached deep emerald canopy, tree silhouettes & corner foliage
+            // 1. Blit cached deep emerald canopy, tree silhouettes, branches & corner foliage
             if (bgCacheCanvas.width > 0 && bgCacheCanvas.height > 0) {
                 ctx.drawImage(bgCacheCanvas, 0, 0);
             } else {
@@ -752,7 +1490,10 @@
                 ctx.fill();
             }
 
-            // 3. Render Gently Swaying Hanging Vines & Teardrop Leaves
+            // 3. Render Animated Background Jungle Wildlife (Toucans, Sloth, Monkey, Birds, Butterflies, Frogs)
+            drawJungleAnimals();
+
+            // 4. Render Gently Swaying Hanging Vines & Teardrop Leaves
             for (let i = 0; i < jungleVines.length; i++) {
                 const vine = jungleVines[i];
                 const primaryWave = Math.sin(frameTick * vine.swaySpeed + vine.phase);
@@ -802,7 +1543,7 @@
                 }
             }
 
-            // 4. Render Drifting Bioluminescent Fireflies / Jungle Spores
+            // 5. Render Drifting Bioluminescent Fireflies / Jungle Spores
             for (let i = 0; i < jungleFireflies.length; i++) {
                 const f = jungleFireflies[i];
 
@@ -881,7 +1622,7 @@
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
 
-            // Rebuild cached jungle canopy, foliage, vines & fireflies for the new dimensions
+            // Rebuild cached jungle canopy, foliage, wildlife, vines & fireflies for the new dimensions
             initJungleEnvironment();
 
             // Shift snake & history relative to the new center if already initialized
@@ -1351,7 +2092,7 @@
         }
 
         function draw() {
-            // 0. Draw Layered Atmospheric Jungle Background
+            // 0. Draw Layered Atmospheric Jungle Background & Wildlife
             drawJungleBackground();
 
             // 1. Draw Central Mass Node
