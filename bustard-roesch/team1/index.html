@@ -2029,18 +2029,17 @@
             // Draw from tail to head so the head renders cleanly on top
             for (let i = snake.segments.length - 1; i >= 0; i--) {
                 const seg = snake.segments[i];
+                const isBlue = i % 2 === 1;
 
                 ctx.beginPath();
                 ctx.arc(seg.x, seg.y, seg.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = isBlue ? '#1da1f2' : '#2ecc71';
                 ctx.fill();
 
                 // Subtle dark hairline separation on segments for crisp definition
-                if (i > 0 && i % 2 === 0) {
-                    ctx.strokeStyle = '#031209';
-                    ctx.lineWidth = 0.8;
-                    ctx.stroke();
-                }
+                ctx.strokeStyle = '#031209';
+                ctx.lineWidth = 0.9;
+                ctx.stroke();
             }
 
             // Draw directional eyes on the head (segment 0)
@@ -2067,7 +2066,7 @@
                 const eyeX = head.x + cosA * forwardOffset + perpX * sideOffset * side;
                 const eyeY = head.y + sinA * forwardOffset + perpY * sideOffset * side;
 
-                // Dark eye socket against the white head
+                // Dark eye socket against the head
                 ctx.beginPath();
                 ctx.arc(eyeX, eyeY, eyeRadius, 0, Math.PI * 2);
                 ctx.fillStyle = '#031209';
