@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello Kitty & Cinnamoroll Gravity Simulation</title>
+    <title>Hello Kitty, Cinnamoroll &amp; Kuromi Gravity Simulation</title>
     <!-- Friendly Rounded Kawaii Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,9 +78,9 @@
             font-family: 'Nunito', sans-serif;
             font-size: 11px;
             font-weight: 800;
-            color: #3d8ac7;
-            background: #e3f4ff;
-            border: 1.5px solid #9dd4fa;
+            color: #6b3fa0;
+            background: #f3ebff;
+            border: 1.5px solid #cbb2f5;
             padding: 2px 10px;
             border-radius: 999px;
             letter-spacing: 0.4px;
@@ -120,7 +120,7 @@
             font-weight: 700;
         }
 
-        @media (max-width: 680px) {
+        @media (max-width: 740px) {
             h1 {
                 font-size: 15px;
             }
@@ -219,7 +219,7 @@
                 </svg>
             </div>
             <h1>Gravity Simulation</h1>
-            <span class="subtitle-tag">Hello Kitty &amp; Cinnamoroll</span>
+            <span class="subtitle-tag">Hello Kitty, Cinnamoroll &amp; Kuromi</span>
         </div>
 
         <div class="header-controls">
@@ -252,7 +252,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to throw flowers into orbit and collect the floating blossoms!
+        Click anywhere on the canvas to throw flowers into orbit—collect the floating blossoms while Kuromi chases all your flower balls!
     </div>
 
     <script>
@@ -408,6 +408,8 @@
             }
         ];
 
+        const KUROMI_CATCH_PHRASES = ['Gotcha! 💜', 'Hehe! 🖤', 'Mine! ✨', 'Yay! 🎀'];
+
         // =========================================================================
         // STATE VARIABLES
         // =========================================================================
@@ -428,6 +430,20 @@
             radius: 12
         };
 
+        // Kuromi Chaser State
+        const kuromi = {
+            x: 180,
+            y: 140,
+            vx: 0,
+            vy: 0,
+            facing: 1,
+            tilt: 0,
+            catchMoodTimer: 0,
+            frameCount: 0,
+            targetBall: null,
+            trail: []
+        };
+
         // Decorative Background Clouds & Sparkles
         let clouds = [];
         let sparkles = [];
@@ -446,6 +462,23 @@
                     scorePillEl.classList.remove('pop');
                 }, 220);
             }
+        }
+
+        /**
+         * Places Kuromi in a playful upper-left starting spot.
+         */
+        function resetKuromiPosition() {
+            const w = Math.max(canvas.width, 320);
+            const h = Math.max(canvas.height, 320);
+            kuromi.x = w * 0.22;
+            kuromi.y = h * 0.26;
+            kuromi.vx = 0;
+            kuromi.vy = 0;
+            kuromi.facing = 1;
+            kuromi.tilt = 0;
+            kuromi.catchMoodTimer = 0;
+            kuromi.targetBall = null;
+            kuromi.trail = [];
         }
 
         /**
@@ -570,6 +603,10 @@
                 }
             }
 
+            // Keep Kuromi within canvas bounds
+            kuromi.x = Math.max(36, Math.min(canvas.width - 36, kuromi.x));
+            kuromi.y = Math.max(36, Math.min(canvas.height - 36, kuromi.y));
+
             initDecorations();
         }
 
@@ -620,6 +657,57 @@
                     isSparkle: i % 3 === 2
                 });
             }
+        }
+
+        /**
+         * Spawns a mischievous lavender-and-pink burst when Kuromi catches a flower ball.
+         */
+        function spawnKuromiCatchBurst(x, y, style) {
+            launchBursts.push({
+                x: x,
+                y: y,
+                radius: 5,
+                maxRadius: 34,
+                alpha: 0.96,
+                color: '155, 89, 182'
+            });
+
+            const burstColors = [
+                '#9b59b6',
+                '#ff6ba8',
+                '#d6a2e8',
+                style ? style.petalMid : '#ff85b2',
+                '#ffffff'
+            ];
+
+            for (let i = 0; i < 12; i++) {
+                const spreadAngle = ((i / 12) * Math.PI * 2) + (Math.random() * 0.25);
+                const speed = 1.5 + Math.random() * 2.3;
+                petalParticles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(spreadAngle) * speed,
+                    vy: Math.sin(spreadAngle) * speed - 0.3,
+                    rotation: Math.random() * Math.PI * 2,
+                    vRot: (Math.random() - 0.5) * 0.2,
+                    size: 3.5 + Math.random() * 2.1,
+                    alpha: 1,
+                    decay: 0.028 + Math.random() * 0.012,
+                    color: burstColors[i % burstColors.length],
+                    isSparkle: i % 2 === 0
+                });
+            }
+
+            const phrase = KUROMI_CATCH_PHRASES[Math.floor(Math.random() * KUROMI_CATCH_PHRASES.length)];
+            floatingTexts.push({
+                x: x,
+                y: y - 14,
+                vy: -1.1,
+                text: phrase,
+                color: '#7b2cbf',
+                alpha: 1,
+                scale: 1.02
+            });
         }
 
         /**
@@ -717,11 +805,127 @@
             throwCount = 0;
             updateScoreDisplay(false);
             spawnCollectibleWave();
+            resetKuromiPosition();
+        }
+
+        /**
+         * Updates Kuromi's chasing AI so she pursues all active flower balls across the sky,
+         * catching them one after another and immediately locking onto the next flower ball.
+         */
+        function updateKuromiChase() {
+            kuromi.frameCount++;
+            if (kuromi.catchMoodTimer > 0) {
+                kuromi.catchMoodTimer--;
+            }
+
+            // Pick the best flower ball to chase among all active flower balls
+            let bestTarget = null;
+            let bestIndex = -1;
+            let bestScore = Infinity;
+
+            for (let i = 0; i < balls.length; i++) {
+                const candidate = balls[i];
+                let d = Math.hypot(candidate.x - kuromi.x, candidate.y - kuromi.y);
+                // Slight stickiness to current target so Kuromi commits cleanly before switching
+                if (candidate === kuromi.targetBall) {
+                    d -= 26;
+                }
+                if (d < bestScore) {
+                    bestScore = d;
+                    bestTarget = candidate;
+                    bestIndex = i;
+                }
+            }
+
+            kuromi.targetBall = bestTarget;
+
+            if (bestTarget) {
+                // Aim slightly ahead of the orbiting flower ball for dynamic pursuit
+                const aimX = bestTarget.x + bestTarget.vx * 3.5;
+                const aimY = bestTarget.y + bestTarget.vy * 3.5;
+                const dx = aimX - kuromi.x;
+                const dy = aimY - kuromi.y;
+                const distToAim = Math.hypot(dx, dy) || 1;
+
+                // Speed scales gently with distance so Kuromi swoops dramatically across the screen
+                const maxSpeed = distToAim > 240 ? 4.35 : 3.65;
+                const desiredVx = (dx / distToAim) * maxSpeed;
+                const desiredVy = (dy / distToAim) * maxSpeed;
+
+                const steering = 0.14;
+                kuromi.vx += (desiredVx - kuromi.vx) * steering;
+                kuromi.vy += (desiredVy - kuromi.vy) * steering;
+
+                kuromi.x += kuromi.vx;
+                kuromi.y += kuromi.vy;
+
+                // Check if Kuromi catches the flower ball
+                const actualDist = Math.hypot(bestTarget.x - kuromi.x, bestTarget.y - kuromi.y);
+                if (actualDist <= 22 + bestTarget.radius) {
+                    spawnKuromiCatchBurst(bestTarget.x, bestTarget.y, bestTarget.style);
+                    balls.splice(bestIndex, 1);
+                    kuromi.catchMoodTimer = 34;
+                    kuromi.targetBall = null;
+                }
+            } else {
+                // Idle/Patrol mode when no thrown flower balls are active:
+                // Kuromi playfully orbits around the sky near the floating blossoms waiting for throws
+                const patrolAngle = animTime * 0.0014;
+                const patrolRadiusX = Math.min(180, canvas.width * 0.24);
+                const patrolRadiusY = Math.min(125, canvas.height * 0.22);
+                const targetX = centralNode.x + Math.cos(patrolAngle) * patrolRadiusX;
+                const targetY = centralNode.y + Math.sin(patrolAngle * 1.4) * patrolRadiusY - 24;
+
+                const dx = targetX - kuromi.x;
+                const dy = targetY - kuromi.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                const patrolSpeed = Math.min(2.4, dist * 0.04);
+
+                const desiredVx = (dx / dist) * patrolSpeed;
+                const desiredVy = (dy / dist) * patrolSpeed;
+                kuromi.vx += (desiredVx - kuromi.vx) * 0.08;
+                kuromi.vy += (desiredVy - kuromi.vy) * 0.08;
+
+                kuromi.x += kuromi.vx;
+                kuromi.y += kuromi.vy;
+            }
+
+            // Smooth horizontal facing & flight tilt
+            if (Math.abs(kuromi.vx) > 0.18) {
+                const targetFacing = kuromi.vx >= 0 ? 1 : -1;
+                kuromi.facing += (targetFacing - kuromi.facing) * 0.22;
+            }
+            const targetTilt = Math.max(-0.32, Math.min(0.32, kuromi.vy * 0.06));
+            kuromi.tilt += (targetTilt - kuromi.tilt) * 0.18;
+
+            // Emit cute lavender/pink sparkles while Kuromi is chasing flower balls
+            if (bestTarget && kuromi.frameCount % 5 === 0 && petalParticles.length < 120) {
+                const chaseColors = ['#c77dff', '#ff70a6', '#e0aaff', '#ffffff'];
+                petalParticles.push({
+                    x: kuromi.x - kuromi.vx * 2.5 + (Math.random() - 0.5) * 10,
+                    y: kuromi.y - kuromi.vy * 2.5 + (Math.random() - 0.5) * 10,
+                    vx: -kuromi.vx * 0.18 + (Math.random() - 0.5) * 0.6,
+                    vy: -kuromi.vy * 0.18 + (Math.random() - 0.5) * 0.6,
+                    rotation: Math.random() * Math.PI * 2,
+                    vRot: (Math.random() - 0.5) * 0.12,
+                    size: 2.8 + Math.random() * 1.6,
+                    alpha: 0.9,
+                    decay: 0.032,
+                    color: chaseColors[kuromi.frameCount % chaseColors.length],
+                    isSparkle: true
+                });
+            }
+
+            // Record short flight ribbon trail for Kuromi
+            kuromi.trail.push({ x: kuromi.x, y: kuromi.y });
+            if (kuromi.trail.length > 26) {
+                kuromi.trail.shift();
+            }
         }
 
         /**
          * Updates orbital physics (inverse square law gravity, absorption, and trail history),
-         * checks collectible flower pickups, and animates decorative particles.
+         * checks collectible flower pickups, updates Kuromi's chase, and animates decorative particles.
          */
         function updatePhysics() {
             // Smooth pop-in animation for collectible flowers
@@ -824,6 +1028,9 @@
                     b.trail.shift();
                 }
             }
+
+            // Update Kuromi chasing all active flower balls
+            updateKuromiChase();
 
             // Update launch & collection ring bursts
             for (let i = launchBursts.length - 1; i >= 0; i--) {
@@ -1264,6 +1471,288 @@
         }
 
         /**
+         * Draws Kuromi flying dynamically around the canvas chasing all the flower balls,
+         * complete with black jester hood, pink pom-poms, pink forehead skull, devil tail, and ribbon trail.
+         */
+        function drawKuromi(time) {
+            // Draw Kuromi's soft lavender-pink chase ribbon trail
+            if (kuromi.trail.length > 1) {
+                ctx.save();
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(kuromi.trail[0].x, kuromi.trail[0].y);
+                for (let i = 1; i < kuromi.trail.length; i++) {
+                    ctx.lineTo(kuromi.trail[i].x, kuromi.trail[i].y);
+                }
+                ctx.strokeStyle = 'rgba(199, 125, 255, 0.34)';
+                ctx.lineWidth = 6;
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 112, 166, 0.55)';
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Draw subtle chase target lock-on ring around the flower ball Kuromi is currently pursuing
+            if (kuromi.targetBall) {
+                const tb = kuromi.targetBall;
+                const lockPulse = 17 + Math.sin(time * 0.012) * 3;
+                ctx.save();
+                ctx.translate(tb.x, tb.y);
+                ctx.rotate(time * 0.004);
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(0, 0, lockPulse, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(155, 89, 182, 0.72)';
+                ctx.lineWidth = 1.8;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            const scale = Math.max(0.76, Math.min(1.0, canvas.width / 960));
+            const bobY = Math.sin(time * 0.008) * 2.5;
+            const earWiggle = Math.sin(time * 0.014) * 0.12;
+            const outlineColor = '#1c1524';
+            const hoodFill = '#2a2233';
+
+            ctx.save();
+            ctx.translate(kuromi.x, kuromi.y + bobY);
+            ctx.rotate(kuromi.tilt);
+            ctx.scale(scale * (kuromi.facing >= 0 ? 1 : -1), scale);
+
+            // Soft lavender aura & white halo so Kuromi stands out crisply against the sky
+            ctx.beginPath();
+            ctx.arc(0, 0, 26, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(199, 125, 255, 0.24)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(0, 0, 20, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.fill();
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 1. Curving Black Devil Tail with Pointed Arrow Tip (behind back)
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(-10, 13);
+            ctx.bezierCurveTo(-22, 18, -30, 10, -27, 2);
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.6;
+            ctx.stroke();
+
+            // Pointed arrow tip on tail
+            ctx.translate(-27, 2);
+            ctx.rotate(-0.45);
+            ctx.fillStyle = hoodFill;
+            ctx.beginPath();
+            ctx.moveTo(0, -6);
+            ctx.lineTo(5, 4);
+            ctx.lineTo(0, 2);
+            ctx.lineTo(-5, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+            ctx.restore();
+
+            // 2. Little Black Body & Reaching White Paws (chasing pose)
+            ctx.fillStyle = hoodFill;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(-2, 16, 11, 9, -0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Reaching white paws stretched forward toward the flower ball
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(11, 14, 5.2, 3.8, -0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.ellipse(7, 20, 5.0, 3.6, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. White Scalloped Jester Collar with Pink Pom-Poms
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 1.7;
+            ctx.beginPath();
+            ctx.moveTo(-13, 10);
+            ctx.quadraticCurveTo(-8, 17, -3, 11);
+            ctx.quadraticCurveTo(2, 17, 7, 11);
+            ctx.quadraticCurveTo(11, 16, 13, 10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#ff6ba8';
+            ctx.beginPath();
+            ctx.arc(-8, 14.5, 2.0, 0, Math.PI * 2);
+            ctx.arc(2, 14.5, 2.0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 4. Two Long Pointed Jester Ears with Pink Pom-Pom Tips
+            // Left jester ear
+            ctx.save();
+            ctx.translate(-9, -11);
+            ctx.rotate(-0.35 - earWiggle);
+            ctx.fillStyle = hoodFill;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.1;
+            ctx.beginPath();
+            ctx.moveTo(-6, 4);
+            ctx.quadraticCurveTo(-11, -13, -3, -24);
+            ctx.quadraticCurveTo(5, -13, 6, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Pink pom-pom on left ear tip
+            ctx.fillStyle = '#ff6ba8';
+            ctx.beginPath();
+            ctx.arc(-3, -25, 4.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-4.2, -26.2, 1.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Right jester ear
+            ctx.save();
+            ctx.translate(9, -11);
+            ctx.rotate(0.38 + earWiggle);
+            ctx.fillStyle = hoodFill;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.1;
+            ctx.beginPath();
+            ctx.moveTo(-6, 4);
+            ctx.quadraticCurveTo(-5, -13, 3, -24);
+            ctx.quadraticCurveTo(11, -13, 6, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Pink pom-pom on right ear tip
+            ctx.fillStyle = '#ff6ba8';
+            ctx.beginPath();
+            ctx.arc(3, -25, 4.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(1.8, -26.2, 1.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 5. Black Jester Hood Head Shape
+            const hoodGrad = ctx.createRadialGradient(-4, -8, 2, 0, 0, 20);
+            hoodGrad.addColorStop(0, '#443752');
+            hoodGrad.addColorStop(0.65, '#2a2233');
+            hoodGrad.addColorStop(1, '#1d1724');
+
+            ctx.fillStyle = hoodGrad;
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.ellipse(0, -1, 17.5, 14.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 6. Iconic Pink Skull Motif on Forehead
+            ctx.save();
+            ctx.translate(1, -10.5);
+            ctx.fillStyle = '#ff5c93';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 4.4, 3.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillRect(-2.4, 2.2, 4.8, 2.1);
+
+            // Tiny skull eye sockets
+            ctx.fillStyle = hoodFill;
+            ctx.beginPath();
+            ctx.arc(-1.6, -0.2, 0.95, 0, Math.PI * 2);
+            ctx.arc(1.6, -0.2, 0.95, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 7. White Face Opening Inside Hood
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(1, 3.2, 13.2, 9.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rosy cheeks
+            ctx.fillStyle = 'rgba(255, 117, 168, 0.72)';
+            ctx.beginPath();
+            ctx.ellipse(-7.5, 5.2, 2.8, 1.8, 0, 0, Math.PI * 2);
+            ctx.ellipse(9.5, 5.2, 2.8, 1.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 8. Eyes & Cheeky Kuromi Expression
+            if (kuromi.catchMoodTimer > 0) {
+                // Happy triumphant squinting arcs right after catching a flower ball
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(-4.5, 2.5, 2.6, Math.PI * 1.1, Math.PI * 1.9);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(6.5, 2.5, 2.6, Math.PI * 1.1, Math.PI * 1.9);
+                ctx.stroke();
+            } else {
+                // Determined mischievous chasing eyes with cute angled brow/lash line
+                ctx.fillStyle = outlineColor;
+                ctx.beginPath();
+                ctx.ellipse(-4.5, 2.0, 2.2, 3.1, 0.1, 0, Math.PI * 2);
+                ctx.ellipse(6.5, 2.0, 2.2, 3.1, -0.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Upper mischievous eyelid slant
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = 1.7;
+                ctx.beginPath();
+                ctx.moveTo(-7.2, -0.5);
+                ctx.lineTo(-2.2, 0.8);
+                ctx.moveTo(9.2, -0.5);
+                ctx.lineTo(4.2, 0.8);
+                ctx.stroke();
+
+                // Bright white eye catchlights
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(-5.1, 1.1, 0.9, 0, Math.PI * 2);
+                ctx.arc(5.9, 1.1, 0.9, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Tiny pink oval nose
+            ctx.fillStyle = '#ff6ba8';
+            ctx.beginPath();
+            ctx.ellipse(1.2, 4.3, 1.8, 1.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cheeky playful smirk
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(1.2, 5.6, 2.8, 0.12 * Math.PI, 0.88 * Math.PI);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        /**
          * Draws Keroppi (Sanrio's cheerful little frog) as the central gravity node.
          */
         function drawKeroppi(cx, cy, time) {
@@ -1698,6 +2187,9 @@
                 // Kawaii 5-petal flower projectile
                 drawFlowerProjectile(b);
             }
+
+            // 9. Kuromi actively chasing all flower balls across the canvas
+            drawKuromi(animTime);
         }
 
         function animate() {
@@ -1708,6 +2200,7 @@
 
         window.onload = function() {
             resizeCanvas();
+            resetKuromiPosition();
             spawnCollectibleWave();
             animate();
         };
