@@ -116,7 +116,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a monkey — the guy in the middle will shoot it with bananas!
+        Click anywhere on the canvas to launch a monkey — the guy in the middle will shoot it with bananas! Click on flying birds to blow them up!
     </div>
 
     <script>
@@ -144,6 +144,7 @@
         let monkeys = [];
         let birds = [];
         let animTime = 0;
+        let screenShake = 0;
         let lastBirdSpawnTime = performance.now() - 4200;
         let nextBirdDirection = 1;
 
@@ -1015,11 +1016,142 @@
             }
         }
 
-        // Canvas Click Handler: Launch monkey at click position (or shoot existing monkey if clicked directly)
+        // Detonate a clicked bird into a fiery blast and tumbling plumage feathers
+        function blowUpBird(index) {
+            const bird = birds.splice(index, 1)[0];
+            if (!bird) return;
+
+            const sp = bird.species;
+            const s = bird.scale;
+            screenShake = Math.max(screenShake, 6.5);
+
+            // 1. Bright fiery explosion flash core
+            impactEffects.push({
+                x: bird.x,
+                y: bird.y,
+                radius: 8 * s,
+                maxRadius: 44 * s,
+                life: 1.0,
+                decay: 0.085,
+                type: 'flash'
+            });
+
+            // 2. Concentric shockwave rings (fiery orange inner + bright gold outer)
+            impactEffects.push({
+                x: bird.x,
+                y: bird.y,
+                radius: 6 * s,
+                maxRadius: 50 * s,
+                life: 1.0,
+                decay: 0.052,
+                color: '#fb923c',
+                type: 'ring'
+            });
+            impactEffects.push({
+                x: bird.x,
+                y: bird.y,
+                radius: 10 * s,
+                maxRadius: 72 * s,
+                life: 1.0,
+                decay: 0.04,
+                color: '#fef08a',
+                type: 'ring'
+            });
+
+            // 3. Puffy explosion smoke clouds
+            for (let c = 0; c < 8; c++) {
+                const a = (Math.PI * 2 * c) / 8 + (Math.random() - 0.5) * 0.45;
+                const spd = (0.8 + Math.random() * 1.9) * s;
+                impactEffects.push({
+                    x: bird.x + (Math.random() - 0.5) * 10,
+                    y: bird.y + (Math.random() - 0.5) * 10,
+                    vx: Math.cos(a) * spd,
+                    vy: Math.sin(a) * spd - 0.35,
+                    radius: (7 + Math.random() * 6) * s,
+                    grow: 0.38 * s,
+                    life: 1.0,
+                    decay: 0.024 + Math.random() * 0.012,
+                    color: c % 2 === 0 ? 'rgba(51, 65, 85, 0.72)' : 'rgba(100, 116, 139, 0.62)',
+                    type: 'smoke'
+                });
+            }
+
+            // 4. High-velocity fiery sparks & embers
+            const sparkPalette = ['#ffffff', '#fef08a', '#f97316', '#ef4444', sp.wingBand];
+            for (let k = 0; k < 22; k++) {
+                const a = (Math.PI * 2 * k) / 22 + (Math.random() - 0.5) * 0.35;
+                const spd = (2.4 + Math.random() * 4.4) * s;
+                impactEffects.push({
+                    x: bird.x,
+                    y: bird.y,
+                    vx: Math.cos(a) * spd,
+                    vy: Math.sin(a) * spd,
+                    life: 1.0,
+                    decay: 0.036 + Math.random() * 0.025,
+                    size: (2.0 + Math.random() * 2.4) * s,
+                    color: sparkPalette[k % sparkPalette.length],
+                    type: 'spark'
+                });
+            }
+
+            // 5. Tumbling species-colored tropical feathers
+            const featherColors = [
+                sp.bodyMain,
+                sp.belly,
+                sp.wingUpper,
+                sp.wingBand,
+                sp.wingTip,
+                sp.tailSecondary
+            ];
+            for (let f = 0; f < 14; f++) {
+                const a = (Math.PI * 2 * f) / 14 + (Math.random() - 0.5) * 0.4;
+                const spd = (2.6 + Math.random() * 3.8) * s;
+                impactEffects.push({
+                    x: bird.x,
+                    y: bird.y,
+                    vx: Math.cos(a) * spd + bird.dir * bird.speed * 0.25,
+                    vy: Math.sin(a) * spd - 1.4,
+                    angle: Math.random() * Math.PI * 2,
+                    spin: (Math.random() - 0.5) * 0.22,
+                    flutterPhase: Math.random() * Math.PI * 2,
+                    length: (7.5 + Math.random() * 4.5) * s,
+                    color: featherColors[f % featherColors.length],
+                    life: 1.0,
+                    decay: 0.015 + Math.random() * 0.008,
+                    type: 'feather'
+                });
+            }
+
+            // 6. Bold comic explosion callout
+            const boomLabels = ['BOOM!', 'KA-BOOM!', 'BLAM!', 'KABOOM!'];
+            impactEffects.push({
+                x: bird.x,
+                y: bird.y - 16 * s,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: -1.3,
+                life: 1.0,
+                decay: 0.024,
+                text: boomLabels[Math.floor(Math.random() * boomLabels.length)],
+                color: '#fde047',
+                type: 'text'
+            });
+        }
+
+        // Canvas Click Handler: Blow up clicked birds, shoot existing monkey, or launch a new monkey
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
+
+            // Check birds first (from topmost/latest rendered to oldest) so clicking a bird blows it up
+            for (let i = birds.length - 1; i >= 0; i--) {
+                const b = birds[i];
+                const hitRadius = 28 * b.scale;
+                if (Math.hypot(clickX - b.x, clickY - b.y) <= hitRadius) {
+                    blowUpBird(i);
+                    return;
+                }
+            }
 
             if (balls.length > 0) {
                 const existing = balls[0];
@@ -1064,6 +1196,7 @@
             balls = [];
             bananas = [];
             impactEffects = [];
+            screenShake = 0;
             guyState.recoil = 0;
             guyState.muzzleFlash = 0;
             guyState.fireCooldown = 0;
@@ -1071,6 +1204,10 @@
 
         function updateFireflies() {
             animTime += 1;
+            if (screenShake > 0) {
+                screenShake *= 0.84;
+                if (screenShake < 0.15) screenShake = 0;
+            }
             for (const f of fireflies) {
                 f.baseY += f.speedY;
                 f.baseX += f.speedX;
@@ -1265,7 +1402,7 @@
             }
         }
 
-        // Update banana splat particles, peel strips, shockwave rings, and pop text
+        // Update banana splats, explosion shockwaves, feathers, smoke, sparks, and pop text
         function updateImpactEffects() {
             for (let i = impactEffects.length - 1; i >= 0; i--) {
                 const eff = impactEffects[i];
@@ -1275,8 +1412,14 @@
                     continue;
                 }
 
-                if (eff.type === 'ring') {
+                if (eff.type === 'ring' || eff.type === 'flash') {
                     eff.radius += (eff.maxRadius - eff.radius) * 0.22;
+                } else if (eff.type === 'smoke') {
+                    eff.x += eff.vx;
+                    eff.y += eff.vy;
+                    eff.vx *= 0.95;
+                    eff.vy *= 0.95;
+                    eff.radius += eff.grow;
                 } else if (eff.type === 'text') {
                     eff.x += eff.vx;
                     eff.y += eff.vy;
@@ -1285,6 +1428,13 @@
                     eff.x += eff.vx;
                     eff.y += eff.vy;
                     eff.angle += eff.spin;
+                } else if (eff.type === 'feather') {
+                    eff.vx *= 0.91;
+                    eff.vy = eff.vy * 0.91 + 0.065;
+                    eff.flutterPhase += 0.16;
+                    eff.x += eff.vx + Math.sin(eff.flutterPhase) * 0.55;
+                    eff.y += eff.vy;
+                    eff.angle += eff.spin + Math.cos(eff.flutterPhase) * 0.05;
                 } else if (eff.type === 'spark') {
                     eff.vx *= 0.94;
                     eff.vy *= 0.94;
@@ -2515,23 +2665,57 @@
             }
         }
 
-        // Draw banana impact shockwaves, peel strips, sparkles, and comic pop labels
+        // Draw banana impact shockwaves, explosions, feathers, smoke, sparkles, and comic pop labels
         function drawImpactEffects() {
             for (const eff of impactEffects) {
                 ctx.save();
                 ctx.globalAlpha = Math.max(0, eff.life);
 
-                if (eff.type === 'ring') {
+                if (eff.type === 'flash') {
+                    const grad = ctx.createRadialGradient(eff.x, eff.y, 0, eff.x, eff.y, eff.radius);
+                    grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+                    grad.addColorStop(0.35, 'rgba(254, 240, 138, 0.85)');
+                    grad.addColorStop(0.7, 'rgba(249, 115, 22, 0.45)');
+                    grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                    ctx.beginPath();
+                    ctx.arc(eff.x, eff.y, eff.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+                } else if (eff.type === 'smoke') {
+                    ctx.beginPath();
+                    ctx.arc(eff.x, eff.y, eff.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = eff.color;
+                    ctx.fill();
+                } else if (eff.type === 'ring') {
                     ctx.beginPath();
                     ctx.arc(eff.x, eff.y, eff.radius, 0, Math.PI * 2);
                     ctx.strokeStyle = eff.color;
-                    ctx.lineWidth = 2.2 * eff.life;
+                    ctx.lineWidth = 2.4 * eff.life;
                     ctx.stroke();
                 } else if (eff.type === 'spark') {
                     ctx.beginPath();
                     ctx.arc(eff.x, eff.y, eff.size * eff.life, 0, Math.PI * 2);
                     ctx.fillStyle = eff.color;
                     ctx.fill();
+                } else if (eff.type === 'feather') {
+                    ctx.translate(eff.x, eff.y);
+                    ctx.rotate(eff.angle);
+                    const len = eff.length;
+                    const wid = len * 0.34;
+                    ctx.beginPath();
+                    ctx.moveTo(-len * 0.5, 0);
+                    ctx.quadraticCurveTo(0, -wid, len * 0.5, 0);
+                    ctx.quadraticCurveTo(0, wid, -len * 0.5, 0);
+                    ctx.fillStyle = eff.color;
+                    ctx.fill();
+
+                    // Central feather quill shaft
+                    ctx.beginPath();
+                    ctx.moveTo(-len * 0.55, 0);
+                    ctx.lineTo(len * 0.45, 0);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+                    ctx.lineWidth = 0.75;
+                    ctx.stroke();
                 } else if (eff.type === 'peel') {
                     ctx.translate(eff.x, eff.y);
                     ctx.rotate(eff.angle);
@@ -2545,10 +2729,10 @@
                     ctx.lineWidth = 0.7;
                     ctx.stroke();
                 } else if (eff.type === 'text') {
-                    ctx.font = 'bold 12px "Courier New", monospace';
+                    ctx.font = 'bold 13px "Courier New", monospace';
                     ctx.textAlign = 'center';
                     ctx.fillStyle = '#1b110a';
-                    ctx.fillText(eff.text, eff.x + 1, eff.y + 1);
+                    ctx.fillText(eff.text, eff.x + 1.2, eff.y + 1.2);
                     ctx.fillStyle = eff.color;
                     ctx.fillText(eff.text, eff.x, eff.y);
                 }
@@ -2558,6 +2742,13 @@
         }
 
         function draw() {
+            ctx.save();
+            if (screenShake > 0) {
+                const sx = (Math.random() - 0.5) * screenShake * 2;
+                const sy = (Math.random() - 0.5) * screenShake * 2;
+                ctx.translate(sx, sy);
+            }
+
             // 0. Draw cached procedural jungle background (including liana vines)
             ctx.drawImage(bgCanvas, 0, 0);
 
@@ -2595,9 +2786,11 @@
                 drawOrbitingMonkey(b);
             }
 
-            // 6. Draw Spinning Bananas & Impact Splats
+            // 6. Draw Spinning Bananas & Impact Splats / Explosions
             drawBananas();
             drawImpactEffects();
+
+            ctx.restore();
         }
 
         function animate(now) {
