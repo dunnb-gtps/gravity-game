@@ -141,6 +141,73 @@
             '#fde68a'  // Soft amber starlight
         ];
 
+        // EARTH CONTINENT & CLOUD DATA (Longitude, Latitude in degrees)
+        const EARTH_CONTINENTS = [
+            {
+                // North America
+                color: '#22c55e',
+                coords: [
+                    [-136, 58], [-115, 64], [-85, 62], [-66, 46],
+                    [-78, 28], [-92, 16], [-105, 22], [-122, 38]
+                ]
+            },
+            {
+                // Greenland
+                color: '#d1fae5',
+                coords: [
+                    [-52, 62], [-44, 78], [-22, 76], [-34, 62]
+                ]
+            },
+            {
+                // South America
+                color: '#16a34a',
+                coords: [
+                    [-76, 10], [-54, 4], [-36, -8], [-46, -26],
+                    [-66, -50], [-74, -36], [-80, -6]
+                ]
+            },
+            {
+                // Africa
+                color: '#4ade80',
+                coords: [
+                    [-16, 16], [-6, 35], [28, 32], [48, 10],
+                    [38, -16], [20, -34], [12, -14], [4, 5], [-12, 6]
+                ]
+            },
+            {
+                // Europe
+                color: '#22c55e',
+                coords: [
+                    [-9, 38], [4, 52], [28, 64], [52, 58],
+                    [44, 42], [22, 38], [6, 43]
+                ]
+            },
+            {
+                // Asia
+                color: '#16a34a',
+                coords: [
+                    [54, 62], [95, 68], [138, 60], [132, 34],
+                    [106, 14], [80, 10], [62, 24], [52, 42]
+                ]
+            },
+            {
+                // Australia
+                color: '#84cc16',
+                coords: [
+                    [115, -20], [136, -13], [151, -26], [144, -38],
+                    [118, -34]
+                ]
+            }
+        ];
+
+        const EARTH_CLOUDS = [
+            [[-120, 32], [-95, 38], [-72, 30], [-92, 24]],
+            [[-45, 48], [-15, 54], [15, 48], [-12, 42]],
+            [[45, 22], [78, 28], [108, 20], [75, 14]],
+            [[-65, -22], [-35, -18], [-12, -26], [-42, -30]],
+            [[85, -32], [120, -28], [148, -36], [116, -40]]
+        ];
+
         // STATE VARIABLES
         let astronauts = [];
         let stars = [];
@@ -148,7 +215,7 @@
         let nextShootingStarTimer = 180;
         let animationTime = 0;
 
-        // Central Gravity Node Definition
+        // Central Gravity Node Definition (Earth)
         const centralNode = {
             x: 0,
             y: 0,
@@ -760,48 +827,144 @@
             }
         }
 
+        /**
+         * Projects a geographic polygon onto the visible front hemisphere of Earth
+         * with smooth horizon clamping so continents rotate naturally around the globe.
+         */
+        function drawSphericalPolygon(coords, radius, rotationRad) {
+            const projected = [];
+            let hasVisiblePoint = false;
+
+            for (let i = 0; i < coords.length; i++) {
+                const lon = (coords[i][0] * Math.PI) / 180 + rotationRad;
+                const lat = (coords[i][1] * Math.PI) / 180;
+
+                const cosLat = Math.cos(lat);
+                const x3d = cosLat * Math.sin(lon);
+                const y3d = -Math.sin(lat);
+                const z3d = cosLat * Math.cos(lon);
+
+                if (z3d > 0) {
+                    hasVisiblePoint = true;
+                    projected.push({ x: radius * x3d, y: radius * y3d });
+                } else {
+                    const limbDist = Math.hypot(x3d, y3d) || 1;
+                    projected.push({
+                        x: radius * (x3d / limbDist),
+                        y: radius * (y3d / limbDist)
+                    });
+                }
+            }
+
+            if (!hasVisiblePoint) return;
+
+            ctx.beginPath();
+            ctx.moveTo(projected[0].x, projected[0].y);
+            for (let i = 1; i < projected.length; i++) {
+                ctx.lineTo(projected[i].x, projected[i].y);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        /**
+         * Renders Planet Earth at the central gravity node with sunlit oceans,
+         * rotating continents, polar ice caps, clouds, and an atmospheric blue limb.
+         */
+        function drawEarth() {
+            const x = centralNode.x;
+            const y = centralNode.y;
+            const r = centralNode.radius;
+
+            // 1. Blue Rayleigh Atmospheric Glow & Subtle Gravitational Ring
+            const pulse = 1 + 0.04 * Math.sin(animationTime * 0.04);
+            const atmoRadius = r * 3.2 * pulse;
+            const atmoGrad = ctx.createRadialGradient(x, y, r * 0.85, x, y, atmoRadius);
+            atmoGrad.addColorStop(0, 'rgba(56, 189, 248, 0.44)');
+            atmoGrad.addColorStop(0.38, 'rgba(37, 99, 235, 0.16)');
+            atmoGrad.addColorStop(1, 'rgba(29, 78, 216, 0)');
+
+            ctx.beginPath();
+            ctx.arc(x, y, atmoRadius, 0, Math.PI * 2);
+            ctx.fillStyle = atmoGrad;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(x, y, r * 2.1, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(125, 211, 252, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // 2. Earth Globe (Clipped to exact 12px radius)
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(-0.22); // Realistic ~12.6° axial tilt
+
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.clip();
+
+            // Ocean sphere base gradient (sunlit from upper-left)
+            const oceanGrad = ctx.createRadialGradient(
+                -r * 0.35, -r * 0.35, r * 0.1,
+                0, 0, r * 1.15
+            );
+            oceanGrad.addColorStop(0, '#38bdf8');
+            oceanGrad.addColorStop(0.45, '#1d4ed8');
+            oceanGrad.addColorStop(0.85, '#1e3a8a');
+            oceanGrad.addColorStop(1, '#09132e');
+
+            ctx.fillStyle = oceanGrad;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+
+            // Rotating Continents
+            const earthRotation = animationTime * 0.0055;
+            for (const continent of EARTH_CONTINENTS) {
+                ctx.fillStyle = continent.color;
+                drawSphericalPolygon(continent.coords, r, earthRotation);
+            }
+
+            // Polar Ice Caps (North & South)
+            ctx.fillStyle = 'rgba(240, 249, 255, 0.85)';
+            ctx.fillRect(-r, -r, r * 2, r * 0.22);
+            ctx.fillRect(-r, r * 0.78, r * 2, r * 0.24);
+
+            // Drifting Cloud Wisps (rotating slightly faster than surface)
+            const cloudRotation = animationTime * 0.0072;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+            for (const cloud of EARTH_CLOUDS) {
+                drawSphericalPolygon(cloud, r, cloudRotation);
+            }
+
+            // Day/Night Terminator & 3D Spherical Shadow
+            const shadowGrad = ctx.createRadialGradient(
+                -r * 0.42, -r * 0.42, r * 0.35,
+                r * 0.15, r * 0.15, r * 1.15
+            );
+            shadowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+            shadowGrad.addColorStop(0.55, 'rgba(2, 6, 23, 0.08)');
+            shadowGrad.addColorStop(0.85, 'rgba(2, 6, 23, 0.55)');
+            shadowGrad.addColorStop(1, 'rgba(1, 4, 16, 0.82)');
+
+            ctx.fillStyle = shadowGrad;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+
+            // Thin Blue Atmospheric Rim Highlight
+            ctx.strokeStyle = 'rgba(125, 211, 252, 0.75)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(0, 0, r - 0.4, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
         function draw() {
             // 0. Draw Deep Space Background, Nebulae, Stars & Shooting Stars
             drawSpaceEnvironment();
 
-            // 1. Draw Central Mass Node with Celestial Corona Aura
-            const pulse = 1 + 0.06 * Math.sin(animationTime * 0.04);
-            const coronaRadius = centralNode.radius * 3.6 * pulse;
-            const coronaGrad = ctx.createRadialGradient(
-                centralNode.x, centralNode.y, centralNode.radius * 0.8,
-                centralNode.x, centralNode.y, coronaRadius
-            );
-            coronaGrad.addColorStop(0, 'rgba(224, 242, 254, 0.36)');
-            coronaGrad.addColorStop(0.4, 'rgba(96, 165, 250, 0.14)');
-            coronaGrad.addColorStop(1, 'rgba(59, 130, 246, 0)');
-
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, coronaRadius, 0, Math.PI * 2);
-            ctx.fillStyle = coronaGrad;
-            ctx.fill();
-
-            // Subtle outer gravitational ring hint
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius * 2.1, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(147, 197, 253, 0.12)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Exact 12px Central Mass Core
-            ctx.save();
-            ctx.shadowColor = 'rgba(186, 230, 253, 0.75)';
-            ctx.shadowBlur = 14;
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-            ctx.restore();
-
-            // Center mark on node
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#02040a';
-            ctx.fill();
+            // 1. Draw Central Gravity Node as Planet Earth
+            drawEarth();
 
             // 2. Draw Astronaut & Luminous Rainbow Trajectory Trail
             for (const astro of astronauts) {
