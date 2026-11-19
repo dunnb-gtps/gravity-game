@@ -50,7 +50,7 @@
             gap: 16px;
         }
 
-        #ballCounter {
+        .status-counter {
             font-size: 13px;
             letter-spacing: 1px;
             text-transform: uppercase;
@@ -109,7 +109,8 @@
     <div id="header">
         <h1>Gravity Simulation</h1>
         <div class="header-controls">
-            <span id="ballCounter">Balls: 0</span>
+            <span id="hitCounter" class="status-counter">Hits: 0/5</span>
+            <span id="ballCounter" class="status-counter">Balls: 0</span>
             <button class="btn-reset" onclick="resetSimulation()">Reset</button>
         </div>
     </div>
@@ -127,6 +128,7 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
         const ballCounter = document.getElementById('ballCounter');
+        const hitCounter = document.getElementById('hitCounter');
 
         // Offscreen canvas to cache the ducks & rainbows background for smooth 60fps rendering
         const bgCanvas = document.createElement('canvas');
@@ -139,6 +141,7 @@
         const TRAIL_LENGTH = 300;          // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
         const MAX_BALLS = 50;              // Maximum simultaneous balls on screen
+        const MAX_DUCK_HITS = 5;           // Duck blows up on the 5th hit
 
         // Natural sky rainbow spectrum in ROYGBIV order
         const RAINBOW_COLORS = [
@@ -155,6 +158,17 @@
         let balls = [];
         let rainbowIndex = 0;
 
+        // Duck hit, speech, and explosion state
+        let duckHits = 0;
+        let duckExploded = false;
+        let speechText = '';
+        let speechTimer = 0;       // Remaining frames to show speech bubble (-1 = stays visible)
+        let hitAnimTimer = 0;      // Pop/recoil animation timer when hit
+        let screenShakeTimer = 0;  // Screen shake duration
+        let explosionFlash = 0;    // Flash intensity on explosion
+        let explosionParticles = [];
+        let shockwaves = [];
+
         // Central Gravity Node Definition (radius matches duck visual size)
         const centralNode = {
             x: 0,
@@ -164,6 +178,10 @@
 
         function updateBallCounter() {
             ballCounter.textContent = `Balls: ${balls.length}`;
+        }
+
+        function updateHitCounter() {
+            hitCounter.textContent = `Hits: ${duckHits}/${MAX_DUCK_HITS}`;
         }
 
         function resizeCanvas() {
@@ -224,7 +242,126 @@
         function resetSimulation() {
             balls = [];
             rainbowIndex = 0;
+            duckHits = 0;
+            duckExploded = false;
+            speechText = '';
+            speechTimer = 0;
+            hitAnimTimer = 0;
+            screenShakeTimer = 0;
+            explosionFlash = 0;
+            explosionParticles = [];
+            shockwaves = [];
             updateBallCounter();
+            updateHitCounter();
+        }
+
+        function handleDuckHit() {
+            if (duckExploded) return;
+
+            duckHits++;
+            updateHitCounter();
+
+            if (duckHits >= MAX_DUCK_HITS) {
+                triggerDuckExplosion();
+            } else if (duckHits === 4) {
+                speechText = 'hit me one more time then i cwashout';
+                speechTimer = -1; // Keep warning visible until the 5th hit or reset
+                hitAnimTimer = 26;
+                screenShakeTimer = 10;
+            } else {
+                speechText = 'stop';
+                speechTimer = 150; // Visible for ~2.5 seconds
+                hitAnimTimer = 20;
+                screenShakeTimer = 6;
+            }
+        }
+
+        function triggerDuckExplosion() {
+            duckExploded = true;
+            speechText = '';
+            speechTimer = 0;
+            screenShakeTimer = 30;
+            explosionFlash = 0.85;
+
+            const cx = centralNode.x;
+            const cy = centralNode.y;
+
+            // Expanding shockwave rings
+            shockwaves.push(
+                { x: cx, y: cy, radius: 10, maxRadius: 210, alpha: 1.0, lineWidth: 6, color: '#FF4500' },
+                { x: cx, y: cy, radius: 5, maxRadius: 140, alpha: 0.9, lineWidth: 4, color: '#FFD700' }
+            );
+
+            // Explosion fireballs, sparks, smoke, and duck feathers
+            const firePalette = ['#FF0000', '#FF3B00', '#FF7F00', '#FFD700', '#FFFFFF'];
+            for (let i = 0; i < 85; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.5 + Math.random() * 8.5;
+                const isSmoke = i >= 65;
+                const isFeather = !isSmoke && i % 4 === 0;
+
+                explosionParticles.push({
+                    x: cx + (Math.random() - 0.5) * 10,
+                    y: cy + (Math.random() - 0.5) * 10,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - (isSmoke ? 0.5 : 0),
+                    size: isSmoke ? (8 + Math.random() * 12) : (isFeather ? (5 + Math.random() * 4) : (2.5 + Math.random() * 4.5)),
+                    color: isSmoke
+                        ? 'rgba(55, 65, 81, 0.85)'
+                        : (isFeather ? (Math.random() > 0.4 ? '#E61414' : '#FFD700') : firePalette[Math.floor(Math.random() * firePalette.length)]),
+                    alpha: 1,
+                    decay: isSmoke ? (0.012 + Math.random() * 0.01) : (0.016 + Math.random() * 0.018),
+                    drag: isSmoke ? 0.95 : 0.96,
+                    gravity: isFeather ? 0.08 : (isSmoke ? -0.03 : 0.04),
+                    rotation: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 0.25,
+                    isFeather: isFeather
+                });
+            }
+        }
+
+        function updateEffects() {
+            if (speechTimer > 0) {
+                speechTimer--;
+                if (speechTimer === 0) {
+                    speechText = '';
+                }
+            }
+
+            if (hitAnimTimer > 0) {
+                hitAnimTimer--;
+            }
+
+            if (screenShakeTimer > 0) {
+                screenShakeTimer--;
+            }
+
+            if (explosionFlash > 0) {
+                explosionFlash = Math.max(0, explosionFlash - 0.045);
+            }
+
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                const sw = shockwaves[i];
+                sw.radius += (sw.maxRadius - sw.radius) * 0.14 + 2.5;
+                sw.alpha -= 0.035;
+                if (sw.alpha <= 0) {
+                    shockwaves.splice(i, 1);
+                }
+            }
+
+            for (let i = explosionParticles.length - 1; i >= 0; i--) {
+                const p = explosionParticles[i];
+                p.vx *= p.drag;
+                p.vy = p.vy * p.drag + p.gravity;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.rotation += p.rotSpeed;
+                p.alpha -= p.decay;
+
+                if (p.alpha <= 0) {
+                    explosionParticles.splice(i, 1);
+                }
+            }
         }
 
         function updatePhysics() {
@@ -242,29 +379,34 @@
                     continue;
                 }
 
-                // Distance vector to central gravity node
-                const dx = centralNode.x - b.x;
-                const dy = centralNode.y - b.y;
-                const distSq = dx * dx + dy * dy;
-                const dist = Math.sqrt(distSq);
+                if (!duckExploded) {
+                    // Distance vector to central gravity node
+                    const dx = centralNode.x - b.x;
+                    const dy = centralNode.y - b.y;
+                    const distSq = dx * dx + dy * dy;
+                    const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
-                if (dist < centralNode.radius + b.radius) {
-                    balls.splice(i, 1);
-                    countChanged = true;
-                    continue;
+                    // Absorption check: ball collides with central duck
+                    if (dist < centralNode.radius + b.radius) {
+                        balls.splice(i, 1);
+                        countChanged = true;
+                        handleDuckHit();
+                        continue;
+                    }
+
+                    // Inverse square law gravity acceleration
+                    const acceleration = GRAVITY_CONSTANT / (distSq + SOFTENING_FACTOR);
+
+                    // Acceleration vector components
+                    const ax = acceleration * (dx / dist);
+                    const ay = acceleration * (dy / dist);
+
+                    // Update velocity
+                    b.vx += ax;
+                    b.vy += ay;
                 }
 
-                // Inverse square law gravity acceleration
-                const acceleration = GRAVITY_CONSTANT / (distSq + SOFTENING_FACTOR);
-
-                // Acceleration vector components
-                const ax = acceleration * (dx / dist);
-                const ay = acceleration * (dy / dist);
-
-                // Update velocity and position
-                b.vx += ax;
-                b.vy += ay;
+                // Update position
                 b.x += b.vx;
                 b.y += b.vy;
 
@@ -281,9 +423,42 @@
         }
 
         /**
+         * Computes progressively redder body & wing colors as duckHits increases (0 to 4).
+         */
+        function getDuckColors(hits) {
+            const t = Math.min(hits, 4) / 4;
+
+            // Body transitions from yellow #FFD700 (255, 215, 0) to deep red (230, 20, 20)
+            const r = Math.round(255 + (230 - 255) * t);
+            const g = Math.round(215 + (20 - 215) * t);
+            const b = Math.round(0 + (20 - 0) * t);
+
+            // Wing transitions from #E6AC00 (230, 172, 0) to dark crimson (158, 8, 8)
+            const wr = Math.round(230 + (158 - 230) * t);
+            const wg = Math.round(172 + (8 - 172) * t);
+            const wb = Math.round(0 + (8 - 0) * t);
+
+            return {
+                body: `rgb(${r}, ${g}, ${b})`,
+                wing: `rgb(${wr}, ${wg}, ${wb})`
+            };
+        }
+
+        /**
          * Renders a cute vector duck on the target 2D context.
          */
-        function drawDuckSprite(targetCtx, x, y, scale = 1, flipX = false, rotation = 0, showRipples = false) {
+        function drawDuckSprite(
+            targetCtx,
+            x,
+            y,
+            scale = 1,
+            flipX = false,
+            rotation = 0,
+            showRipples = false,
+            bodyColor = '#FFD700',
+            wingColor = '#E6AC00',
+            angerLevel = 0
+        ) {
             targetCtx.save();
             targetCtx.translate(x, y);
             targetCtx.rotate(rotation);
@@ -308,7 +483,7 @@
             targetCtx.fillStyle = '#FF8C00';
             targetCtx.fill();
 
-            // 2. Yellow body with upturned tail on the left (#FFD700)
+            // 2. Body with upturned tail on the left
             targetCtx.beginPath();
             targetCtx.moveTo(11.0, -2.0);
             targetCtx.quadraticCurveTo(15.0, 5.5, 11.5, 13.5);
@@ -317,20 +492,20 @@
             targetCtx.quadraticCurveTo(-12.5, 1.5, -6.5, 1.0);
             targetCtx.quadraticCurveTo(-1.5, 0.5, 1.0, -3.5);
             targetCtx.closePath();
-            targetCtx.fillStyle = '#FFD700';
+            targetCtx.fillStyle = bodyColor;
             targetCtx.fill();
 
-            // 3. Yellow head (#FFD700)
+            // 3. Head
             targetCtx.beginPath();
             targetCtx.arc(7.0, -8.0, 7.5, 0, Math.PI * 2);
-            targetCtx.fillStyle = '#FFD700';
+            targetCtx.fillStyle = bodyColor;
             targetCtx.fill();
 
-            // 4. Subtle curved wing line (#E6AC00)
+            // 4. Subtle curved wing line
             targetCtx.beginPath();
             targetCtx.moveTo(-5.5, 3.5);
             targetCtx.quadraticCurveTo(0.0, 11.5, 6.5, 6.0);
-            targetCtx.strokeStyle = '#E6AC00';
+            targetCtx.strokeStyle = wingColor;
             targetCtx.lineWidth = 1.6;
             targetCtx.lineCap = 'round';
             targetCtx.stroke();
@@ -345,6 +520,81 @@
             targetCtx.arc(10.2, -10.2, 0.75, 0, Math.PI * 2);
             targetCtx.fillStyle = '#FFFFFF';
             targetCtx.fill();
+
+            // 6. Angry eyebrow as hits build up
+            if (angerLevel >= 2) {
+                targetCtx.beginPath();
+                targetCtx.moveTo(6.5, -13.2);
+                targetCtx.lineTo(12.2, -11.4);
+                targetCtx.strokeStyle = '#14213d';
+                targetCtx.lineWidth = angerLevel >= 4 ? 2.0 : 1.5;
+                targetCtx.lineCap = 'round';
+                targetCtx.stroke();
+            }
+
+            targetCtx.restore();
+        }
+
+        /**
+         * Renders a comic speech bubble above the central duck.
+         */
+        function drawSpeechBubble(targetCtx, anchorX, anchorY, text, isWarning) {
+            if (!text) return;
+
+            targetCtx.save();
+            targetCtx.font = 'bold 14px "Courier New", Courier, monospace';
+            const textMetrics = targetCtx.measureText(text);
+            const paddingX = 14;
+            const boxWidth = Math.ceil(textMetrics.width + paddingX * 2);
+            const boxHeight = 32;
+            const radius = 8;
+
+            // Keep bubble within horizontal canvas bounds
+            let boxX = anchorX - boxWidth / 2;
+            boxX = Math.max(10, Math.min(canvas.width - boxWidth - 10, boxX));
+            const boxY = anchorY - 64;
+
+            // Pop-in scale when newly triggered
+            const popScale = hitAnimTimer > 14 ? (1 + (hitAnimTimer - 14) * 0.025) : 1;
+            const centerX = boxX + boxWidth / 2;
+            const centerY = boxY + boxHeight / 2;
+            targetCtx.translate(centerX, centerY);
+            targetCtx.scale(popScale, popScale);
+            targetCtx.translate(-centerX, -centerY);
+
+            // Speech bubble body
+            targetCtx.beginPath();
+            targetCtx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+            targetCtx.fillStyle = isWarning ? '#FFF1F2' : '#FFFFFF';
+            targetCtx.fill();
+            targetCtx.lineWidth = 2;
+            targetCtx.strokeStyle = isWarning ? '#DC2626' : '#14213d';
+            targetCtx.stroke();
+
+            // Speech bubble pointer tail pointing toward the duck
+            const tailX = Math.max(boxX + 14, Math.min(boxX + boxWidth - 14, anchorX));
+            targetCtx.beginPath();
+            targetCtx.moveTo(tailX - 6, boxY + boxHeight - 1);
+            targetCtx.lineTo(anchorX, anchorY - 22);
+            targetCtx.lineTo(tailX + 6, boxY + boxHeight - 1);
+            targetCtx.closePath();
+            targetCtx.fillStyle = isWarning ? '#FFF1F2' : '#FFFFFF';
+            targetCtx.fill();
+
+            // Outline for the tail sides
+            targetCtx.beginPath();
+            targetCtx.moveTo(tailX - 6, boxY + boxHeight);
+            targetCtx.lineTo(anchorX, anchorY - 22);
+            targetCtx.lineTo(tailX + 6, boxY + boxHeight);
+            targetCtx.strokeStyle = isWarning ? '#DC2626' : '#14213d';
+            targetCtx.lineWidth = 2;
+            targetCtx.stroke();
+
+            // Text inside bubble
+            targetCtx.fillStyle = isWarning ? '#B91C1C' : '#14213d';
+            targetCtx.textAlign = 'center';
+            targetCtx.textBaseline = 'middle';
+            targetCtx.fillText(text, boxX + boxWidth / 2, boxY + boxHeight / 2 + 1);
 
             targetCtx.restore();
         }
@@ -443,15 +693,35 @@
         }
 
         /**
-         * Renders the central gravitational duck with a subtle glow so it stands out clearly.
+         * Renders the central gravitational duck with progressive red tinting and speech bubble.
          */
         function drawCentralDuck(x, y) {
+            if (duckExploded) return;
+
+            const colors = getDuckColors(duckHits);
+            const redRatio = Math.min(duckHits, 4) / 4;
+
+            // Recoil / nervous tremble offsets
+            let offsetX = 0;
+            let offsetY = 0;
+            let scale = 1;
+
+            if (hitAnimTimer > 0) {
+                scale = 1 + Math.sin((hitAnimTimer / 20) * Math.PI) * 0.25;
+                offsetX = (Math.random() - 0.5) * 4;
+                offsetY = (Math.random() - 0.5) * 4;
+            } else if (duckHits === 4) {
+                // Angry trembling right before cwashout
+                offsetX = (Math.random() - 0.5) * 2.5;
+                offsetY = (Math.random() - 0.5) * 2.5;
+            }
+
             ctx.save();
 
-            // Soft glowing aura around the central gravity duck
+            // Glowing aura shifts from warm white/yellow to angry red as hits increase
             const glow = ctx.createRadialGradient(x, y, 4, x, y, 36);
-            glow.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
-            glow.addColorStop(0.65, 'rgba(255, 250, 210, 0.45)');
+            glow.addColorStop(0, redRatio > 0 ? `rgba(255, ${Math.round(255 * (1 - redRatio * 0.75))}, ${Math.round(255 * (1 - redRatio * 0.85))}, 0.92)` : 'rgba(255, 255, 255, 0.92)');
+            glow.addColorStop(0.65, redRatio > 0 ? `rgba(255, ${Math.round(250 * (1 - redRatio))}, ${Math.round(210 * (1 - redRatio))}, 0.45)` : 'rgba(255, 250, 210, 0.45)');
             glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
             ctx.fillStyle = glow;
             ctx.beginPath();
@@ -461,7 +731,7 @@
             // Subtle dashed gravity well ring
             ctx.beginPath();
             ctx.arc(x, y, 26, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(20, 33, 61, 0.25)';
+            ctx.strokeStyle = redRatio > 0.5 ? 'rgba(220, 38, 38, 0.45)' : 'rgba(20, 33, 61, 0.25)';
             ctx.lineWidth = 1;
             ctx.setLineDash([3, 3]);
             ctx.stroke();
@@ -469,15 +739,108 @@
 
             ctx.restore();
 
-            // Draw the central duck
-            drawDuckSprite(ctx, x, y, 1, false, 0, false);
+            // Draw the central duck with current hit color
+            drawDuckSprite(
+                ctx,
+                x + offsetX,
+                y + offsetY,
+                scale,
+                false,
+                0,
+                false,
+                colors.body,
+                colors.wing,
+                duckHits
+            );
+
+            // Draw speech bubble if active
+            if (speechText) {
+                drawSpeechBubble(ctx, x, y, speechText, duckHits === 4);
+            }
+        }
+
+        function drawExplosionEffects() {
+            // Shockwave rings
+            for (const sw of shockwaves) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = sw.color;
+                ctx.globalAlpha = Math.max(0, sw.alpha);
+                ctx.lineWidth = sw.lineWidth;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Particles & feathers
+            for (const p of explosionParticles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.fillStyle = p.color;
+
+                if (p.isFeather) {
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, p.size * 1.6, p.size * 0.65, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // Brief screen flash
+            if (explosionFlash > 0) {
+                ctx.save();
+                ctx.fillStyle = `rgba(255, 245, 220, ${explosionFlash})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+
+            // Post-explosion status banner once particles settle
+            if (duckExploded && explosionParticles.length < 25) {
+                ctx.save();
+                const msg = 'THE DUCK CWASHED OUT! CLICK RESET TO RESTORE.';
+                ctx.font = 'bold 14px "Courier New", Courier, monospace';
+                const w = ctx.measureText(msg).width + 32;
+                const h = 36;
+                const bx = (canvas.width - w) / 2;
+                const by = canvas.height / 2 - h / 2;
+
+                ctx.beginPath();
+                ctx.roundRect(bx, by, w, h, 6);
+                ctx.fillStyle = 'rgba(20, 33, 61, 0.88)';
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(msg, canvas.width / 2, canvas.height / 2 + 1);
+                ctx.restore();
+            }
         }
 
         function draw() {
+            ctx.save();
+
+            // Apply screen shake on impact or explosion
+            if (screenShakeTimer > 0) {
+                const intensity = duckExploded ? (screenShakeTimer * 0.45) : (screenShakeTimer * 0.35);
+                const sx = (Math.random() - 0.5) * intensity;
+                const sy = (Math.random() - 0.5) * intensity;
+                ctx.translate(sx, sy);
+            }
+
             // 1. Draw cached Ducks & Rainbows background
             ctx.drawImage(bgCanvas, 0, 0);
 
-            // 2. Draw Central Duck Node
+            // 2. Draw Central Duck Node (if not blown up)
             drawCentralDuck(centralNode.x, centralNode.y);
 
             // 3. Draw Balls & Trails
@@ -507,10 +870,16 @@
                 ctx.lineWidth = 1;
                 ctx.stroke();
             }
+
+            // 4. Draw explosion shockwaves, particles, and post-explosion banner
+            drawExplosionEffects();
+
+            ctx.restore();
         }
 
         function animate() {
             updatePhysics();
+            updateEffects();
             draw();
             requestAnimationFrame(animate);
         }
