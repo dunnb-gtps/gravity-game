@@ -241,7 +241,7 @@
                 }
             ];
 
-            // Flying holiday silhouettes in the background sky
+            // Flying holiday elements in the sky, featuring Santa's sleigh prominently
             holidayFlyers = [
                 createHolidayFlyer('sleigh', true),
                 createHolidayFlyer('comet_star', true),
@@ -290,7 +290,7 @@
             }
         }
 
-        function createHolidayFlyer(type, randomX = false) {
+        function createHolidayFlyer(type, initial = false) {
             const goingRight = type === 'sleigh' ? true : Math.random() > 0.35;
             const dir = goingRight ? 1 : -1;
             const w = canvas.width || 1000;
@@ -299,8 +299,8 @@
             let speed = 0.5;
             let scale = 1;
             if (type === 'sleigh') {
-                speed = (0.55 + Math.random() * 0.2) * dir;
-                scale = 1.05;
+                speed = 0.75 * dir;
+                scale = 1.35;
             } else if (type === 'comet_star') {
                 speed = (0.8 + Math.random() * 0.45) * dir;
                 scale = 0.85 + Math.random() * 0.25;
@@ -309,17 +309,25 @@
                 scale = 0.95;
             }
 
-            const margin = 110;
-            const startX = randomX
-                ? Math.random() * w
-                : (dir === 1 ? -margin : w + margin);
+            const margin = type === 'sleigh' ? 145 : 110;
+            let startX;
+            let startY;
+
+            if (type === 'sleigh') {
+                // Position Santa's sleigh prominently in the upper sky on initial load
+                startX = initial ? w * 0.28 : (dir === 1 ? -margin : w + margin);
+                startY = initial ? Math.max(76, h * 0.15) : 65 + Math.random() * Math.max(80, h * 0.25);
+            } else {
+                startX = initial ? Math.random() * w : (dir === 1 ? -margin : w + margin);
+                startY = 45 + Math.random() * Math.max(100, h - 130);
+            }
 
             return {
                 type: type,
                 x: startX,
-                y: 45 + Math.random() * Math.max(100, h - 130),
+                y: startY,
                 vx: speed,
-                vy: (Math.random() - 0.5) * 0.12,
+                vy: type === 'sleigh' ? 0 : (Math.random() - 0.5) * 0.12,
                 dir: dir,
                 scale: scale,
                 bobPhase: Math.random() * Math.PI * 2,
@@ -424,22 +432,38 @@
             }
 
             // Update flying holiday elements
-            const margin = 120;
             for (let i = 0; i < holidayFlyers.length; i++) {
                 const flyer = holidayFlyers[i];
+                const margin = flyer.type === 'sleigh' ? 150 : 120;
                 flyer.x += flyer.vx;
-                flyer.y += flyer.vy + Math.sin(frameCount * 0.025 + flyer.bobPhase) * 0.12;
+                flyer.y += flyer.vy + Math.sin(frameCount * 0.03 + flyer.bobPhase) * (flyer.type === 'sleigh' ? 0.22 : 0.12);
 
                 // Record golden stardust trail
                 if (frameCount % 2 === 0) {
-                    const offset = flyer.type === 'sleigh' ? -24 : -10;
+                    const offset = flyer.type === 'sleigh' ? -44 : -10;
+                    const trailY = flyer.type === 'sleigh' ? flyer.y + 8 * flyer.scale : flyer.y;
                     flyer.trail.push({
                         x: flyer.x + flyer.dir * offset * flyer.scale,
-                        y: flyer.y
+                        y: trailY
                     });
-                    if (flyer.trail.length > 26) {
+                    const maxTrail = flyer.type === 'sleigh' ? 38 : 26;
+                    if (flyer.trail.length > maxTrail) {
                         flyer.trail.shift();
                     }
+                }
+
+                // Gentle magic stardust sparkles drifting off Santa's sleigh
+                if (flyer.type === 'sleigh' && frameCount % 7 === 0) {
+                    sparkles.push({
+                        x: flyer.x - flyer.dir * 42 * flyer.scale + (Math.random() - 0.5) * 8,
+                        y: flyer.y + 6 * flyer.scale + (Math.random() - 0.5) * 6,
+                        vx: -flyer.dir * (0.2 + Math.random() * 0.4),
+                        vy: 0.15 + Math.random() * 0.35,
+                        life: 0.9,
+                        decay: 0.022,
+                        color: Math.random() < 0.65 ? '#ffd166' : '#ffffff',
+                        size: 1.3 + Math.random() * 1.1
+                    });
                 }
 
                 // Respawn flyer when it drifts off-screen
@@ -913,17 +937,343 @@
             }
         }
 
+        function drawSantaSleigh(flyer) {
+            const gallopPhase = frameCount * 0.2 + flyer.bobPhase;
+            const wavePhase = Math.sin(frameCount * 0.14 + flyer.bobPhase);
+            const hatBob = Math.sin(frameCount * 0.16 + flyer.bobPhase) * 1.2;
+
+            // Warm golden magic halo behind Santa's sleigh
+            const sleighAura = ctx.createRadialGradient(-22, -4, 3, -22, -4, 34);
+            sleighAura.addColorStop(0, 'rgba(255, 209, 102, 0.22)');
+            sleighAura.addColorStop(1, 'rgba(255, 209, 102, 0)');
+            ctx.fillStyle = sleighAura;
+            ctx.beginPath();
+            ctx.arc(-22, -4, 34, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 1. GOLDEN SLEIGH RUNNERS & STRUTS
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 1.8;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-44, 11);
+            ctx.lineTo(-7, 11);
+            ctx.quadraticCurveTo(1, 11, 1, 5.5);
+            ctx.quadraticCurveTo(1, 3, -2.5, 3.5);
+            ctx.stroke();
+
+            // Vertical struts connecting runners to sleigh body
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(-36, 11);
+            ctx.lineTo(-34, 6);
+            ctx.moveTo(-14, 11);
+            ctx.lineTo(-13, 6);
+            ctx.stroke();
+
+            // 2. OVERFLOWING SACK OF PRESENTS IN BACK OF SLEIGH
+            // Wrapped gift boxes peeking out of the sack
+            ctx.fillStyle = '#2d6a4f';
+            ctx.fillRect(-37, -13, 6, 6);
+            ctx.fillStyle = '#ffd166';
+            ctx.fillRect(-34.5, -13, 1.2, 6);
+
+            ctx.fillStyle = '#0077b6';
+            ctx.fillRect(-30, -14, 6, 7);
+            ctx.fillStyle = '#e63946';
+            ctx.fillRect(-27.6, -14, 1.2, 7);
+
+            ctx.fillStyle = '#ffd166';
+            ctx.fillRect(-33.5, -17, 5, 5);
+            ctx.fillStyle = '#c1121f';
+            ctx.fillRect(-31.5, -17, 1, 5);
+
+            // Brown velvet toy sack
+            ctx.fillStyle = '#7f4f24';
+            ctx.beginPath();
+            ctx.ellipse(-32, -3, 8.5, 7.5, -0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b08968';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+
+            // Gold ribbon tying the toy sack
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.moveTo(-36, -8.5);
+            ctx.lineTo(-27, -8.5);
+            ctx.stroke();
+
+            // 3. SANTA CLAUS SITTING IN THE SLEIGH
+            // Santa's plump red coat torso
+            ctx.fillStyle = '#d62828';
+            ctx.beginPath();
+            ctx.ellipse(-18, -5.5, 6.2, 6.5, 0.08, 0, Math.PI * 2);
+            ctx.fill();
+
+            // White fur trim down the front of Santa's coat
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(-14.2, -10, 2.2, 8);
+
+            // Black leather belt & golden buckle
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(-23.5, -4.5, 11, 2);
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 0.9;
+            ctx.strokeRect(-15.5, -4.8, 3, 2.6);
+
+            // Santa's head
+            ctx.beginPath();
+            ctx.arc(-16.5, -14.8, 4.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffcdb2';
+            ctx.fill();
+
+            // Rosy cheek & cheerful eye
+            ctx.fillStyle = 'rgba(230, 57, 70, 0.55)';
+            ctx.beginPath();
+            ctx.arc(-14.5, -14.2, 1.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.arc(-14.6, -15.6, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Full fluffy white beard & mustache
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-14.2, -12.6, 2.6, 0, Math.PI * 2);
+            ctx.arc(-16.4, -12.2, 2.5, 0, Math.PI * 2);
+            ctx.arc(-14.6, -9.8, 2.7, 0, Math.PI * 2);
+            ctx.arc(-12.7, -13.5, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cute button nose
+            ctx.fillStyle = '#f28482';
+            ctx.beginPath();
+            ctx.arc(-12.1, -14.8, 1.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Classic Red Santa Hat with white fur brim & pom-pom
+            ctx.fillStyle = '#d62828';
+            ctx.beginPath();
+            ctx.moveTo(-21.2, -17.5);
+            ctx.quadraticCurveTo(-18.5, -23.5, -12.5, -17.8);
+            ctx.lineTo(-24.8, -21.2 + hatBob);
+            ctx.closePath();
+            ctx.fill();
+
+            // White fluffy hat brim
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.roundRect(-21.6, -18.8, 9.8, 2.5, 1.2);
+            ctx.fill();
+
+            // White pom-pom at tip of Santa's hat
+            ctx.beginPath();
+            ctx.arc(-25.3, -21.2 + hatBob, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Santa's front arm holding the reins
+            ctx.strokeStyle = '#d62828';
+            ctx.lineWidth = 2.6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-15.5, -8.5);
+            ctx.lineTo(-9.5, -6.5);
+            ctx.stroke();
+
+            // White cuff & red mitten on front hand
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-10.2, -6.7, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#c1121f';
+            ctx.beginPath();
+            ctx.arc(-8.8, -6.4, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Santa's waving arm ("Ho! Ho! Ho!")
+            const waveX = -22.5 + wavePhase * 1.8;
+            const waveY = -15.8 - Math.abs(wavePhase) * 1.2;
+            ctx.strokeStyle = '#d62828';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(-19.5, -9.2);
+            ctx.lineTo(waveX, waveY);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(waveX + 0.5, waveY + 0.8, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#c1121f';
+            ctx.beginPath();
+            ctx.arc(waveX, waveY - 0.3, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 4. SLEIGH CARRIAGE BODY (drawn over Santa's lower half so he sits inside)
+            const sleighGrad = ctx.createLinearGradient(-42, -9, -6, 7);
+            sleighGrad.addColorStop(0, '#9e1b24');
+            sleighGrad.addColorStop(0.5, '#d62828');
+            sleighGrad.addColorStop(1, '#b5171e');
+
+            ctx.beginPath();
+            ctx.moveTo(-43, -8.5);
+            ctx.quadraticCurveTo(-36, -8.5, -33, -2.5);
+            ctx.lineTo(-14, -2.5);
+            ctx.quadraticCurveTo(-9, -2.5, -5.5, -7.5);
+            ctx.quadraticCurveTo(-4, -1, -8.5, 6.5);
+            ctx.lineTo(-39.5, 6.5);
+            ctx.quadraticCurveTo(-44.5, 2, -43, -8.5);
+            ctx.closePath();
+            ctx.fillStyle = sleighGrad;
+            ctx.fill();
+
+            // Gold trim along sleigh rim & base
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Decorative gold flourish on sleigh side
+            ctx.strokeStyle = 'rgba(255, 209, 102, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-34, 2);
+            ctx.quadraticCurveTo(-24, -1, -13, 2);
+            ctx.stroke();
+
+            // 5. GOLDEN REINS & REINDEER TEAM (WITH RUDOLPH)
+            const reindeerTeam = [
+                { x: 16, y: -5.5, phase: 0.7, isFar: true, isRudolph: false },
+                { x: 20, y: -2.2, phase: 0.0, isFar: false, isRudolph: false },
+                { x: 40, y: -5.5, phase: 2.2, isFar: true, isRudolph: false },
+                { x: 45, y: -2.2, phase: 1.5, isFar: false, isRudolph: true }
+            ];
+
+            // Golden reins from Santa's hand to the reindeer
+            ctx.strokeStyle = 'rgba(255, 209, 102, 0.65)';
+            ctx.lineWidth = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(-8.5, -6.4);
+            ctx.quadraticCurveTo(5, -3, 20, -4.5);
+            ctx.quadraticCurveTo(32, -3.5, 45, -4.5);
+            ctx.stroke();
+
+            for (const deer of reindeerTeam) {
+                const stride = Math.sin(gallopPhase + deer.phase);
+                const bounce = Math.cos(gallopPhase + deer.phase) * 1.1;
+                const rx = deer.x;
+                const ry = deer.y + bounce;
+
+                ctx.save();
+                ctx.translate(rx, ry);
+                if (deer.isFar) {
+                    ctx.scale(0.92, 0.92);
+                }
+
+                // Galloping legs
+                ctx.strokeStyle = deer.isFar ? '#5c4033' : '#6d4c41';
+                ctx.lineWidth = 1.3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                // Back legs
+                ctx.moveTo(-3.5, 1.5);
+                ctx.lineTo(-5.5 - stride * 2.5, 6.5);
+                // Front legs
+                ctx.moveTo(3.5, 1.5);
+                ctx.lineTo(5.5 + stride * 2.5, 6.5);
+                ctx.stroke();
+
+                // Reindeer torso
+                ctx.fillStyle = deer.isFar ? '#6d4c41' : '#8d6e63';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 5.5, 2.7, -0.08, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Little white tail
+                ctx.fillStyle = '#f8fafc';
+                ctx.beginPath();
+                ctx.arc(-5.6, -1.2, 1.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Neck & Head
+                ctx.fillStyle = deer.isFar ? '#6d4c41' : '#8d6e63';
+                ctx.beginPath();
+                ctx.moveTo(3.5, -0.5);
+                ctx.lineTo(5.2, -4.5);
+                ctx.lineTo(7.2, -3.5);
+                ctx.lineTo(5.2, 1.0);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.ellipse(6.8, -4.3, 2.7, 1.8, 0.15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Festive red harness & gold jingle bell
+                ctx.strokeStyle = '#e63946';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(2.8, -2.5);
+                ctx.lineTo(3.6, 2.2);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffd166';
+                ctx.beginPath();
+                ctx.arc(4.2, -1.2, 1.0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Branching antlers
+                ctx.strokeStyle = '#d7ccc8';
+                ctx.lineWidth = 0.9;
+                ctx.beginPath();
+                ctx.moveTo(5.6, -5.8);
+                ctx.lineTo(4.6, -9.8);
+                ctx.moveTo(5.1, -7.8);
+                ctx.lineTo(6.6, -9.2);
+                ctx.moveTo(6.5, -5.8);
+                ctx.lineTo(7.2, -9.6);
+                ctx.stroke();
+
+                // Rudolph's glowing red nose vs. standard dark nose
+                if (deer.isRudolph) {
+                    const nosePulse = 0.75 + 0.25 * Math.sin(frameCount * 0.18);
+                    const noseGlow = ctx.createRadialGradient(9.6, -4.1, 0.5, 9.6, -4.1, 6.5);
+                    noseGlow.addColorStop(0, `rgba(255, 59, 48, ${0.85 * nosePulse})`);
+                    noseGlow.addColorStop(1, 'rgba(255, 59, 48, 0)');
+                    ctx.fillStyle = noseGlow;
+                    ctx.beginPath();
+                    ctx.arc(9.6, -4.1, 6.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ff2a2a';
+                    ctx.beginPath();
+                    ctx.arc(9.6, -4.1, 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#2b1d16';
+                    ctx.beginPath();
+                    ctx.arc(9.3, -4.1, 1.0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
         function drawHolidayFlyers() {
             for (const flyer of holidayFlyers) {
                 // Draw warm golden stardust trail
                 if (flyer.trail.length > 1) {
                     for (let t = 1; t < flyer.trail.length; t++) {
-                        const alpha = (t / flyer.trail.length) * 0.35;
+                        const alpha = (t / flyer.trail.length) * (flyer.type === 'sleigh' ? 0.48 : 0.35);
                         ctx.beginPath();
                         ctx.moveTo(flyer.trail[t - 1].x, flyer.trail[t - 1].y);
                         ctx.lineTo(flyer.trail[t].x, flyer.trail[t].y);
                         ctx.strokeStyle = `rgba(255, 209, 102, ${alpha})`;
-                        ctx.lineWidth = 1.2;
+                        ctx.lineWidth = flyer.type === 'sleigh' ? 1.8 : 1.2;
                         ctx.stroke();
                     }
                 }
@@ -933,78 +1283,7 @@
                 ctx.scale(flyer.dir * flyer.scale, flyer.scale);
 
                 if (flyer.type === 'sleigh') {
-                    // Golden runners
-                    ctx.beginPath();
-                    ctx.moveTo(-24, 6);
-                    ctx.lineTo(-4, 6);
-                    ctx.quadraticCurveTo(2, 6, 3, 1);
-                    ctx.strokeStyle = '#ffd166';
-                    ctx.lineWidth = 1.3;
-                    ctx.stroke();
-
-                    // Red sleigh body
-                    ctx.beginPath();
-                    ctx.moveTo(-22, 4);
-                    ctx.lineTo(-24, -4);
-                    ctx.lineTo(-16, -4);
-                    ctx.quadraticCurveTo(-12, 1, -6, -2);
-                    ctx.lineTo(-2, -2);
-                    ctx.lineTo(-4, 4);
-                    ctx.closePath();
-                    ctx.fillStyle = '#c1121f';
-                    ctx.fill();
-                    ctx.strokeStyle = '#ffd166';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-
-                    // Santa silhouette & hat
-                    ctx.beginPath();
-                    ctx.arc(-13, -5, 3.2, 0, Math.PI * 2);
-                    ctx.fillStyle = '#e63946';
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.arc(-15, -7.5, 1.5, 0, Math.PI * 2);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fill();
-
-                    // Reins line
-                    ctx.beginPath();
-                    ctx.moveTo(-2, -1);
-                    ctx.lineTo(24, -1);
-                    ctx.strokeStyle = 'rgba(255, 209, 102, 0.45)';
-                    ctx.lineWidth = 0.8;
-                    ctx.stroke();
-
-                    // Two reindeer silhouettes + Rudolph's glowing red nose!
-                    const gallop = Math.sin(frameCount * 0.18 + flyer.bobPhase) * 1.5;
-                    for (let r = 0; r < 2; r++) {
-                        const rx = 11 + r * 12;
-                        const ry = -1 + (r === 0 ? gallop : -gallop);
-                        ctx.fillStyle = '#8d6e63';
-                        ctx.beginPath();
-                        ctx.ellipse(rx, ry, 4.2, 2.1, 0, 0, Math.PI * 2);
-                        ctx.fill();
-                        // Head & antlers
-                        ctx.beginPath();
-                        ctx.arc(rx + 4, ry - 2.5, 1.8, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.strokeStyle = '#bcaaa4';
-                        ctx.lineWidth = 0.8;
-                        ctx.beginPath();
-                        ctx.moveTo(rx + 3.5, ry - 4);
-                        ctx.lineTo(rx + 2.5, ry - 7);
-                        ctx.moveTo(rx + 4.5, ry - 4);
-                        ctx.lineTo(rx + 5.5, ry - 7);
-                        ctx.stroke();
-
-                        // Lead reindeer (Rudolph) glowing red nose
-                        if (r === 1) {
-                            ctx.beginPath();
-                            ctx.arc(rx + 6, ry - 2.3, 1.6, 0, Math.PI * 2);
-                            ctx.fillStyle = '#ff2a2a';
-                            ctx.fill();
-                        }
-                    }
+                    drawSantaSleigh(flyer);
 
                 } else if (flyer.type === 'comet_star') {
                     // Glowing Christmas Shooting Star
@@ -1294,7 +1573,7 @@
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 0. Draw Festive Background Layer (Stars, Snow, Horizon, Trees & Elves, Landmarks, Flyers)
+            // 0. Draw Festive Background Layer (Stars, Snow, Horizon, Trees & Elves, Landmarks, Santa's Sleigh & Flyers)
             drawStarsAndSnow();
             drawWinterHorizon();
             drawFestiveObjects();
