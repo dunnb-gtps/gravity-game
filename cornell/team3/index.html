@@ -93,6 +93,35 @@
             color: #000000;
         }
 
+        .btn-voice {
+            background: rgba(110, 231, 255, 0.12);
+            color: #6ee7ff;
+            border: 1px solid #6ee7ff;
+            padding: 6px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-voice:hover {
+            background: #6ee7ff;
+            color: #0b0e14;
+        }
+
+        .btn-voice.muted {
+            background: rgba(255, 255, 255, 0.05);
+            color: #9aa4b2;
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+
+        .btn-voice.muted:hover {
+            background: #ffffff;
+            color: #0b0e14;
+        }
+
         .btn-store {
             position: relative;
             background: rgba(238, 255, 84, 0.12);
@@ -414,6 +443,7 @@
             <div class="stat-box mice-box">Mice: <span id="miceValue">0/1</span></div>
             <div class="stat-box">Balls: <span id="ballsValue">6</span></div>
             <div class="stat-box">Points: <span id="scoreValue">0</span></div>
+            <button class="btn-voice" id="voiceToggleBtn" onclick="toggleVoice()">Voice: ON</button>
             <button class="btn-store" id="storeToggleBtn" onclick="openStore()">
                 Store
                 <span class="store-badge"></span>
@@ -482,6 +512,7 @@
         const storeGridEl = document.getElementById('storeGrid');
         const storeToastEl = document.getElementById('storeToast');
         const storeToggleBtnEl = document.getElementById('storeToggleBtn');
+        const voiceToggleBtnEl = document.getElementById('voiceToggleBtn');
 
         // SIMULATION CONSTANTS
         const BASE_GRAVITY_CONSTANT = 1800; // Base strength of gravitational pull (G)
@@ -637,6 +668,67 @@
             ]
         };
 
+        // MOUSE DIALOGUE BANK
+        const MOUSE_DIALOGUE = {
+            general: [
+                "Hey! Watch the whiskers!",
+                "Oof! Right in the cheddar!",
+                "I was just minding my own cheese!",
+                "Not fair, you're using gravity!",
+                "Tell my family... hide the gouda!",
+                "Squeak! That's gonna leave a mark!",
+                "Curse you, orbital physics!",
+                "My tail! Watch the tail!",
+                "I didn't even get a bite yet!",
+                "Okay, okay, you got me!",
+                "Whoa! That curveball was nasty!",
+                "I demand a rematch!"
+            ],
+            armoredHelmet: [
+                "Hey! That thimble was an heirloom!",
+                "Joke's on you, I wore a helmet!",
+                "My shiny armor! Now I'm mad!",
+                "Nice shot, human—try again!"
+            ],
+            armoredDefeat: [
+                "Should've worn two helmets...",
+                "Foiled even with heavy armor!"
+            ],
+            speedy: [
+                "How'd you catch me?! I was zooming!",
+                "Too fast... well, almost too fast!",
+                "My cardio completely failed me!"
+            ],
+            evasive: [
+                "Wait—I forgot to dodge that one!",
+                "Hey, no fair curving the ball!",
+                "My ninja reflexes let me down!"
+            ],
+            combo: [
+                "Double trouble! Unbelievable!",
+                "Stop, we're already dizzy!",
+                "A multi-hit combo?! Show-off!"
+            ],
+            skins: {
+                cheddar: [
+                    "Careful, I'm extra sharp!",
+                    "Hey! Don't melt the cheddar!"
+                ],
+                cyber: [
+                    "SYSTEM ERROR: Tail.exe crashed!",
+                    "BEEP-SQUEAK! Shields offline!"
+                ],
+                royal: [
+                    "Unhand me, peasant!",
+                    "Mind the royal crown!"
+                ],
+                clockwork: [
+                    "My gears! You unwound me!",
+                    "TICK-TOCK-SQUEAK! Out of wind!"
+                ]
+            }
+        };
+
         // STORE STATE & PERSISTENCE
         const STORAGE_KEY = 'gravity_mouse_hunt_skins_v1';
         let activeStoreCategory = 'background';
@@ -690,6 +782,120 @@
             return SKIN_CATALOG[category].find(item => item.id === id) || SKIN_CATALOG[category][0];
         }
 
+        // VOICE & SPEECH SYNTHESIS HELPERS
+        let voiceEnabled = true;
+        let audioCtx = null;
+        let lastSpokenLine = '';
+
+        function toggleVoice() {
+            voiceEnabled = !voiceEnabled;
+            voiceToggleBtnEl.textContent = voiceEnabled ? 'Voice: ON' : 'Voice: OFF';
+            voiceToggleBtnEl.classList.toggle('muted', !voiceEnabled);
+            if (!voiceEnabled && 'speechSynthesis' in window) {
+                try {
+                    window.speechSynthesis.cancel();
+                } catch (e) {}
+            }
+        }
+
+        function playMouseSqueak() {
+            if (!voiceEnabled) return;
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                if (!audioCtx) {
+                    audioCtx = new AudioContextClass();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(980, now);
+                osc.frequency.exponentialRampToValueAtTime(1680, now + 0.06);
+                osc.frequency.exponentialRampToValueAtTime(1280, now + 0.13);
+
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(0.075, now + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } catch (e) {
+                // Ignore Web Audio errors if blocked
+            }
+        }
+
+        function speakMouseLine(text, variant) {
+            if (!voiceEnabled) return;
+            playMouseSqueak();
+
+            if (!('speechSynthesis' in window)) return;
+            try {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+                const enVoice = voices.find(v => /en(-|_)(US|GB)/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang));
+                if (enVoice) {
+                    utterance.voice = enVoice;
+                }
+
+                utterance.pitch = variant === 'armored' ? 1.45 : (variant === 'speedy' ? 1.95 : 1.8);
+                utterance.rate = variant === 'speedy' ? 1.28 : 1.15;
+                utterance.volume = 0.9;
+
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                // Ignore speech synthesis errors
+            }
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
+
+        function pickMouseDialogue(mouse, isHelmetHit, comboCount) {
+            if (isHelmetHit) {
+                const pool = MOUSE_DIALOGUE.armoredHelmet;
+                return pool[Math.floor(Math.random() * pool.length)];
+            }
+
+            let pool = [...MOUSE_DIALOGUE.general];
+
+            if (mouse.variant === 'armored') {
+                pool = pool.concat(MOUSE_DIALOGUE.armoredDefeat, MOUSE_DIALOGUE.armoredDefeat);
+            } else if (mouse.variant === 'speedy') {
+                pool = pool.concat(MOUSE_DIALOGUE.speedy, MOUSE_DIALOGUE.speedy);
+            } else if (mouse.variant === 'evasive') {
+                pool = pool.concat(MOUSE_DIALOGUE.evasive, MOUSE_DIALOGUE.evasive);
+            }
+
+            if (comboCount > 1) {
+                pool = pool.concat(MOUSE_DIALOGUE.combo, MOUSE_DIALOGUE.combo);
+            }
+
+            const equippedMouseSkin = storeState.equipped.mice;
+            if (MOUSE_DIALOGUE.skins[equippedMouseSkin]) {
+                pool = pool.concat(MOUSE_DIALOGUE.skins[equippedMouseSkin], MOUSE_DIALOGUE.skins[equippedMouseSkin]);
+            }
+
+            let chosen = pool[Math.floor(Math.random() * pool.length)];
+            if (pool.length > 1 && chosen === lastSpokenLine) {
+                chosen = pool[(pool.indexOf(chosen) + 1) % pool.length];
+            }
+            lastSpokenLine = chosen;
+            return chosen;
+        }
+
         // GAME STATE VARIABLES
         let balls = [];
         let mice = [];
@@ -703,6 +909,7 @@
         let currentGravity = BASE_GRAVITY_CONSTANT;
 
         let hitEffects = [];
+        let speechBubbles = [];
         let particles = [];
         let centerPulse = 0;
         let frameTick = 0;
@@ -1509,12 +1716,14 @@
         }
 
         function retryCurrentLevel() {
+            speechBubbles = [];
             setupLevel(level);
         }
 
         function resetSimulation() {
             score = 0;
             hitEffects = [];
+            speechBubbles = [];
             particles = [];
             centerPulse = 0;
             levelBanner.active = false;
@@ -1546,6 +1755,32 @@
                 ringRadius: ringRadius,
                 alpha: 1
             });
+        }
+
+        function triggerMouseTalk(mouse, { isHelmetHit = false, combo = 1 } = {}) {
+            const line = pickMouseDialogue(mouse, isHelmetHit, combo);
+            const borderColor = isHelmetHit
+                ? '#6ee7ff'
+                : (combo > 1 ? '#ff8fa3' : '#eeff54');
+
+            // Nudge any existing active bubbles upward so simultaneous combo hits don't overlap
+            for (const existing of speechBubbles) {
+                if (Math.abs(existing.anchorX - mouse.x) < 190 && Math.abs(existing.offsetY) < 42) {
+                    existing.offsetY -= 40;
+                }
+            }
+
+            speechBubbles.push({
+                anchorX: mouse.x,
+                anchorY: mouse.y,
+                offsetY: 0,
+                text: line,
+                borderColor: borderColor,
+                age: 0,
+                maxAge: 155
+            });
+
+            speakMouseLine(line, mouse.variant);
         }
 
         function updateMice() {
@@ -1654,6 +1889,15 @@
                 }
             }
 
+            for (let i = speechBubbles.length - 1; i >= 0; i--) {
+                const sb = speechBubbles[i];
+                sb.age += 1;
+                sb.offsetY -= 0.12;
+                if (sb.age >= sb.maxAge) {
+                    speechBubbles.splice(i, 1);
+                }
+            }
+
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
                 p.x += p.vx;
@@ -1722,7 +1966,8 @@
                         if (m.hp > 0) {
                             m.speed *= 1.3;
                             spawnBurst(m.x, m.y, '#cbd5e1', 14);
-                            addFloatingText(m.x, m.y - 18, 'HELMET OFF!', '#6ee7ff', 18);
+                            addFloatingText(m.x, m.y + 22, 'HELMET OFF!', '#6ee7ff', 18);
+                            triggerMouseTalk(m, { isHelmetHit: true, combo: b.combo });
                             b.vx *= 0.88;
                             b.vy = -b.vy * 0.8;
                         } else {
@@ -1738,10 +1983,11 @@
 
                             const label = b.combo > 1
                                 ? `COMBO x${b.combo}! +${pts}`
-                                : `SQUEAK! +${pts}`;
+                                : `+${pts}`;
 
                             spawnBurst(m.x, m.y, equippedThrowSkin.burstColor || '#eeff54', 18);
-                            addFloatingText(m.x, m.y - 16, label, '#eeff54', 20);
+                            addFloatingText(m.x, m.y + 18, label, '#eeff54', 20);
+                            triggerMouseTalk(m, { isHelmetHit: false, combo: b.combo });
                             mice.splice(j, 1);
 
                             b.vx *= 0.92;
@@ -1930,7 +2176,6 @@
                 targetCtx.lineTo(4, 5);
                 targetCtx.stroke();
             } else if (skinId === 'clockwork') {
-                // Seam line + spinning brass wind-up key
                 targetCtx.strokeStyle = '#451a03';
                 targetCtx.lineWidth = 1.2;
                 targetCtx.beginPath();
@@ -2037,7 +2282,6 @@
             targetCtx.rotate(rotation);
 
             if (skinId === 'capture_orb') {
-                // Red & white capture ball
                 targetCtx.beginPath();
                 targetCtx.arc(0, 0, r, 0, Math.PI * 2);
                 targetCtx.clip();
@@ -2047,11 +2291,9 @@
                 targetCtx.fillStyle = '#f8fafc';
                 targetCtx.fillRect(-r, 0, r * 2, r);
 
-                // Center band
                 targetCtx.fillStyle = '#111827';
                 targetCtx.fillRect(-r, -r * 0.16, r * 2, r * 0.32);
 
-                // Center button
                 targetCtx.beginPath();
                 targetCtx.arc(0, 0, r * 0.32, 0, Math.PI * 2);
                 targetCtx.fillStyle = '#111827';
@@ -2084,7 +2326,6 @@
                 targetCtx.arc(0, 0, r, 0, Math.PI * 2);
                 targetCtx.fill();
 
-                // Swirling magma arcs
                 targetCtx.strokeStyle = 'rgba(254, 240, 138, 0.75)';
                 targetCtx.lineWidth = 1.4;
                 targetCtx.beginPath();
@@ -2138,7 +2379,6 @@
                 targetCtx.arc(0, 0, r, 0, Math.PI * 2);
                 targetCtx.fill();
 
-                // Bright white star center
                 targetCtx.fillStyle = '#ffffff';
                 targetCtx.beginPath();
                 for (let s = 0; s < 8; s++) {
@@ -2217,7 +2457,6 @@
 
             if (skinId === 'black_hole') {
                 targetCtx.save();
-                // Swirling accretion disk
                 const spin = frameTick * 0.03;
                 targetCtx.translate(cx, cy);
                 targetCtx.rotate(spin);
@@ -2242,7 +2481,6 @@
                 targetCtx.ellipse(0, 0, r * 1.4, r * 0.48, -0.5, 0, Math.PI * 2);
                 targetCtx.stroke();
 
-                // Event horizon core
                 targetCtx.fillStyle = '#03050a';
                 targetCtx.beginPath();
                 targetCtx.arc(0, 0, r * 0.86, 0, Math.PI * 2);
@@ -2270,7 +2508,6 @@
                 targetCtx.lineWidth = 2;
                 targetCtx.stroke();
 
-                // Cheese holes
                 const holes = [
                     [-0.38, -0.25, 0.2],
                     [0.32, -0.32, 0.16],
@@ -2327,7 +2564,6 @@
 
             if (skinId === 'sun') {
                 targetCtx.save();
-                // Coronal rays
                 const rays = 12;
                 targetCtx.translate(cx, cy);
                 targetCtx.rotate(frameTick * 0.015);
@@ -2464,6 +2700,103 @@
             targetCtx.restore();
         }
 
+        function drawSpeechBubbles() {
+            for (const sb of speechBubbles) {
+                const progress = sb.age / sb.maxAge;
+                const popScale = sb.age < 8
+                    ? 0.55 + (sb.age / 8) * 0.52
+                    : (sb.age < 12 ? 1.07 - ((sb.age - 8) / 4) * 0.07 : 1);
+                const alpha = progress > 0.78
+                    ? Math.max(0, 1 - (progress - 0.78) / 0.22)
+                    : Math.min(1, sb.age / 6);
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.font = 'bold 13px "Courier New", Courier, monospace';
+                const textMetrics = ctx.measureText(sb.text);
+
+                const padX = 12;
+                const iconSpace = 18;
+                const boxW = Math.ceil(textMetrics.width + padX * 2 + iconSpace);
+                const boxH = 32;
+                const radius = 8;
+
+                let boxY = sb.anchorY - 30 - boxH + sb.offsetY;
+                let flipped = false;
+                if (boxY < 10) {
+                    boxY = sb.anchorY + 26 - sb.offsetY;
+                    flipped = true;
+                }
+
+                const boxX = Math.max(12, Math.min(canvas.width - boxW - 12, sb.anchorX - boxW / 2));
+                const tailBaseX = Math.max(boxX + 14, Math.min(boxX + boxW - 14, sb.anchorX));
+                const pivotX = boxX + boxW / 2;
+                const pivotY = boxY + boxH / 2;
+
+                ctx.translate(pivotX, pivotY);
+                ctx.scale(popScale, popScale);
+                ctx.translate(-pivotX, -pivotY);
+
+                // Bubble body + tail
+                ctx.fillStyle = 'rgba(11, 14, 20, 0.94)';
+                ctx.strokeStyle = sb.borderColor;
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+                ctx.fill();
+                ctx.stroke();
+
+                // Pointer triangle
+                ctx.beginPath();
+                if (!flipped) {
+                    ctx.moveTo(tailBaseX - 6, boxY + boxH - 1);
+                    ctx.lineTo(tailBaseX, boxY + boxH + 8);
+                    ctx.lineTo(tailBaseX + 6, boxY + boxH - 1);
+                } else {
+                    ctx.moveTo(tailBaseX - 6, boxY + 1);
+                    ctx.lineTo(tailBaseX, boxY - 8);
+                    ctx.lineTo(tailBaseX + 6, boxY + 1);
+                }
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(11, 14, 20, 0.94)';
+                ctx.fill();
+
+                ctx.beginPath();
+                if (!flipped) {
+                    ctx.moveTo(tailBaseX - 6, boxY + boxH);
+                    ctx.lineTo(tailBaseX, boxY + boxH + 8);
+                    ctx.lineTo(tailBaseX + 6, boxY + boxH);
+                } else {
+                    ctx.moveTo(tailBaseX - 6, boxY);
+                    ctx.lineTo(tailBaseX, boxY - 8);
+                    ctx.lineTo(tailBaseX + 6, boxY);
+                }
+                ctx.stroke();
+
+                // Mini mouse speaker emblem on the left
+                const iconX = boxX + 15;
+                const iconY = boxY + boxH / 2 + 1;
+                ctx.fillStyle = '#ff8fa3';
+                ctx.beginPath();
+                ctx.arc(iconX - 4, iconY - 5, 3, 0, Math.PI * 2);
+                ctx.arc(iconX + 4, iconY - 5, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#cbd5e1';
+                ctx.beginPath();
+                ctx.arc(iconX, iconY, 4.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Dialogue text
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(sb.text, boxX + padX + iconSpace, boxY + boxH / 2 + 0.5);
+
+                ctx.restore();
+            }
+        }
+
         function draw() {
             const equippedBg = getEquippedSkin('background');
             const bgPattern = getBackgroundPattern(equippedBg.id, ctx);
@@ -2561,9 +2894,12 @@
                 ctx.restore();
             }
 
+            // 6. Draw Mouse Speech Bubbles
+            drawSpeechBubbles();
+
             ctx.restore();
 
-            // 6. Draw Level Cleared Banner Overlay
+            // 7. Draw Level Cleared Banner Overlay
             if (levelBanner.active) {
                 const fade = Math.min(1, levelBanner.timer / 20, (levelBanner.duration - levelBanner.timer + 10) / 15);
                 ctx.save();
