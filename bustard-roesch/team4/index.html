@@ -109,7 +109,7 @@
             text-align: right;
         }
 
-        /* Ball Color Picker Controls */
+        /* Star Color Picker Controls */
         .color-control {
             display: flex;
             align-items: center;
@@ -217,13 +217,12 @@
             <span id="speedValue">5.0</span>
         </div>
 
-        <!-- Pastel Ball Color Selector -->
-        <div class="color-control" role="group" aria-label="Ball Color Selection">
-            <span>Ball:</span>
+        <!-- Pink & Blue Star Color Selector -->
+        <div class="color-control" role="group" aria-label="Star Color Selection">
+            <span>Stars:</span>
             <button type="button" class="color-btn active" data-mode="cycle" onclick="setColorMode('cycle', this)">Cycle</button>
             <button type="button" class="swatch-btn" style="background: #ff9ebb;" title="Pastel Pink" aria-label="Pastel Pink" onclick="setColorMode(0, this)"></button>
             <button type="button" class="swatch-btn" style="background: #8ecae6;" title="Pastel Blue" aria-label="Pastel Blue" onclick="setColorMode(1, this)"></button>
-            <button type="button" class="swatch-btn" style="background: #80ded9;" title="Pastel Teal" aria-label="Pastel Teal" onclick="setColorMode(2, this)"></button>
         </div>
 
         <!-- Simulation Reset Trigger -->
@@ -237,7 +236,7 @@
 
     <!-- Usage Guidance -->
     <div class="instructions">
-        Adjust the speed bar above, pick a pastel ball color (or Cycle), and click anywhere on the canvas to orbit the dancing pup.
+        Adjust the speed bar above, pick a pink or blue star (or Cycle), and click anywhere on the canvas to orbit the dancing pup.
     </div>
 
     <script>
@@ -253,17 +252,17 @@
         const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
 
-        // PASTEL BALL PALETTE (Pink, Blue, Teal)
-        const BALL_COLORS = [
+        // PINK & BLUE STAR PALETTE
+        const STAR_COLORS = [
             { name: 'Pastel Pink', fill: '#ff9ebb' },
-            { name: 'Pastel Blue', fill: '#8ecae6' },
-            { name: 'Pastel Teal', fill: '#80ded9' }
+            { name: 'Pastel Blue', fill: '#8ecae6' }
         ];
 
         // STATE VARIABLES
         let launchVelocity = parseFloat(speedSlider.value); // Adjustable velocity on click
-        let balls = [];
-        let colorMode = 'cycle'; // 'cycle' or palette index (0, 1, 2)
+        let stars = [];
+        let ambientStars = [];
+        let colorMode = 'cycle'; // 'cycle' or palette index (0, 1)
         let colorIndex = 0;
 
         // Central Gravity Node Definition (Sized to match the dancing pastel pink dog)
@@ -274,7 +273,7 @@
         };
 
         /**
-         * Switches between cycling through pastel colors or locking a single color.
+         * Switches between cycling through pink & blue or locking a single color.
          */
         function setColorMode(mode, btnEl) {
             colorMode = mode;
@@ -302,6 +301,30 @@
         updateSpeedUI();
 
         /**
+         * Populates subtle twinkling pink and blue stars across the background sky.
+         */
+        function generateAmbientStars() {
+            const count = Math.max(24, Math.floor((canvas.width * canvas.height) / 18000));
+            const pinkShades = ['#ff85ab', '#ff9ebb'];
+            const blueShades = ['#60b5e5', '#8ecae6'];
+
+            ambientStars = [];
+            for (let i = 0; i < count; i++) {
+                const isPink = i % 2 === 0;
+                const palette = isPink ? pinkShades : blueShades;
+                ambientStars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    outerRadius: 3.5 + Math.random() * 3.5,
+                    innerRadius: 1.4 + Math.random() * 1.3,
+                    color: palette[Math.floor(Math.random() * palette.length)],
+                    twinkleSpeed: 0.002 + Math.random() * 0.003,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        /**
          * Resizes the HTML5 canvas to match its responsive container
          * and recenters the central gravity node.
          */
@@ -313,85 +336,89 @@
             // Recenter gravity node dynamically
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
+
+            generateAmbientStars();
         }
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
         /**
-         * Canvas Click Handler: Launches a ball directly at the clicked coordinates.
+         * Canvas Click Handler: Launches a star directly at the clicked coordinates.
          */
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchBall(clickX, clickY);
+            launchStar(clickX, clickY);
         });
 
         /**
-         * Initializes an orbiting pastel projectile at (x, y) using the
+         * Initializes an orbiting pink or blue star at (x, y) using the
          * current launchVelocity and FIXED_LAUNCH_ANGLE.
          */
-        function launchBall(x, y) {
+        function launchStar(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = launchVelocity * Math.sin(rad);  // sin(90°) = 1  -> vx = launchVelocity
             const vy = -launchVelocity * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Select pastel color (either cycling Pink -> Blue -> Teal or fixed selection)
+            // Select pink or blue color (either cycling Pink -> Blue or fixed selection)
             let chosenColor;
             if (colorMode === 'cycle') {
-                chosenColor = BALL_COLORS[colorIndex].fill;
-                colorIndex = (colorIndex + 1) % BALL_COLORS.length;
+                chosenColor = STAR_COLORS[colorIndex].fill;
+                colorIndex = (colorIndex + 1) % STAR_COLORS.length;
             } else {
-                chosenColor = BALL_COLORS[colorMode].fill;
+                chosenColor = STAR_COLORS[colorMode].fill;
             }
 
-            balls.push({
+            stars.push({
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 6,
+                radius: 7,
+                rotation: Math.random() * Math.PI * 2,
+                spin: (Math.random() < 0.5 ? -1 : 1) * 0.035,
                 color: chosenColor,
                 trail: [] // Stores history of past {x, y} coordinates
             });
         }
 
         /**
-         * Clears active projectiles from the simulation canvas.
+         * Clears active orbiting stars from the simulation canvas.
          */
         function resetSimulation() {
-            balls = [];
+            stars = [];
             colorIndex = 0;
         }
 
         /**
-         * Advances projectile kinematics using softened inverse-square gravity
-         * and removes projectiles that collide with the central dog or leave bounds.
+         * Advances star kinematics using softened inverse-square gravity
+         * and removes stars that collide with the central dog or leave bounds.
          */
         function updatePhysics() {
-            for (let i = balls.length - 1; i >= 0; i--) {
-                const b = balls[i];
+            for (let i = stars.length - 1; i >= 0; i--) {
+                const s = stars[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Remove star if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin ||
-                    b.y < -margin || b.y > canvas.height + margin) {
-                    balls.splice(i, 1);
+                if (s.x < -margin || s.x > canvas.width + margin ||
+                    s.y < -margin || s.y > canvas.height + margin) {
+                    stars.splice(i, 1);
                     continue;
                 }
 
                 // Distance vector to central gravity node
-                const dx = centralNode.x - b.x;
-                const dy = centralNode.y - b.y;
+                const dx = centralNode.x - s.x;
+                const dy = centralNode.y - s.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central dancing dog
-                if (dist < centralNode.radius + b.radius) {
-                    balls.splice(i, 1);
+                // Absorption check: star collides with central dancing dog
+                if (dist < centralNode.radius + s.radius) {
+                    stars.splice(i, 1);
                     continue;
                 }
 
@@ -402,17 +429,64 @@
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
 
-                // Update velocity and position
-                b.vx += ax;
-                b.vy += ay;
-                b.x += b.vx;
-                b.y += b.vy;
+                // Update velocity, position, and gentle spin
+                s.vx += ax;
+                s.vy += ay;
+                s.x += s.vx;
+                s.y += s.vy;
+                s.rotation += s.spin;
 
                 // Record position history for line trail
-                b.trail.push({ x: b.x, y: b.y });
-                if (b.trail.length > TRAIL_LENGTH) {
-                    b.trail.shift();
+                s.trail.push({ x: s.x, y: s.y });
+                if (s.trail.length > TRAIL_LENGTH) {
+                    s.trail.shift();
                 }
+            }
+        }
+
+        /**
+         * Traces a symmetrical multi-pointed star path at (cx, cy).
+         */
+        function traceStarPath(cx, cy, spikes, outerRadius, innerRadius, rotation = 0) {
+            let rot = (Math.PI / 2) * 3 + rotation;
+            const step = Math.PI / spikes;
+
+            ctx.beginPath();
+            ctx.moveTo(
+                cx + Math.cos(rot) * outerRadius,
+                cy + Math.sin(rot) * outerRadius
+            );
+
+            for (let i = 0; i < spikes; i++) {
+                rot += step;
+                ctx.lineTo(
+                    cx + Math.cos(rot) * innerRadius,
+                    cy + Math.sin(rot) * innerRadius
+                );
+                rot += step;
+                ctx.lineTo(
+                    cx + Math.cos(rot) * outerRadius,
+                    cy + Math.sin(rot) * outerRadius
+                );
+            }
+            ctx.closePath();
+        }
+
+        /**
+         * Renders twinkling pink and blue stars across the background sky.
+         */
+        function drawAmbientStars(timestamp) {
+            for (const st of ambientStars) {
+                const twinkle = 0.45 + 0.45 * Math.sin(timestamp * st.twinkleSpeed + st.phase);
+                ctx.save();
+                ctx.globalAlpha = twinkle;
+                traceStarPath(st.x, st.y, 4, st.outerRadius, st.innerRadius, 0);
+                ctx.fillStyle = st.color;
+                ctx.fill();
+                ctx.lineWidth = 0.8;
+                ctx.strokeStyle = 'rgba(30, 41, 59, 0.35)';
+                ctx.stroke();
+                ctx.restore();
             }
         }
 
@@ -628,8 +702,8 @@
         }
 
         /**
-         * Renders the pastel gradient backdrop, central dancing pink dog,
-         * trajectory paths, and active pastel projectiles.
+         * Renders the pastel gradient backdrop, twinkling pink & blue stars,
+         * central dancing pink dog, trajectory paths, and orbiting stars.
          */
         function draw(timestamp = 0) {
             // Paint diagonal pastel gradient across the canvas
@@ -640,17 +714,20 @@
             ctx.fillStyle = bgGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Central Dancing Pastel Pink Dog
+            // 1. Draw Ambient Twinkling Pink & Blue Background Stars
+            drawAmbientStars(timestamp);
+
+            // 2. Draw Central Dancing Pastel Pink Dog
             drawDancingDog(centralNode.x, centralNode.y, timestamp);
 
-            // 2. Draw Balls & Trails
-            for (const b of balls) {
+            // 3. Draw Orbiting Pink & Blue Stars & Trails
+            for (const s of stars) {
                 // Draw path line with subtle slate casing and pastel core
-                if (b.trail.length > 1) {
+                if (s.trail.length > 1) {
                     ctx.beginPath();
-                    ctx.moveTo(b.trail[0].x, b.trail[0].y);
-                    for (let t = 1; t < b.trail.length; t++) {
-                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                    ctx.moveTo(s.trail[0].x, s.trail[0].y);
+                    for (let t = 1; t < s.trail.length; t++) {
+                        ctx.lineTo(s.trail[t].x, s.trail[t].y);
                     }
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
@@ -658,15 +735,14 @@
                     ctx.lineWidth = 2.6;
                     ctx.stroke();
 
-                    ctx.strokeStyle = b.color;
+                    ctx.strokeStyle = s.color;
                     ctx.lineWidth = 1.6;
                     ctx.stroke();
                 }
 
-                // Draw pastel ball object with crisp slate border
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fillStyle = b.color;
+                // Draw 5-pointed pink or blue star with crisp slate border
+                traceStarPath(s.x, s.y, 5, 9, 4.2, s.rotation);
+                ctx.fillStyle = s.color;
                 ctx.fill();
                 ctx.lineWidth = 1.5;
                 ctx.strokeStyle = '#1e293b';
