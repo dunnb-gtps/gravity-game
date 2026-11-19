@@ -116,7 +116,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch a ball — the guy in the middle will shoot it with bananas!
+        Click anywhere on the canvas to launch a monkey — the guy in the middle will shoot it with bananas!
     </div>
 
     <script>
@@ -162,6 +162,14 @@
             muzzleFlash: 0,
             fireCooldown: 0
         };
+
+        // Fur & skin palettes for launched monkeys
+        const ORBIT_MONKEY_PALETTES = [
+            { furMain: '#6b4226', furDark: '#3d2312', furLight: '#8a5937', skin: '#edd0b0', skinShade: '#cfa074' },
+            { furMain: '#5c3820', furDark: '#361e0f', furLight: '#7a4d2e', skin: '#e8be96', skinShade: '#c9986b' },
+            { furMain: '#784828', furDark: '#472a16', furLight: '#995f38', skin: '#f0d5b8', skinShade: '#d4af87' },
+            { furMain: '#52301a', furDark: '#2e190c', furLight: '#704427', skin: '#e6ba91', skinShade: '#c49264' }
+        ];
 
         // Tropical Bird Species Palettes
         const BIRD_SPECIES = [
@@ -831,7 +839,7 @@
             };
         }
 
-        // Predict future ball position under gravity so the banana hits the moving target
+        // Predict future monkey position under gravity so the banana hits the moving target
         function computeInterceptPoint(b, mx, my) {
             const bananaSpeed = 13.5;
             let simX = b.x;
@@ -849,7 +857,7 @@
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                if (dist < centralNode.radius + b.radius) {
+                if (dist < centralNode.radius + 5) {
                     break;
                 }
 
@@ -884,7 +892,7 @@
             };
         }
 
-        // Aim the central guy's banana gun and shoot a spinning banana at the ball
+        // Aim the central guy's banana gun and shoot a spinning banana at the monkey
         function fireBananaAtBall(b) {
             if (!b) return;
 
@@ -938,7 +946,7 @@
             }
         }
 
-        // Spawn a lively banana splat / peel burst when a banana hits the ball
+        // Spawn a lively banana splat / peel burst when a banana hits the monkey
         function spawnBananaImpact(x, y, bnVx, bnVy, isPop) {
             const labels = ['BONK!', 'SPLAT!', 'POW!', 'PEEL!'];
             const label = isPop ? 'BANANA BOOM!' : labels[Math.floor(Math.random() * labels.length)];
@@ -947,8 +955,8 @@
             impactEffects.push({
                 x: x,
                 y: y,
-                radius: 4,
-                maxRadius: isPop ? 42 : 24,
+                radius: 6,
+                maxRadius: isPop ? 46 : 28,
                 life: 1.0,
                 decay: isPop ? 0.045 : 0.065,
                 color: isPop ? '#fde047' : '#fef08a',
@@ -958,7 +966,7 @@
             // Floating comic impact text
             impactEffects.push({
                 x: x,
-                y: y - 10,
+                y: y - 14,
                 vx: (Math.random() - 0.5) * 0.6,
                 vy: -1.15,
                 life: 1.0,
@@ -1007,7 +1015,7 @@
             }
         }
 
-        // Canvas Click Handler: Launch ball at click position (or shoot existing ball if clicked directly)
+        // Canvas Click Handler: Launch monkey at click position (or shoot existing monkey if clicked directly)
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -1015,7 +1023,7 @@
 
             if (balls.length > 0) {
                 const existing = balls[0];
-                if (Math.hypot(clickX - existing.x, clickY - existing.y) <= 26) {
+                if (Math.hypot(clickX - existing.x, clickY - existing.y) <= 30) {
                     fireBananaAtBall(existing);
                     return;
                 }
@@ -1029,21 +1037,26 @@
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
+            const palette = ORBIT_MONKEY_PALETTES[Math.floor(Math.random() * ORBIT_MONKEY_PALETTES.length)];
 
-            // Overwrite existing array to strictly maintain a single ball on screen
+            // Overwrite existing array to strictly maintain a single monkey on screen
             balls = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 4,
+                radius: 11,
                 hue: 0,
                 hits: 0,
                 hitFlash: 0,
+                angle: 0,
+                spinSpeed: 0.075,
+                limbPhase: Math.random() * Math.PI * 2,
+                palette: palette,
                 trail: []
             }];
 
-            // Immediately shoot a banana from the guy in the middle at the newly clicked ball
+            // Immediately shoot a banana from the guy in the middle at the newly clicked monkey
             fireBananaAtBall(balls[0]);
         }
 
@@ -1099,7 +1112,7 @@
             }
         }
 
-        // Update pendulum sway, natural blinking, and subtle gaze tracking for all monkeys
+        // Update pendulum sway, natural blinking, and subtle gaze tracking for all hanging monkeys
         function updateMonkeys() {
             for (const m of monkeys) {
                 m.currentAngle = Math.sin(animTime * m.swaySpeed + m.phase) * m.swayAmp;
@@ -1186,12 +1199,12 @@
             }
         }
 
-        // Update flying banana projectiles and check collisions with the active ball
+        // Update flying banana projectiles and check collisions with the active monkey
         function updateBananas() {
             for (let i = bananas.length - 1; i >= 0; i--) {
                 const bn = bananas[i];
 
-                // Subtle terminal guidance when nearing the orbiting ball so hits feel crisp
+                // Subtle terminal guidance when nearing the orbiting monkey so hits feel crisp
                 if (balls.length > 0) {
                     const target = balls[0];
                     const toX = target.x - bn.x;
@@ -1218,7 +1231,7 @@
                     bn.trail.shift();
                 }
 
-                // Check collision against active ball
+                // Check collision against active monkey
                 if (balls.length > 0) {
                     const b = balls[0];
                     const dist = Math.hypot(b.x - bn.x, b.y - bn.y);
@@ -1226,9 +1239,10 @@
                         b.hits = (b.hits || 0) + 1;
                         b.hitFlash = 1.0;
 
-                        // Playful velocity nudge from banana impact
+                        // Playful velocity nudge & extra tumble spin from banana impact
                         b.vx += (bn.vx / bn.speed) * 0.75;
                         b.vy += (bn.vy / bn.speed) * 0.75;
+                        b.spinSpeed = (b.spinSpeed >= 0 ? 1 : -1) * 0.24;
 
                         const isPop = b.hits >= 4;
                         spawnBananaImpact(b.x, b.y, bn.vx, bn.vy, isPop);
@@ -1285,10 +1299,16 @@
                 const b = balls[i];
 
                 if (b.hitFlash > 0) {
-                    b.hitFlash = Math.max(0, b.hitFlash - 0.12);
+                    b.hitFlash = Math.max(0, b.hitFlash - 0.10);
                 }
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
+                // Smoothly relax tumble spin back to cruising speed
+                const baseSpin = 0.075;
+                b.spinSpeed += (baseSpin - b.spinSpeed) * 0.06;
+                b.angle += b.spinSpeed;
+                b.limbPhase += 0.18;
+
+                // Remove monkey if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
                 if (b.x < -margin || b.x > canvas.width + margin ||
                     b.y < -margin || b.y > canvas.height + margin) {
@@ -1302,8 +1322,8 @@
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
-                if (dist < centralNode.radius + b.radius) {
+                // Absorption check: monkey collides with central mass
+                if (dist < centralNode.radius + 5) {
                     balls.splice(i, 1);
                     continue;
                 }
@@ -1948,6 +1968,232 @@
             }
         }
 
+        // Draw an acrobatic tumbling monkey in place of the launched ball
+        function drawOrbitingMonkey(b) {
+            const pal = b.palette || ORBIT_MONKEY_PALETTES[0];
+            const flash = b.hitFlash || 0;
+            const wave = Math.sin(b.limbPhase);
+
+            // Soft luminous halo around the monkey (pulses golden when hit by a banana)
+            const haloRadius = b.radius * (1.75 + flash * 0.9);
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, haloRadius, 0, Math.PI * 2);
+            ctx.fillStyle = flash > 0.1
+                ? `rgba(255, 225, 53, ${0.32 + flash * 0.45})`
+                : 'rgba(216, 243, 220, 0.22)';
+            ctx.fill();
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(b.angle);
+            const popScale = 1 + flash * 0.16;
+            ctx.scale(popScale, popScale);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 1. Curled prehensile tail trailing behind
+            ctx.beginPath();
+            ctx.moveTo(-4, 5.5);
+            ctx.bezierCurveTo(
+                -13, 8.5 + wave * 1.5,
+                -16, 1.0 + wave * 2.2,
+                -11.5, -2.5 + wave * 2.5
+            );
+            ctx.bezierCurveTo(
+                -8.5, -4.5 + wave * 2.5,
+                -9.0, -0.5 + wave * 2.2,
+                -11.5, 0.2 + wave * 2.2
+            );
+            ctx.strokeStyle = pal.furDark;
+            ctx.lineWidth = 2.8;
+            ctx.stroke();
+            ctx.strokeStyle = pal.furMain;
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+
+            // 2. Back leg & back arm (darker fur for depth)
+            ctx.beginPath();
+            ctx.moveTo(-2.5, 6);
+            ctx.quadraticCurveTo(-5.5, 11.5 - wave * 1.2, -2.5, 13.5);
+            ctx.strokeStyle = pal.furDark;
+            ctx.lineWidth = 3.4;
+            ctx.stroke();
+
+            ctx.fillStyle = pal.skin;
+            ctx.beginPath();
+            ctx.ellipse(-2.0, 14.0, 2.2, 1.3, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(-2.5, 0.5);
+            ctx.quadraticCurveTo(-8.5, -2.0 + wave * 1.5, -9.5, -6.5);
+            ctx.strokeStyle = pal.furDark;
+            ctx.lineWidth = 3.2;
+            ctx.stroke();
+
+            ctx.fillStyle = pal.skin;
+            ctx.beginPath();
+            ctx.arc(-9.5, -6.8, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Torso & warm belly patch
+            ctx.beginPath();
+            ctx.ellipse(-0.5, 3.2, 5.4, 6.4, -0.25, 0, Math.PI * 2);
+            ctx.fillStyle = pal.furMain;
+            ctx.fill();
+            ctx.strokeStyle = pal.furDark;
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.ellipse(0.4, 3.6, 3.3, 4.3, -0.25, 0, Math.PI * 2);
+            ctx.fillStyle = pal.skin;
+            ctx.fill();
+
+            // 4. Front leg
+            ctx.beginPath();
+            ctx.moveTo(1.5, 6.5);
+            ctx.quadraticCurveTo(5.5, 10.5 + wave * 1.2, 3.5, 13.8);
+            ctx.strokeStyle = pal.furMain;
+            ctx.lineWidth = 3.5;
+            ctx.stroke();
+
+            ctx.fillStyle = pal.skin;
+            ctx.beginPath();
+            ctx.ellipse(4.1, 14.2, 2.3, 1.3, -0.15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 5. Expressive Monkey Head
+            ctx.save();
+            ctx.translate(2.2, -4.6);
+
+            // Ears
+            for (const side of [-1, 1]) {
+                const ex = side * 6.8;
+                ctx.beginPath();
+                ctx.arc(ex, -0.3, 2.8, 0, Math.PI * 2);
+                ctx.fillStyle = pal.furMain;
+                ctx.fill();
+                ctx.strokeStyle = pal.furDark;
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(ex, -0.3, 1.6, 0, Math.PI * 2);
+                ctx.fillStyle = pal.skin;
+                ctx.fill();
+            }
+
+            // Head base
+            ctx.beginPath();
+            ctx.arc(0, 0, 6.2, 0, Math.PI * 2);
+            ctx.fillStyle = pal.furMain;
+            ctx.fill();
+            ctx.strokeStyle = pal.furDark;
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+
+            // Hair tuft on crown
+            ctx.fillStyle = pal.furDark;
+            ctx.beginPath();
+            ctx.moveTo(-1.8, -5.8);
+            ctx.quadraticCurveTo(-1.0, -8.8, 0.2, -8.2);
+            ctx.quadraticCurveTo(1.2, -9.1, 2.1, -5.8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Eye mask & muzzle
+            ctx.fillStyle = pal.skin;
+            ctx.beginPath();
+            ctx.arc(-2.0, -1.2, 2.7, 0, Math.PI * 2);
+            ctx.arc(2.0, -1.2, 2.7, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.ellipse(0, 1.9, 4.2, 3.1, 0, 0, Math.PI * 2);
+            ctx.fillStyle = pal.skin;
+            ctx.fill();
+            ctx.strokeStyle = pal.skinShade;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+
+            // Eyes & mouth (comical bonked expression when hit by a banana!)
+            for (const side of [-1, 1]) {
+                const ex = side * 2.0;
+                const ey = -1.2;
+
+                if (flash > 0.25) {
+                    // Dizzy/bonked '>' '<' eyes
+                    ctx.beginPath();
+                    ctx.moveTo(ex - side * 1.1, ey - 1.1);
+                    ctx.lineTo(ex + side * 0.9, ey);
+                    ctx.lineTo(ex - side * 1.1, ey + 1.1);
+                    ctx.strokeStyle = pal.furDark;
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, 1.75, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fffdf7';
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.arc(ex + 0.35, ey, 1.05, 0, Math.PI * 2);
+                    ctx.fillStyle = '#1b110a';
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.arc(ex + 0.05, ey - 0.35, 0.35, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                }
+            }
+
+            // Nostrils
+            ctx.fillStyle = pal.furDark;
+            ctx.beginPath();
+            ctx.ellipse(-0.85, 1.2, 0.5, 0.35, 0, 0, Math.PI * 2);
+            ctx.ellipse(0.85, 1.2, 0.5, 0.35, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Grin or surprised 'O' mouth
+            if (flash > 0.25) {
+                ctx.beginPath();
+                ctx.ellipse(0, 3.1, 1.3, 1.5, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#3d1e10';
+                ctx.fill();
+            } else {
+                ctx.beginPath();
+                ctx.arc(0, 2.2, 2.1, 0.16 * Math.PI, 0.84 * Math.PI);
+                ctx.strokeStyle = pal.furDark;
+                ctx.lineWidth = 1.05;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            // 6. Front waving arm
+            ctx.beginPath();
+            ctx.moveTo(3.2, 1.2);
+            ctx.quadraticCurveTo(8.5, -0.5 - wave * 1.6, 10.5, -5.2 - wave * 1.4);
+            ctx.strokeStyle = pal.furDark;
+            ctx.lineWidth = 3.5;
+            ctx.stroke();
+            ctx.strokeStyle = pal.furMain;
+            ctx.lineWidth = 2.3;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(10.5, -5.4 - wave * 1.4, 1.9, 0, Math.PI * 2);
+            ctx.fillStyle = pal.skin;
+            ctx.fill();
+            ctx.strokeStyle = pal.furDark;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
         // Draw the central guy holding and firing his banana gun
         function drawBananaGunGuy(x, y) {
             ctx.save();
@@ -2327,7 +2573,7 @@
             // 4. Draw Central Character (Guy with a Banana Gun)
             drawBananaGunGuy(centralNode.x, centralNode.y);
 
-            // 5. Draw Ball & Rainbow Trail
+            // 5. Draw Orbiting Monkey & Rainbow Trail
             for (const b of balls) {
                 if (b.trail.length > 1) {
                     ctx.save();
@@ -2345,20 +2591,8 @@
                     ctx.restore();
                 }
 
-                // Subtle soft halo around ball (pulses golden when hit by a banana)
-                const haloRadius = b.radius * (2.2 + (b.hitFlash || 0) * 1.6);
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, haloRadius, 0, Math.PI * 2);
-                ctx.fillStyle = (b.hitFlash || 0) > 0.1
-                    ? `rgba(255, 225, 53, ${0.35 + b.hitFlash * 0.45})`
-                    : 'rgba(216, 243, 220, 0.25)';
-                ctx.fill();
-
-                // Draw ball object
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.radius + (b.hitFlash || 0) * 1.4, 0, Math.PI * 2);
-                ctx.fillStyle = (b.hitFlash || 0) > 0.2 ? '#fef08a' : '#ffffff';
-                ctx.fill();
+                // Draw tumbling monkey object
+                drawOrbitingMonkey(b);
             }
 
             // 6. Draw Spinning Bananas & Impact Splats
