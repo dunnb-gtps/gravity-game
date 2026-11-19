@@ -1264,6 +1264,125 @@
         }
 
         /**
+         * Draws Keroppi (Sanrio's cheerful little frog) as the central gravity node.
+         */
+        function drawKeroppi(cx, cy, time) {
+            const outlineColor = '#2f4f24';
+            const pulseAura = 20 + Math.sin(time * 0.004) * 2.5;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            // 1. Soft pulsing lily-pad green aura around Keroppi
+            ctx.beginPath();
+            ctx.arc(0, 0, pulseAura, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(126, 217, 87, 0.22)';
+            ctx.fill();
+
+            // Subtle white backing halo so Keroppi pops cleanly against the sky & trails
+            ctx.beginPath();
+            ctx.arc(0, 0, 16.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.fill();
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 2. Tiny signature red bow tie peeking beneath Keroppi's chin
+            ctx.fillStyle = '#ff4d6d';
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 1.5;
+
+            // Left bow loop
+            ctx.beginPath();
+            ctx.ellipse(-4.2, 13.2, 3.6, 2.3, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Right bow loop
+            ctx.beginPath();
+            ctx.ellipse(4.2, 13.2, 3.6, 2.3, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Center bow knot
+            ctx.beginPath();
+            ctx.arc(0, 13.2, 2.0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Classic bright lime-green rounded frog head
+            const headGrad = ctx.createRadialGradient(-4, -2, 2, 0, 2.5, 16.5);
+            headGrad.addColorStop(0, '#b3f285');
+            headGrad.addColorStop(0.55, '#7ed957');
+            headGrad.addColorStop(1, '#58b332');
+
+            ctx.beginPath();
+            ctx.ellipse(0, 2.5, 15.8, 11.2, 0, 0, Math.PI * 2);
+            ctx.fillStyle = headGrad;
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = outlineColor;
+            ctx.stroke();
+
+            // 4. Two big round white eyes sitting atop Keroppi's head
+            const eyeOffsets = [-6.3, 6.3];
+            for (const ex of eyeOffsets) {
+                ctx.beginPath();
+                ctx.arc(ex, -6.2, 6.2, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = outlineColor;
+                ctx.stroke();
+            }
+
+            // 5. Pupils (with occasional cute blink)
+            const isBlinking = (time % 4600) < 130;
+            if (isBlinking) {
+                ctx.strokeStyle = '#231f20';
+                ctx.lineWidth = 1.9;
+                for (const ex of eyeOffsets) {
+                    ctx.beginPath();
+                    ctx.arc(ex, -5.6, 3.0, Math.PI * 1.1, Math.PI * 1.9);
+                    ctx.stroke();
+                }
+            } else {
+                const pupilOffsets = [-5.1, 5.1];
+                for (const px of pupilOffsets) {
+                    ctx.beginPath();
+                    ctx.arc(px, -5.6, 2.55, 0, Math.PI * 2);
+                    ctx.fillStyle = '#231f20';
+                    ctx.fill();
+
+                    // Tiny glossy white catchlight
+                    ctx.beginPath();
+                    ctx.arc(px - 0.85, -6.55, 0.85, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                }
+            }
+
+            // 6. Rosy pink cheeks
+            ctx.fillStyle = 'rgba(255, 117, 151, 0.85)';
+            ctx.beginPath();
+            ctx.ellipse(-10.5, 2.4, 3.1, 2.2, 0, 0, Math.PI * 2);
+            ctx.ellipse(10.5, 2.4, 3.1, 2.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 7. Signature wide V-shaped Keroppi smile
+            ctx.beginPath();
+            ctx.moveTo(-6.0, 3.3);
+            ctx.lineTo(0, 7.6);
+            ctx.lineTo(6.0, 3.3);
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        /**
          * Draws a floating pastel kawaii collectible flower with mint leaves,
          * soft pulsing aura ring, and glossy petal highlights.
          */
@@ -1540,40 +1659,8 @@
                 drawCollectibleFlower(flower, animTime);
             }
 
-            // 6. Central Mass Node (radius = 12) - High-Contrast Strawberry & Gold Planet
-            const pulseAura = 18 + Math.sin(animTime * 0.004) * 2.5;
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, pulseAura, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255, 71, 126, 0.16)';
-            ctx.fill();
-
-            // Main planet sphere (exact radius = 12)
-            const nodeGrad = ctx.createRadialGradient(
-                centralNode.x - 4, centralNode.y - 4, 2,
-                centralNode.x, centralNode.y, centralNode.radius
-            );
-            nodeGrad.addColorStop(0, '#ff9ebb');
-            nodeGrad.addColorStop(0.55, '#ff477e');
-            nodeGrad.addColorStop(1, '#c9184a');
-
-            ctx.beginPath();
-            ctx.arc(centralNode.x, centralNode.y, centralNode.radius, 0, Math.PI * 2);
-            ctx.fillStyle = nodeGrad;
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#591936';
-            ctx.stroke();
-
-            // Center golden 4-point star emblem on node
-            ctx.fillStyle = '#ffe066';
-            ctx.beginPath();
-            const sr = 5;
-            ctx.moveTo(centralNode.x, centralNode.y - sr);
-            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x + sr, centralNode.y);
-            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x, centralNode.y + sr);
-            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x - sr, centralNode.y);
-            ctx.quadraticCurveTo(centralNode.x, centralNode.y, centralNode.x, centralNode.y - sr);
-            ctx.fill();
+            // 6. Central Mass Node (radius = 12) - Keroppi
+            drawKeroppi(centralNode.x, centralNode.y, animTime);
 
             // 7. Launch & Collection Bursts, Shooting Mini-Petals & Popups
             drawPetalEffects();
