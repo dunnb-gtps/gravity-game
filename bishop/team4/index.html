@@ -183,13 +183,16 @@
         const ctx = canvas.getContext('2d');
         const trainCounterEl = document.getElementById('trainCounter');
 
-        // SIMULATION CONSTANTS (Preserved from baseline)
+        // SIMULATION CONSTANTS
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 300;          // Number of historic track points stored
         const SOFTENING_FACTOR = 400;      // Prevents infinite velocity near center
-        const BALL_RADIUS = 4;             // Coaster lead car collision radius in pixels
+        const BALL_RADIUS = 4;             // Coaster lead car boundary radius in pixels
+        const LEAD_COLLISION_RADIUS = 5.5; // Lead car hitbox radius for train-to-train collisions
+        const CAR_COLLISION_RADIUS = 4.5;  // Trailing car hitbox radius for train-to-train collisions
+        const TRAIN_RESTITUTION = 0.95;    // Elasticity of train-to-train collisions
 
         // COASTER COLOR PALETTE
         const COASTER_THEMES = [
@@ -203,6 +206,7 @@
         // STATE VARIABLES
         let balls = [];
         let sparks = [];
+        let collisionRings = [];
         let stars = [];
         let themeIndex = 0;
         let wheelAngle = 0;
@@ -298,16 +302,140 @@
             }
         }
 
+        function spawnCollisionRing(x, y) {
+            collisionRings.push({
+                x,
+                y,
+                radius: 4,
+                life: 1.0
+            });
+        }
+
         function resetSimulation() {
             balls = [];
             sparks = [];
+            collisionRings = [];
             updateCounter();
+        }
+
+        // Compute world positions and hitboxes for a train's lead car and trailing cars
+        function getTrainCars(b) {
+            const cars = [{
+                x: b.x,
+                y: b.y,
+                angle: Math.atan2(b.vy, b.vx),
+                radius: LEAD_COLLISION_RADIUS,
+                isLead: true
+            }];
+
+            const carOffsets = [11, 21];
+            let targetIdx = 0;
+            let accumulatedDist = 0;
+
+            for (let t = b.trail.length - 1; t > 0 && targetIdx < carOffsets.length; t--) {
+                const pCurr = b.trail[t];
+                const pPrev = b.trail[t - 1];
+                const dx = pCurr.x - pPrev.x;
+                const dy = pCurr.y - pPrev.y;
+                const segLen = Math.hypot(dx, dy);
+
+                if (segLen > 0.001) {
+                    accumulatedDist += segLen;
+                    if (accumulatedDist >= carOffsets[targetIdx]) {
+                        cars.push({
+                            x: pPrev.x,
+                            y: pPrev.y,
+                            angle: Math.atan2(dy, dx),
+                            radius: CAR_COLLISION_RADIUS,
+                            isLead: false
+                        });
+                        targetIdx++;
+                    }
+                }
+            }
+
+            return cars;
+        }
+
+        // Handle elastic collisions between distinct trains (across lead and trailing cars)
+        function resolveTrainCollisions() {
+            const count = balls.length;
+            if (count < 2) return;
+
+            const allTrainCars = balls.map(b => getTrainCars(b));
+
+            for (let i = 0; i < count; i++) {
+                for (let j = i + 1; j < count; j++) {
+                    const b1 = balls[i];
+                    const b2 = balls[j];
+                    const cars1 = allTrainCars[i];
+                    const cars2 = allTrainCars[j];
+
+                    // Find the deepest-penetrating car contact between train i and train j
+                    let deepestContact = null;
+                    let maxOverlap = 0;
+
+                    for (let c1Idx = 0; c1Idx < cars1.length; c1Idx++) {
+                        const c1 = cars1[c1Idx];
+                        for (let c2Idx = 0; c2Idx < cars2.length; c2Idx++) {
+                            const c2 = cars2[c2Idx];
+                            const dx = c1.x - c2.x;
+                            const dy = c1.y - c2.y;
+                            const dist = Math.hypot(dx, dy);
+                            const minDist = c1.radius + c2.radius;
+                            const overlap = minDist - dist;
+
+                            if (overlap > maxOverlap) {
+                                maxOverlap = overlap;
+                                deepestContact = { c1, c2, dx, dy, dist };
+                            }
+                        }
+                    }
+
+                    if (deepestContact) {
+                        const { c1, c2, dx, dy, dist } = deepestContact;
+                        let nx = 1;
+                        let ny = 0;
+                        if (dist > 0.0001) {
+                            nx = dx / dist;
+                            ny = dy / dist;
+                        }
+
+                        // Separate overlapping trains equally along the collision normal
+                        const separation = maxOverlap * 0.5;
+                        b1.x += nx * separation;
+                        b1.y += ny * separation;
+                        b2.x -= nx * separation;
+                        b2.y -= ny * separation;
+
+                        // Relative velocity along the collision normal
+                        const dvx = b1.vx - b2.vx;
+                        const dvy = b1.vy - b2.vy;
+                        const velAlongNormal = dvx * nx + dvy * ny;
+
+                        // Apply elastic impulse if trains are moving toward each other
+                        if (velAlongNormal < 0) {
+                            const impulse = -(1 + TRAIN_RESTITUTION) * velAlongNormal * 0.5;
+                            b1.vx += impulse * nx;
+                            b1.vy += impulse * ny;
+                            b2.vx -= impulse * nx;
+                            b2.vy -= impulse * ny;
+
+                            const contactX = (c1.x + c2.x) * 0.5;
+                            const contactY = (c1.y + c2.y) * 0.5;
+                            spawnSparks(contactX, contactY, b1.theme.stripe, 6);
+                            spawnSparks(contactX, contactY, b2.theme.stripe, 6);
+                            spawnCollisionRing(contactX, contactY);
+                        }
+                    }
+                }
+            }
         }
 
         function updatePhysics() {
             wheelAngle += 0.012;
 
-            // Update celebratory station sparks
+            // Update celebratory & collision sparks
             for (let i = sparks.length - 1; i >= 0; i--) {
                 const s = sparks[i];
                 s.x += s.vx;
@@ -319,6 +447,17 @@
                 }
             }
 
+            // Update expanding collision shockwave rings
+            for (let i = collisionRings.length - 1; i >= 0; i--) {
+                const r = collisionRings[i];
+                r.radius += 1.6;
+                r.life -= 0.06;
+                if (r.life <= 0) {
+                    collisionRings.splice(i, 1);
+                }
+            }
+
+            // 1. Apply central gravity and integrate train positions
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
@@ -348,6 +487,14 @@
                 b.vy += ay;
                 b.x += b.vx;
                 b.y += b.vy;
+            }
+
+            // 2. Resolve collisions between trains
+            resolveTrainCollisions();
+
+            // 3. Enforce park boundary wall bounces and record coaster track history
+            for (let i = 0; i < balls.length; i++) {
+                const b = balls[i];
 
                 // Bounce off the left and right walls of the park
                 if (b.x - b.radius < 0) {
@@ -626,32 +773,13 @@
         }
 
         function drawCoasterTrain(b) {
-            const leadAngle = Math.atan2(b.vy, b.vx);
+            const cars = getTrainCars(b);
 
-            // Walk backward along the trail to place 2 trailing cars behind the lead car
-            const carOffsets = [11, 21];
-            let targetIdx = 0;
-            let accumulatedDist = 0;
-
-            for (let t = b.trail.length - 1; t > 0 && targetIdx < carOffsets.length; t--) {
-                const pCurr = b.trail[t];
-                const pPrev = b.trail[t - 1];
-                const dx = pCurr.x - pPrev.x;
-                const dy = pCurr.y - pPrev.y;
-                const segLen = Math.hypot(dx, dy);
-
-                if (segLen > 0.001) {
-                    accumulatedDist += segLen;
-                    if (accumulatedDist >= carOffsets[targetIdx]) {
-                        const segAngle = Math.atan2(dy, dx);
-                        drawSingleCar(pPrev.x, pPrev.y, segAngle, b.theme, false);
-                        targetIdx++;
-                    }
-                }
+            // Draw trailing cars first so the lead car renders cleanly on top
+            for (let c = cars.length - 1; c >= 0; c--) {
+                const car = cars[c];
+                drawSingleCar(car.x, car.y, car.angle, b.theme, car.isLead);
             }
-
-            // Draw lead coaster car at exact physics coordinates
-            drawSingleCar(b.x, b.y, leadAngle, b.theme, true);
         }
 
         function drawSparks() {
@@ -662,6 +790,16 @@
                 ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
                 ctx.fill();
             }
+
+            for (const r of collisionRings) {
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = Math.max(0, r.life * 0.75);
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
             ctx.globalAlpha = 1;
         }
 
@@ -680,7 +818,7 @@
                 drawCoasterTrain(b);
             }
 
-            // 4. Launch / station arrival sparks
+            // 4. Launch, collision & station arrival sparks
             drawSparks();
         }
 
