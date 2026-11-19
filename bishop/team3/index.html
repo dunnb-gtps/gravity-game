@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Physics Baseline - Spider-Man</title>
+    <title>Gravity Physics Simulation - Alien</title>
     <style>
         * {
             box-sizing: border-box;
@@ -104,7 +104,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas for an alien spaceship to shoot Spider-Man into orbit.
+        Click anywhere on the canvas for an alien spaceship to shoot a full-body alien into orbit.
     </div>
 
     <script>
@@ -161,17 +161,14 @@
          * Creates a single procedural background meteor with craggy vertices and craters.
          */
         function createBackgroundMeteor(w, h) {
-            // Depth factor (0.35 = distant & small, 1.0 = closer & larger)
             const depth = 0.35 + Math.random() * 0.65;
             const radius = 4 + depth * 11;
 
-            // Gentle floating drift velocity (px/sec)
             const speed = 10 + depth * 26;
             const driftAngle = Math.random() * Math.PI * 2;
             const vx = Math.cos(driftAngle) * speed;
             const vy = Math.sin(driftAngle) * speed;
 
-            // Irregular craggy polygon outline (9 to 13 vertices)
             const vertexCount = 9 + Math.floor(Math.random() * 5);
             const vertices = [];
             for (let i = 0; i < vertexCount; i++) {
@@ -180,7 +177,6 @@
                 vertices.push({ angle, scale: radialScale });
             }
 
-            // Surface craters
             const craterCount = depth > 0.6 ? (2 + Math.floor(Math.random() * 3)) : 1;
             const craters = [];
             for (let i = 0; i < craterCount; i++) {
@@ -223,7 +219,6 @@
             for (let i = 0; i < targetCount; i++) {
                 backgroundMeteors.push(createBackgroundMeteor(w, h));
             }
-            // Sort by depth so smaller distant meteors render behind larger closer ones
             backgroundMeteors.sort((a, b) => a.depth - b.depth);
         }
 
@@ -295,7 +290,6 @@
                 }
                 ctx.closePath();
 
-                // Directional 3D rocky shading
                 const rockGrad = ctx.createRadialGradient(-r * 0.32, -r * 0.32, r * 0.1, 0, 0, r * 1.15);
                 rockGrad.addColorStop(0.0, m.palette.light);
                 rockGrad.addColorStop(0.55, m.palette.mid);
@@ -303,7 +297,6 @@
                 ctx.fillStyle = rockGrad;
                 ctx.fill();
 
-                // Clip craters cleanly inside the meteor silhouette
                 ctx.save();
                 ctx.clip();
                 for (let c = 0; c < m.craters.length; c++) {
@@ -313,7 +306,6 @@
                     ctx.arc(crater.x, crater.y, crater.r, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Subtle lit crater rim
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
                     ctx.lineWidth = 0.7;
                     ctx.beginPath();
@@ -322,7 +314,6 @@
                 }
                 ctx.restore();
 
-                // Faint starlight rim outline
                 ctx.strokeStyle = `rgba(210, 224, 245, ${(0.18 * m.depth).toFixed(3)})`;
                 ctx.lineWidth = 0.85;
                 ctx.stroke();
@@ -347,7 +338,6 @@
             const cx = w * 0.5;
             const cy = h * 0.5;
 
-            // 1. Deep space base gradient (midnight black -> deep indigo -> dark cosmic blue)
             const baseGrad = bgCtx.createLinearGradient(0, 0, w, h);
             baseGrad.addColorStop(0.0, '#020208');
             baseGrad.addColorStop(0.35, '#09071d');
@@ -356,20 +346,17 @@
             bgCtx.fillStyle = baseGrad;
             bgCtx.fillRect(0, 0, w, h);
 
-            // Subtle outer edge vignette to keep deep space corners rich and dark
             const vignette = bgCtx.createRadialGradient(cx, cy, diag * 0.18, cx, cy, diag * 0.65);
             vignette.addColorStop(0, 'rgba(9, 7, 29, 0)');
             vignette.addColorStop(1, 'rgba(2, 2, 8, 0.65)');
             bgCtx.fillStyle = vignette;
             bgCtx.fillRect(0, 0, w, h);
 
-            // 2. Tilted Milky Way / Spiral Galaxy Formation
             bgCtx.save();
             bgCtx.translate(cx, cy);
-            const galaxyTilt = -0.48; // Tilted diagonally from bottom-left to top-right
+            const galaxyTilt = -0.48;
             bgCtx.rotate(galaxyTilt);
 
-            // Broad outer galactic halo (elliptical perspective)
             bgCtx.save();
             bgCtx.scale(1, 0.34);
             const outerHalo = bgCtx.createRadialGradient(0, 0, 10, 0, 0, diag * 0.56);
@@ -383,16 +370,13 @@
             bgCtx.fill();
             bgCtx.restore();
 
-            // Additive nebula clouds along spiral arms & galactic disk
             bgCtx.globalCompositeOperation = 'screen';
 
             const nebulaClouds = [
-                // Deep violet & cosmic magenta outer/mid arm clouds
                 { x: -diag * 0.26, y: -18, rx: diag * 0.22, ry: diag * 0.08, color: 'rgba(104, 42, 178, 0.15)' },
                 { x:  diag * 0.25, y:  20, rx: diag * 0.23, ry: diag * 0.085, color: 'rgba(112, 45, 185, 0.15)' },
                 { x: -diag * 0.14, y:  24, rx: diag * 0.17, ry: diag * 0.065, color: 'rgba(182, 48, 128, 0.13)' },
                 { x:  diag * 0.15, y: -22, rx: diag * 0.18, ry: diag * 0.068, color: 'rgba(188, 52, 134, 0.13)' },
-                // Teal / cyan ionized star-forming pockets
                 { x: -diag * 0.21, y:  10, rx: diag * 0.14, ry: diag * 0.052, color: 'rgba(26, 152, 188, 0.12)' },
                 { x:  diag * 0.20, y: -12, rx: diag * 0.15, ry: diag * 0.055, color: 'rgba(32, 165, 196, 0.12)' },
                 { x: -diag * 0.07, y: -14, rx: diag * 0.12, ry: diag * 0.048, color: 'rgba(45, 145, 185, 0.10)' },
@@ -414,7 +398,6 @@
                 bgCtx.restore();
             }
 
-            // Warm golden-amber galactic core glow (balanced so white central node stays crisp)
             bgCtx.save();
             bgCtx.scale(1, 0.42);
             const coreGrad = bgCtx.createRadialGradient(0, 0, 6, 0, 0, diag * 0.20);
@@ -428,7 +411,6 @@
             bgCtx.fill();
             bgCtx.restore();
 
-            // Unresolved powdery star-dust mist concentrated along spiral arms & galactic plane
             const dustCount = Math.min(900, Math.floor((w * h) / 750));
             for (let i = 0; i < dustCount; i++) {
                 const u1 = Math.random() || 0.0001;
@@ -449,7 +431,6 @@
                 bgCtx.fill();
             }
 
-            // Subtle dark cosmic dust lanes carving depth across the galactic plane
             bgCtx.globalCompositeOperation = 'source-over';
             const dustLanes = [
                 { x: -diag * 0.16, y: -4, rx: diag * 0.16, ry: 7, rot: 0.06, alpha: 0.36 },
@@ -474,9 +455,8 @@
                 bgCtx.restore();
             }
 
-            bgCtx.restore(); // Restore galactic coordinate transform
+            bgCtx.restore();
 
-            // 3. Multi-layered background starfield (baked onto offscreen canvas)
             const staticStarCount = Math.max(260, Math.min(620, Math.floor((w * h) / 1450)));
             for (let i = 0; i < staticStarCount; i++) {
                 const sx = Math.random() * w;
@@ -491,7 +471,6 @@
                 bgCtx.fill();
             }
 
-            // 4. Populate live twinkling stars & brighter diffraction-spike stars
             twinklingStars = [];
             const twinkleCount = Math.max(95, Math.min(165, Math.floor((w * h) / 5200)));
             const spikeStarCount = Math.max(10, Math.min(18, Math.floor(twinkleCount * 0.11)));
@@ -528,7 +507,6 @@
                 const { r, g, b } = s.color;
 
                 if (s.hasSpikes) {
-                    // Soft stellar halo
                     const haloRadius = s.radius * 4.5;
                     const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, haloRadius);
                     halo.addColorStop(0.0, `rgba(${r}, ${g}, ${b}, ${(alpha * 0.55).toFixed(3)})`);
@@ -539,7 +517,6 @@
                     ctx.arc(s.x, s.y, haloRadius, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Delicate 4-point diffraction spikes
                     const len = s.spikeLength * (0.9 + wave * 0.12);
                     ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${(alpha * 0.65).toFixed(3)})`;
                     ctx.lineWidth = 0.85;
@@ -551,7 +528,6 @@
                     ctx.stroke();
                 }
 
-                // Crisp star core
                 ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
                 ctx.beginPath();
                 ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
@@ -568,10 +544,8 @@
             centralNode.x = canvas.width / 2;
             centralNode.y = canvas.height / 2;
 
-            // Regenerate cached galaxy and starfield for new dimensions
             generateGalaxyBackground();
 
-            // Initialize or adjust floating background meteors
             if (backgroundMeteors.length === 0) {
                 initBackgroundMeteors();
             } else {
@@ -585,7 +559,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Spawn alien spaceship to shoot Spider-Man from click position
+        // Canvas Click Handler: Spawn alien spaceship to shoot full-body alien from click position
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -596,10 +570,9 @@
 
         /**
          * Spawns the alien spaceship aligned so its plasma launcher cannon shoots
-         * Spider-Man directly from (x, y), along with muzzle blast & spark effects.
+         * the full-body alien directly from (x, y), along with muzzle blast & spark effects.
          */
         function spawnAlienShooter(muzzleX, muzzleY, launchAngleRad) {
-            // Cannon muzzle offset relative to spaceship center (in local unrotated coords)
             const cannonMuzzleOffsetX = 56;
             const cannonMuzzleOffsetY = 5;
 
@@ -613,18 +586,17 @@
                 baseY: shipY,
                 vx: 0,
                 vy: 0,
-                angle: launchAngleRad - Math.PI / 2, // 0 rad when shooting right (90°)
-                recoil: 15,                          // Immediate kickback on shot
-                pitchRecoil: -0.14,                  // Slight nose-up kick on blast
+                angle: launchAngleRad - Math.PI / 2,
+                recoil: 15,
+                pitchRecoil: -0.14,
                 age: 0,
-                hoverDuration: 1.35,                 // Seconds hovering after shot
-                departDuration: 0.85,                // Seconds zooming away
+                hoverDuration: 1.35,
+                departDuration: 0.85,
                 alpha: 1,
                 muzzleGlow: 1.0,
                 bobPhase: Math.random() * Math.PI * 2
             };
 
-            // Expanding plasma shockwave ring at cannon muzzle
             shockwaves.push({
                 x: muzzleX,
                 y: muzzleY,
@@ -633,7 +605,6 @@
                 alpha: 0.95
             });
 
-            // Burst of neon alien energy sparks & plasma particles from the cannon
             const sparkColors = ['#5eff7a', '#00f5d4', '#b8ff66', '#ffffff', '#70e4ff'];
             for (let i = 0; i < 24; i++) {
                 const spread = (Math.random() - 0.5) * 1.15;
@@ -653,22 +624,21 @@
         }
 
         function launchBall(x, y) {
-            // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
-            const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
-            const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
+            const vx = LAUNCH_VELOCITY * Math.sin(rad);
+            const vy = -LAUNCH_VELOCITY * Math.cos(rad);
 
-            // Position the alien spaceship so its cannon fires the ball right out of its barrel
             spawnAlienShooter(x, y, rad);
 
-            // Overwrite existing array to strictly maintain a single Spider-Man ball on screen
+            // Strictly maintain a single orbiting full-body alien on screen
             balls = [{
                 x: x,
                 y: y,
                 vx: vx,
                 vy: vy,
-                radius: 15,
-                trail: [] // Stores history of past {x, y} coordinates
+                radius: 17,
+                limbPhase: Math.random() * Math.PI * 2,
+                trail: []
             }];
         }
 
@@ -680,22 +650,18 @@
         }
 
         function updateAlienAndEffects(dt) {
-            // Update alien spaceship recoil, hover, and departure flight
             if (alienShip) {
                 alienShip.age += dt;
 
-                // Damped spring recovery from cannon recoil
                 alienShip.recoil *= Math.pow(0.06, dt);
                 alienShip.pitchRecoil *= Math.pow(0.05, dt);
                 alienShip.muzzleGlow = Math.max(0, alienShip.muzzleGlow - dt * 2.4);
 
                 if (alienShip.age <= alienShip.hoverDuration) {
-                    // Gentle anti-gravity hover after firing
                     const bobY = Math.sin(alienShip.age * 5.2 + alienShip.bobPhase) * 3.5;
                     alienShip.x = alienShip.baseX - alienShip.recoil;
                     alienShip.y = alienShip.baseY + bobY;
                 } else {
-                    // Smooth thruster fly-away upward and backward into deep space
                     const departT = (alienShip.age - alienShip.hoverDuration) / alienShip.departDuration;
                     alienShip.vx -= 420 * dt;
                     alienShip.vy -= 260 * dt;
@@ -704,7 +670,6 @@
                     alienShip.pitchRecoil = Math.max(-0.32, alienShip.pitchRecoil - 0.35 * dt);
                     alienShip.alpha = Math.max(0, 1 - Math.pow(departT, 1.4));
 
-                    // Thruster trail sparks during departure
                     if (Math.random() < 0.75) {
                         launchParticles.push({
                             x: alienShip.x - 10 + (Math.random() - 0.5) * 14,
@@ -724,7 +689,6 @@
                 }
             }
 
-            // Update plasma shockwaves
             for (let i = shockwaves.length - 1; i >= 0; i--) {
                 const sw = shockwaves[i];
                 sw.radius += (sw.maxRadius - sw.radius) * 0.22;
@@ -734,7 +698,6 @@
                 }
             }
 
-            // Update launch spark particles
             for (let i = launchParticles.length - 1; i >= 0; i--) {
                 const p = launchParticles[i];
                 p.x += p.vx;
@@ -752,7 +715,6 @@
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
 
-                // Remove ball if it travels too far off-screen (prevents memory leak)
                 const margin = 500;
                 if (b.x < -margin || b.x > canvas.width + margin || 
                     b.y < -margin || b.y > canvas.height + margin) {
@@ -760,32 +722,26 @@
                     continue;
                 }
 
-                // Distance vector to central gravity node
                 const dx = centralNode.x - b.x;
                 const dy = centralNode.y - b.y;
                 const distSq = dx * dx + dy * dy;
                 const dist = Math.sqrt(distSq);
 
-                // Absorption check: ball collides with central mass
                 if (dist < centralNode.radius + b.radius) {
                     balls.splice(i, 1);
                     continue;
                 }
 
-                // Inverse square law gravity acceleration
                 const acceleration = GRAVITY_CONSTANT / (distSq + SOFTENING_FACTOR);
 
-                // Acceleration vector components
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
 
-                // Update velocity and position
                 b.vx += ax;
                 b.vy += ay;
                 b.x += b.vx;
                 b.y += b.vy;
 
-                // Record position history for line trail
                 b.trail.push({ x: b.x, y: b.y });
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
@@ -795,7 +751,7 @@
 
         /**
          * Renders the alien pilot inside a glowing glass cockpit dome atop a metallic UFO saucer
-         * with a side-mounted plasma launcher cannon firing the ball.
+         * with a side-mounted plasma launcher cannon firing the alien into orbit.
          */
         function drawAlienSpaceship(time) {
             if (!alienShip) return;
@@ -805,7 +761,6 @@
             ctx.translate(alienShip.x, alienShip.y);
             ctx.rotate(alienShip.angle + alienShip.pitchRecoil);
 
-            // 1. Soft Anti-Gravity Tractor / Hover Glow under the saucer
             const hoverPulse = 0.85 + Math.sin(time * 0.012) * 0.15;
             const underGlow = ctx.createRadialGradient(0, 14, 2, 0, 22, 36 * hoverPulse);
             underGlow.addColorStop(0.0, 'rgba(64, 255, 178, 0.55)');
@@ -816,7 +771,6 @@
             ctx.ellipse(0, 20, 32 * hoverPulse, 14 * hoverPulse, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Thruster emitter pod under belly
             ctx.fillStyle = '#1b2838';
             ctx.beginPath();
             ctx.ellipse(0, 13, 14, 5, 0, 0, Math.PI * 2);
@@ -826,12 +780,9 @@
             ctx.ellipse(0, 14, 9, 2.8, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // 2. Plasma Ball Launcher Cannon mounted on the right side of the hull
-            // Barrel housing & mounting bracket
             ctx.save();
             ctx.translate(22, 5);
 
-            // Mounting collar
             ctx.fillStyle = '#2d3748';
             ctx.strokeStyle = '#0f172a';
             ctx.lineWidth = 1.2;
@@ -840,7 +791,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Main cannon barrel tube
             const barrelGrad = ctx.createLinearGradient(0, -8, 0, 8);
             barrelGrad.addColorStop(0.0, '#94a3b8');
             barrelGrad.addColorStop(0.35, '#e2e8f0');
@@ -852,7 +802,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Glowing plasma energy coils along the barrel
             const coilPositions = [12, 19, 25];
             for (const cx of coilPositions) {
                 ctx.fillStyle = alienShip.muzzleGlow > 0.1 ? '#72ff8e' : '#00e5ff';
@@ -862,7 +811,6 @@
             }
             ctx.shadowBlur = 0;
 
-            // Flared muzzle nozzle tip (at local x = 34 => world shipX + 56 = launchX)
             ctx.fillStyle = '#1e293b';
             ctx.beginPath();
             ctx.moveTo(29, -8.5);
@@ -873,13 +821,11 @@
             ctx.fill();
             ctx.stroke();
 
-            // Glowing inner cannon bore
             ctx.fillStyle = alienShip.muzzleGlow > 0.05 ? '#b9ffca' : '#10b981';
             ctx.beginPath();
             ctx.ellipse(35, 0, 2.5, 8.5, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Muzzle flash flare on shot
             if (alienShip.muzzleGlow > 0.05) {
                 const flashR = 24 * alienShip.muzzleGlow;
                 const flashGrad = ctx.createRadialGradient(36, 0, 1, 38, 0, flashR);
@@ -893,20 +839,17 @@
             }
             ctx.restore();
 
-            // 3. Alien Pilot (drawn before glass dome so it sits visibly inside the cockpit)
+            // Alien Pilot inside cockpit
             ctx.save();
-            // Subtle recoil lean for the alien pilot
             const alienLean = Math.min(0.22, alienShip.recoil * 0.015);
             ctx.translate(0, -7);
             ctx.rotate(-alienLean);
 
-            // Alien shoulders / flight suit
             ctx.fillStyle = '#2563eb';
             ctx.beginPath();
             ctx.ellipse(0, 6, 11, 6, 0, Math.PI, Math.PI * 2);
             ctx.fill();
 
-            // Glowing cockpit firing console & alien hands pressing the trigger button
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(6, 1, 9, 5);
             ctx.fillStyle = '#39ff14';
@@ -914,7 +857,6 @@
             ctx.arc(11, 1, 2.1, 0, Math.PI * 2);
             ctx.fill();
 
-            // Alien slender green arm reaching for the firing control
             ctx.strokeStyle = '#38d958';
             ctx.lineWidth = 2.6;
             ctx.lineCap = 'round';
@@ -923,7 +865,6 @@
             ctx.lineTo(10, 1.5);
             ctx.stroke();
 
-            // Bobbing antennae
             const antWiggle = Math.sin(time * 0.018) * 1.6 + alienShip.recoil * 0.18;
             ctx.strokeStyle = '#38d958';
             ctx.lineWidth = 1.6;
@@ -934,14 +875,12 @@
             ctx.quadraticCurveTo(5 - antWiggle * 0.4, -18, 7 - antWiggle, -20);
             ctx.stroke();
 
-            // Glowing antenna tips
             ctx.fillStyle = '#a3ff12';
             ctx.beginPath();
             ctx.arc(-9 - antWiggle, -20, 2, 0, Math.PI * 2);
             ctx.arc(7 - antWiggle, -20, 2, 0, Math.PI * 2);
             ctx.fill();
 
-            // Alien pear-shaped head
             const headGrad = ctx.createRadialGradient(-2, -8, 1, 0, -5, 11);
             headGrad.addColorStop(0.0, '#8aff7a');
             headGrad.addColorStop(0.65, '#34c759');
@@ -954,25 +893,20 @@
             ctx.closePath();
             ctx.fill();
 
-            // Large glossy black alien eyes (looking right toward Spider-Man!)
             ctx.fillStyle = '#07090f';
-            // Left eye
             ctx.beginPath();
             ctx.ellipse(-2.2, -5.8, 2.7, 3.8, -0.25, 0, Math.PI * 2);
             ctx.fill();
-            // Right eye
             ctx.beginPath();
             ctx.ellipse(4.4, -5.8, 2.9, 4.0, 0.25, 0, Math.PI * 2);
             ctx.fill();
 
-            // Crisp eye catchlights
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.arc(-1.4, -7.1, 0.95, 0, Math.PI * 2);
             ctx.arc(5.2, -7.1, 1.05, 0, Math.PI * 2);
             ctx.fill();
 
-            // Excited alien expression ("O" right after firing, grin afterward)
             ctx.fillStyle = '#0b3b18';
             if (alienShip.age < 0.35) {
                 ctx.beginPath();
@@ -987,7 +921,6 @@
             }
             ctx.restore();
 
-            // 4. Translucent Glass Cockpit Canopy Dome
             const domeGrad = ctx.createRadialGradient(-6, -18, 2, 0, -8, 24);
             domeGrad.addColorStop(0.0, 'rgba(210, 250, 255, 0.45)');
             domeGrad.addColorStop(0.55, 'rgba(100, 215, 255, 0.20)');
@@ -1002,7 +935,6 @@
             ctx.lineWidth = 1.3;
             ctx.stroke();
 
-            // Curved glass specular highlight streak
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
             ctx.lineWidth = 1.8;
             ctx.lineCap = 'round';
@@ -1010,7 +942,6 @@
             ctx.arc(0, -4, 17, Math.PI * 1.15, Math.PI * 1.42);
             ctx.stroke();
 
-            // 5. Main Metallic UFO Saucer Hull
             const hullGrad = ctx.createLinearGradient(0, -7, 0, 14);
             hullGrad.addColorStop(0.0, '#cbd5e1');
             hullGrad.addColorStop(0.32, '#f8fafc');
@@ -1026,7 +957,6 @@
             ctx.lineWidth = 1.4;
             ctx.stroke();
 
-            // Metallic upper collar ring around cockpit base
             ctx.fillStyle = '#475569';
             ctx.beginPath();
             ctx.ellipse(0, -4, 22, 4.2, 0, 0, Math.PI * 2);
@@ -1035,7 +965,6 @@
             ctx.lineWidth = 0.9;
             ctx.stroke();
 
-            // Pulsing perimeter UFO lights along the saucer rim
             const rimOffsets = [-28, -17, -6, 6, 17, 28];
             for (let i = 0; i < rimOffsets.length; i++) {
                 const lx = rimOffsets[i];
@@ -1057,7 +986,6 @@
          * Renders muzzle shockwaves and glowing plasma launch sparks.
          */
         function drawLaunchEffects() {
-            // Shockwave rings
             for (const sw of shockwaves) {
                 ctx.save();
                 ctx.translate(sw.x, sw.y);
@@ -1069,7 +997,6 @@
                 ctx.restore();
             }
 
-            // Glowing plasma sparks
             for (const p of launchParticles) {
                 ctx.save();
                 ctx.globalAlpha = Math.max(0, p.alpha);
@@ -1084,152 +1011,273 @@
         }
 
         /**
-         * Helper to trace a single Spider-Man eye lens path (dir = -1 for left, +1 for right).
+         * Helper to draw a three-fingered alien hand at (x, y) rotated by `angle`.
          */
-        function traceSpiderEyePath(r, dir, scale = 1) {
-            const cx = dir * 0.45 * r;
-            const cy = 0.04 * r;
-            const sx = (x) => cx + (dir * x * r - cx) * scale;
-            const sy = (y) => cy + (y * r - cy) * scale;
+        function drawAlienHand(x, y, angle, s) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = '#4ade80';
+            ctx.strokeStyle = '#14532d';
+            ctx.lineWidth = 0.8 * s;
 
+            // Palm
             ctx.beginPath();
-            // Inner corner near nose bridge
-            ctx.moveTo(sx(0.14), sy(0.14));
-            // Upper brow sweep to sharp temple tip
-            ctx.quadraticCurveTo(sx(0.42), sy(-0.02), sx(0.74), sy(-0.34));
-            // Outer cheek curve
-            ctx.quadraticCurveTo(sx(0.78), sy(0.16), sx(0.42), sy(0.26));
-            // Lower lid return to inner corner
-            ctx.quadraticCurveTo(sx(0.24), sy(0.26), sx(0.14), sy(0.14));
-            ctx.closePath();
+            ctx.arc(0, 0, 2.1 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Three slender fingers
+            const fingerAngles = [-0.55, 0, 0.55];
+            for (const fa of fingerAngles) {
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(fa) * 3.8 * s, Math.sin(fa) * 3.8 * s);
+                ctx.strokeStyle = '#4ade80';
+                ctx.lineWidth = 1.4 * s;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+            ctx.restore();
         }
 
         /**
-         * Renders the ball as Spider-Man's iconic masked head with 3D spherical shading,
-         * radiating web lines, scalloped web rings, and bold white-and-black lenses.
+         * Renders the orbiting projectile as a full-body alien floating in zero gravity,
+         * complete with antennae, large glossy black eyes, cosmic flight suit torso,
+         * waving arms with three-fingered hands, and kicking legs with space boots.
          */
-        function drawSpiderManBall(b) {
-            const r = b.radius;
+        function drawFullBodyAlien(b, time) {
+            const s = b.radius / 15; // Scale multiplier so body proportions match radius cleanly
+            const phase = time * 0.011 + b.limbPhase;
 
             ctx.save();
             ctx.translate(b.x, b.y);
 
-            // Subtle dynamic swing tilt based on vertical velocity
-            const tilt = Math.max(-0.35, Math.min(0.35, b.vy * 0.035));
-            ctx.rotate(tilt);
+            // Dynamic zero-gravity flight tilt aligned subtly with velocity
+            const speed = Math.hypot(b.vx, b.vy);
+            const flightLean = Math.max(-0.45, Math.min(0.45, (b.vx * 0.045) + (b.vy * 0.025)));
+            const zeroGWobble = Math.sin(phase * 0.65) * 0.12;
+            ctx.rotate(flightLean + zeroGWobble);
 
-            // Soft crimson rim glow so Spider-Man pops against deep space
-            ctx.save();
-            ctx.shadowColor = 'rgba(255, 45, 55, 0.55)';
-            ctx.shadowBlur = 10;
+            // 1. Soft Bio-Luminescent Cosmic Aura around the alien
+            const auraGrad = ctx.createRadialGradient(0, 0, 2 * s, 0, 0, 26 * s);
+            auraGrad.addColorStop(0.0, 'rgba(94, 255, 130, 0.28)');
+            auraGrad.addColorStop(0.6, 'rgba(56, 249, 215, 0.10)');
+            auraGrad.addColorStop(1.0, 'rgba(56, 249, 215, 0)');
+            ctx.fillStyle = auraGrad;
             ctx.beginPath();
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.fillStyle = '#d9161e';
+            ctx.arc(0, 0, 26 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Legs & Space Boots (Lower Body - animated zero-G floating kick)
+            const leftLegSwing = Math.sin(phase) * 0.34;
+            const rightLegSwing = Math.sin(phase + Math.PI) * 0.34;
+            const leftKneeBend = 0.25 + Math.max(0, Math.sin(phase)) * 0.35;
+            const rightKneeBend = 0.25 + Math.max(0, Math.sin(phase + Math.PI)) * 0.35;
+
+            const drawLeg = (hipX, swingAngle, kneeBend, sideSign) => {
+                ctx.save();
+                ctx.translate(hipX * s, 9.5 * s);
+                ctx.rotate(swingAngle + sideSign * 0.14);
+
+                // Upper thigh (alien green)
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3.2 * s;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, 6.5 * s);
+                ctx.stroke();
+
+                // Lower calf + knee articulation
+                ctx.translate(0, 6.5 * s);
+                ctx.rotate(-kneeBend * sideSign * 0.65);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, 6.0 * s);
+                ctx.stroke();
+
+                // Cosmic space boot
+                ctx.translate(0, 6.0 * s);
+                ctx.fillStyle = '#0f172a';
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 1.0 * s;
+                ctx.beginPath();
+                ctx.roundRect(-2.4 * s, -1.2 * s, 5.6 * s, 3.6 * s, 1.8 * s);
+                ctx.fill();
+                ctx.stroke();
+
+                // Glowing boot sole accent
+                ctx.fillStyle = '#5eff7a';
+                ctx.fillRect(-1.8 * s, 1.5 * s, 4.4 * s, 0.9 * s);
+
+                ctx.restore();
+            };
+
+            drawLeg(-3.2, leftLegSwing, leftKneeBend, -1);
+            drawLeg(3.2, rightLegSwing, rightKneeBend, 1);
+
+            // 3. Arms & Three-Fingered Hands (Upper Limbs - zero-G waving)
+            const leftArmWave = -0.75 + Math.sin(phase * 1.25) * 0.42;
+            const rightArmWave = 0.75 + Math.cos(phase * 1.25) * 0.42;
+
+            const drawArm = (shoulderX, armAngle, sideSign) => {
+                ctx.save();
+                ctx.translate(shoulderX * s, 1.5 * s);
+                ctx.rotate(armAngle);
+
+                // Upper arm
+                ctx.strokeStyle = '#34d399';
+                ctx.lineWidth = 2.8 * s;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(sideSign * 6.5 * s, 0);
+                ctx.stroke();
+
+                // Forearm with slight elbow bend
+                ctx.translate(sideSign * 6.5 * s, 0);
+                ctx.rotate(-sideSign * (0.35 + Math.sin(phase * 1.4) * 0.2));
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(sideSign * 5.8 * s, 0);
+                ctx.stroke();
+
+                // Three-fingered alien hand
+                drawAlienHand(sideSign * 6.4 * s, 0, sideSign > 0 ? 0 : Math.PI, s);
+                ctx.restore();
+            };
+
+            drawArm(-5.2, leftArmWave, -1);
+            drawArm(5.2, rightArmWave, 1);
+
+            // 4. Slender Torso & Fitted Cosmic Flight Suit
+            ctx.save();
+            // Neck
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(-2.0 * s, -2.5 * s, 4.0 * s, 3.5 * s);
+
+            // Torso silhouette (tapered athletic alien build)
+            const suitGrad = ctx.createLinearGradient(-6 * s, 0, 6 * s, 10 * s);
+            suitGrad.addColorStop(0.0, '#3b82f6');
+            suitGrad.addColorStop(0.5, '#1d4ed8');
+            suitGrad.addColorStop(1.0, '#1e1b4b');
+            ctx.fillStyle = suitGrad;
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.0 * s;
+
+            ctx.beginPath();
+            ctx.moveTo(-5.8 * s, 0.5 * s);
+            ctx.lineTo(5.8 * s, 0.5 * s);
+            ctx.lineTo(4.2 * s, 10.2 * s);
+            ctx.lineTo(-4.2 * s, 10.2 * s);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Glowing cosmic utility belt
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-4.4 * s, 7.6 * s, 8.8 * s, 2.0 * s);
+            ctx.fillStyle = '#5eff7a';
+            ctx.beginPath();
+            ctx.arc(0, 8.6 * s, 1.3 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Chest emblem (glowing plasma core badge)
+            ctx.fillStyle = '#00f5d4';
+            ctx.beginPath();
+            ctx.arc(0, 4.0 * s, 1.7 * s, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-0.4 * s, 3.6 * s, 0.6 * s, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
 
-            // Clip everything inside the spherical mask silhouette
+            // 5. Iconic Large Alien Head, Antennae & Expressive Face
             ctx.save();
+            ctx.translate(0, -8.5 * s);
+
+            // Bobbing antennae reacting to speed & zero-G
+            const antSway = Math.sin(phase * 1.5) * 1.8 * s - Math.min(3, speed * 0.25) * s;
+            ctx.strokeStyle = '#38d958';
+            ctx.lineWidth = 1.6 * s;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.clip();
-
-            // 1. 3D Spherical Spider-Man Crimson Base Gradient
-            const maskGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r * 1.15);
-            maskGrad.addColorStop(0.0, '#ff4d54');
-            maskGrad.addColorStop(0.45, '#d9161e');
-            maskGrad.addColorStop(0.85, '#990b11');
-            maskGrad.addColorStop(1.0, '#590408');
-            ctx.fillStyle = maskGrad;
-            ctx.fillRect(-r, -r, r * 2, r * 2);
-
-            // 2. Webbing Pattern (radiating from bridge of nose)
-            const webOriginX = 0;
-            const webOriginY = r * 0.08;
-            const spokeAngles = [
-                -Math.PI / 2,        // Top center
-                -Math.PI * 0.25,     // Upper right
-                -Math.PI * 0.05,     // Right temple
-                 Math.PI * 0.22,     // Lower right
-                 Math.PI / 2,        // Bottom chin
-                 Math.PI * 0.78,     // Lower left
-                 Math.PI * 1.05,     // Left temple
-                -Math.PI * 0.75      // Upper left
-            ];
-
-            ctx.strokeStyle = 'rgba(18, 12, 14, 0.78)';
-            ctx.lineWidth = Math.max(0.85, r * 0.06);
-
-            // Radial web spokes
-            for (const angle of spokeAngles) {
-                ctx.beginPath();
-                ctx.moveTo(webOriginX, webOriginY);
-                ctx.lineTo(
-                    webOriginX + Math.cos(angle) * r * 1.35,
-                    webOriginY + Math.sin(angle) * r * 1.35
-                );
-                ctx.stroke();
-            }
-
-            // Concentric scalloped web arcs between spokes
-            const ringRadii = [r * 0.38, r * 0.68, r * 0.98];
-            for (const ringR of ringRadii) {
-                ctx.beginPath();
-                for (let i = 0; i < spokeAngles.length; i++) {
-                    const a1 = spokeAngles[i];
-                    const a2 = spokeAngles[(i + 1) % spokeAngles.length];
-
-                    const x1 = webOriginX + Math.cos(a1) * ringR;
-                    const y1 = webOriginY + Math.sin(a1) * ringR;
-                    const x2 = webOriginX + Math.cos(a2) * ringR;
-                    const y2 = webOriginY + Math.sin(a2) * ringR;
-
-                    // Midpoint pulled slightly inward toward origin for authentic web sag
-                    let midAngle = (a1 + a2) / 2;
-                    if (Math.abs(a2 - a1) > Math.PI) {
-                        midAngle += Math.PI;
-                    }
-                    const sagR = ringR * 0.84;
-                    const cx = webOriginX + Math.cos(midAngle) * sagR;
-                    const cy = webOriginY + Math.sin(midAngle) * sagR;
-
-                    if (i === 0) {
-                        ctx.moveTo(x1, y1);
-                    }
-                    ctx.quadraticCurveTo(cx, cy, x2, y2);
-                }
-                ctx.stroke();
-            }
-
-            ctx.restore(); // End circular mask clip
-
-            // Crisp dark outer edge stroke
-            ctx.beginPath();
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.strokeStyle = '#180507';
-            ctx.lineWidth = 1.2;
+            ctx.moveTo(-3.6 * s, -6.5 * s);
+            ctx.quadraticCurveTo((-6.5 * s) + antSway * 0.4, -12.5 * s, (-8.0 * s) + antSway, -14.5 * s);
+            ctx.moveTo(3.6 * s, -6.5 * s);
+            ctx.quadraticCurveTo((6.5 * s) + antSway * 0.4, -12.5 * s, (8.0 * s) + antSway, -14.5 * s);
             ctx.stroke();
 
-            // 3. Iconic Spider-Man Eyes (Left & Right)
-            for (const dir of [-1, 1]) {
-                // Thick black outer lens frame
-                traceSpiderEyePath(r, dir, 1.0);
-                ctx.fillStyle = '#0c0c0f';
-                ctx.fill();
+            // Glowing antenna orbs
+            ctx.fillStyle = '#a3ff12';
+            ctx.shadowColor = '#a3ff12';
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+            ctx.arc((-8.0 * s) + antSway, -14.5 * s, 1.9 * s, 0, Math.PI * 2);
+            ctx.arc((8.0 * s) + antSway, -14.5 * s, 1.9 * s, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
 
-                // Bright white inner lens
-                traceSpiderEyePath(r, dir, 0.72);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
+            // Classic pear-shaped alien cranium
+            const headGrad = ctx.createRadialGradient(-2.5 * s, -3.5 * s, 1 * s, 0, 0, 10.5 * s);
+            headGrad.addColorStop(0.0, '#9eff8e');
+            headGrad.addColorStop(0.58, '#34c759');
+            headGrad.addColorStop(1.0, '#15803d');
+            ctx.fillStyle = headGrad;
+            ctx.strokeStyle = '#0f3d1e';
+            ctx.lineWidth = 1.0 * s;
 
-                // Subtle cool highlight glint inside lens
-                ctx.fillStyle = 'rgba(200, 230, 255, 0.55)';
+            ctx.beginPath();
+            ctx.moveTo(0, 6.8 * s); // Chin
+            ctx.bezierCurveTo(-9.5 * s, 5.5 * s, -11.2 * s, -7.2 * s, 0, -8.4 * s);
+            ctx.bezierCurveTo(11.2 * s, -7.2 * s, 9.5 * s, 5.5 * s, 0, 6.8 * s);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Large glossy black almond-shaped alien eyes
+            ctx.fillStyle = '#06080e';
+            // Left eye
+            ctx.beginPath();
+            ctx.ellipse(-3.6 * s, -0.8 * s, 2.8 * s, 4.0 * s, -0.28, 0, Math.PI * 2);
+            ctx.fill();
+            // Right eye
+            ctx.beginPath();
+            ctx.ellipse(3.6 * s, -0.8 * s, 2.8 * s, 4.0 * s, 0.28, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Crisp white eye catchlights
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-4.3 * s, -2.1 * s, 1.0 * s, 0, Math.PI * 2);
+            ctx.arc(2.9 * s, -2.1 * s, 1.0 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Secondary subtle eye glint
+            ctx.fillStyle = 'rgba(180, 245, 255, 0.7)';
+            ctx.beginPath();
+            ctx.arc(-2.8 * s, 0.6 * s, 0.5 * s, 0, Math.PI * 2);
+            ctx.arc(4.4 * s, 0.6 * s, 0.5 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Happy/amazed zero-G alien mouth ("O" when moving fast, big smile otherwise)
+            if (speed > 6.5) {
+                ctx.fillStyle = '#064e23';
                 ctx.beginPath();
-                ctx.arc(dir * 0.48 * r, -0.04 * r, r * 0.055, 0, Math.PI * 2);
+                ctx.ellipse(0, 3.8 * s, 1.3 * s, 1.7 * s, 0, 0, Math.PI * 2);
                 ctx.fill();
+            } else {
+                ctx.strokeStyle = '#064e23';
+                ctx.lineWidth = 1.2 * s;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.arc(0, 2.8 * s, 2.2 * s, 0.22, Math.PI - 0.22);
+                ctx.stroke();
             }
 
-            ctx.restore();
+            ctx.restore(); // End Head
+            ctx.restore(); // End Full-Body Alien
         }
 
         function draw(timestamp = performance.now()) {
@@ -1251,25 +1299,25 @@
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            // 2. Draw Alien Spaceship (behind Spider-Man so the ball emerges cleanly out of the barrel)
+            // 2. Draw Alien Spaceship (behind the launched alien so it emerges cleanly out of the barrel)
             drawAlienSpaceship(timestamp);
 
-            // 3. Draw Spider-Man & Web Trail
+            // 3. Draw Full-Body Alien & Orbital Trail
             for (const b of balls) {
-                // Draw web-silk path line
+                // Draw glowing orbital trajectory path
                 if (b.trail.length > 1) {
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
                         ctx.lineTo(b.trail[t].x, b.trail[t].y);
                     }
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.88)';
-                    ctx.lineWidth = 1.4;
+                    ctx.strokeStyle = 'rgba(165, 255, 210, 0.85)';
+                    ctx.lineWidth = 1.5;
                     ctx.stroke();
                 }
 
-                // Draw Spider-Man ball
-                drawSpiderManBall(b);
+                // Draw full-body alien
+                drawFullBodyAlien(b, timestamp);
             }
 
             // 4. Draw Muzzle Flash Shockwaves & Plasma Sparks
