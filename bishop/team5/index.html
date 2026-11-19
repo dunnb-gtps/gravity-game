@@ -1717,7 +1717,7 @@
                     b.rotation += 0.18 * Math.sign(b.planet.spinRate || 1);
                     b.cloudRotation += 0.22;
 
-                    b.trail.push({ x: b.x, y: b.y });
+                    b.trail.push({ x: b.x, y: b.y, wrapped: false });
                     if (b.trail.length > TRAIL_LENGTH) {
                         b.trail.shift();
                     }
@@ -1727,15 +1727,6 @@
                         lastEventMessage = `${b.planet.name} Consumed`;
                         balls.splice(i, 1);
                     }
-                    continue;
-                }
-
-                // Remove planet if it travels too far off-screen
-                const margin = 500;
-                if (b.x < -margin || b.x > canvas.width + margin || 
-                    b.y < -margin || b.y > canvas.height + margin) {
-                    lastEventMessage = `${b.planet.name} Lost in Space`;
-                    balls.splice(i, 1);
                     continue;
                 }
 
@@ -1792,7 +1783,27 @@
                 b.x += b.vx;
                 b.y += b.vy;
 
-                b.trail.push({ x: b.x, y: b.y });
+                // Spawn planet on the opposite side if it goes past the screen
+                let wrapped = false;
+                if (canvas.width > 0 && canvas.height > 0) {
+                    if (b.x < -b.radius) {
+                        b.x = canvas.width + b.radius;
+                        wrapped = true;
+                    } else if (b.x > canvas.width + b.radius) {
+                        b.x = -b.radius;
+                        wrapped = true;
+                    }
+
+                    if (b.y < -b.radius) {
+                        b.y = canvas.height + b.radius;
+                        wrapped = true;
+                    } else if (b.y > canvas.height + b.radius) {
+                        b.y = -b.radius;
+                        wrapped = true;
+                    }
+                }
+
+                b.trail.push({ x: b.x, y: b.y, wrapped });
                 if (b.trail.length > TRAIL_LENGTH) {
                     b.trail.shift();
                 }
@@ -2219,13 +2230,17 @@
                 ctx.fill();
             }
 
-            // 5. Draw Each Planet's Orbital Motion Trail
+            // 5. Draw Each Planet's Orbital Motion Trail (breaking cleanly across screen wraps)
             for (const b of balls) {
                 if (b.trail.length > 1) {
                     ctx.beginPath();
                     ctx.moveTo(b.trail[0].x, b.trail[0].y);
                     for (let t = 1; t < b.trail.length; t++) {
-                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                        if (b.trail[t].wrapped) {
+                            ctx.moveTo(b.trail[t].x, b.trail[t].y);
+                        } else {
+                            ctx.lineTo(b.trail[t].x, b.trail[t].y);
+                        }
                     }
                     ctx.strokeStyle = b.planet.trailColor;
                     ctx.lineWidth = 1.2;
