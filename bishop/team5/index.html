@@ -152,7 +152,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch gravity balls. Spawn 80 to trigger a meteor strike!
+        Click anywhere on the canvas to launch gravity balls. Spawn 80 to summon a meteor that supercharges the black hole!
     </div>
 
     <script>
@@ -165,7 +165,7 @@
         const bgCtx = bgCanvas.getContext('2d');
 
         // SIMULATION CONSTANTS (Tuned for stronger black hole gravity)
-        const GRAVITY_CONSTANT = 2350;     // Strength of gravitational pull (G)
+        const GRAVITY_CONSTANT = 2350;     // Base strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 280;          // Number of historic trail points stored
@@ -373,10 +373,11 @@
         ];
 
         // BLACK HOLE CONSTANTS
-        const EVENT_HORIZON_RADIUS = 16;   // Radius of the pitch-black singularity core
-        const SUCTION_RADIUS = 56;         // Outer radius of the accretion suction danger zone
+        const EVENT_HORIZON_RADIUS = 16;   // Base radius of the pitch-black singularity core
+        const SUCTION_RADIUS = 56;         // Base outer radius of the accretion suction danger zone
         const CAPTURE_DURATION = 18;       // Frames over which a captured planet spirals into nothing
-        const ACCRETION_PARTICLE_COUNT = 34;
+        const ACCRETION_PARTICLE_COUNT = 42;
+        const SUPERCHARGE_DURATION = 900;  // Frames (~15s) of sustained supercharge after meteor absorption
 
         // STATE VARIABLES
         let balls = [];
@@ -386,6 +387,12 @@
         let inSuctionZone = false;
         let planetCycleIndex = 0;
         let lastEventMessage = '';
+
+        // BLACK HOLE METEOR POWER STATE
+        let powerLevel = 0;                // Permanent stacked power level from absorbed meteors
+        let superchargeTimer = 0;          // Sustained post-impact supercharge countdown
+        let incomingPowerRatio = 0;        // 0..1 intensity while meteor is streaming power in
+        let powerStreamParticles = [];     // Glowing energy orbs pulled from meteor into black hole
 
         // METEOR & EXPLOSION STATE
         let meteor = null;
@@ -410,6 +417,51 @@
             eventHorizonRadius: EVENT_HORIZON_RADIUS,
             suctionRadius: SUCTION_RADIUS
         };
+
+        /**
+         * Computes the current empowered state and multipliers of the black hole
+         */
+        function getBlackHolePowerState() {
+            const isReceiving = Boolean(meteor);
+            if (meteor) {
+                const journey = Math.min(1, Math.max(0, meteor.distTraveled / (meteor.targetDist || 1)));
+                incomingPowerRatio = 0.45 + 0.55 * journey;
+            } else {
+                incomingPowerRatio = 0;
+            }
+
+            const isSupercharged = superchargeTimer > 0;
+            const isPowered = isReceiving || isSupercharged || powerLevel > 0;
+
+            const permanentBonus = powerLevel * 0.35;
+            const surgeBonus = isReceiving
+                ? (1.8 + 1.7 * incomingPowerRatio)
+                : (isSupercharged ? 1.65 : 0);
+
+            const gravityMultiplier = 1 + permanentBonus + surgeBonus;
+
+            const targetHorizonRadius = EVENT_HORIZON_RADIUS + (
+                isReceiving
+                    ? (5 + 4.5 * incomingPowerRatio)
+                    : (isSupercharged ? 4.5 : Math.min(6, powerLevel * 1.5))
+            );
+
+            const targetSuctionRadius = SUCTION_RADIUS + (
+                isReceiving
+                    ? (46 + 44 * incomingPowerRatio)
+                    : (isSupercharged ? 42 : Math.min(36, powerLevel * 10))
+            );
+
+            return {
+                isPowered,
+                isReceiving,
+                isSupercharged,
+                gravityMultiplier,
+                targetHorizonRadius,
+                targetSuctionRadius,
+                chargeProgress: isSupercharged ? (superchargeTimer / SUPERCHARGE_DURATION) : (isReceiving ? incomingPowerRatio : 0)
+            };
+        }
 
         /**
          * Pre-renders the deep-space spiral galaxy, colorful nebulae, dust lanes, and starfield
@@ -469,7 +521,6 @@
                 'rgba(255, 212, 148, '
             ];
 
-            // Soft spiral arm gas glow
             for (let arm = 0; arm < armCount; arm++) {
                 const baseAngle = (arm * Math.PI * 2) / armCount;
                 for (let step = 18; step < 95; step++) {
@@ -491,7 +542,6 @@
                 }
             }
 
-            // Thousands of fine stardust particles along the spiral arms
             const starDustCount = 1350;
             for (let i = 0; i < starDustCount; i++) {
                 const arm = i % armCount;
@@ -561,7 +611,6 @@
             const w = canvas.width || 1000;
             const h = canvas.height || 650;
 
-            // Animated twinkling foreground stars
             twinklingStars = [];
             for (let i = 0; i < 42; i++) {
                 twinklingStars.push({
@@ -576,7 +625,6 @@
 
             shootingStars = [];
 
-            // Cruising Spaceships (Starfighters, Cruisers, Retro Rockets)
             spaceships = [
                 createSpaceship('interceptor', w * 0.15, h * 0.22, 1.35, 0.22, 0.95),
                 createSpaceship('cruiser', w * 0.82, h * 0.78, -0.95, -0.18, 0.88),
@@ -584,7 +632,6 @@
                 createSpaceship('interceptor', w * 0.22, h * 0.82, 1.55, -0.28, 0.68)
             ];
 
-            // Flying Saucers (UFOs) with Alien Pilots inside
             ufos = [
                 {
                     x: w * 0.20,
@@ -621,7 +668,6 @@
                 }
             ];
 
-            // Cute Free-Floating Space Aliens in Bubble Helmets
             spaceAliens = [
                 {
                     x: w * 0.14,
@@ -672,7 +718,6 @@
             const h = canvas.height;
             const pad = 90;
 
-            // Occasional Shooting Star
             if (Math.random() < 0.012 && shootingStars.length < 2) {
                 const fromLeft = Math.random() < 0.5;
                 shootingStars.push({
@@ -695,7 +740,6 @@
                 }
             }
 
-            // Update Spaceships
             for (const ship of spaceships) {
                 ship.pulsePhase += 0.12;
                 ship.x += ship.vx;
@@ -718,7 +762,6 @@
                 }
             }
 
-            // Update Alien UFOs
             for (const ufo of ufos) {
                 ufo.bobPhase += ufo.bobSpeed;
                 ufo.beamTimer = (ufo.beamTimer + 1) % 340;
@@ -734,7 +777,6 @@
                 }
             }
 
-            // Update Free-Floating Space Aliens
             for (const alien of spaceAliens) {
                 alien.phase += 0.03;
                 alien.tilt = Math.sin(alien.phase * 0.7) * 0.24;
@@ -1184,7 +1226,7 @@
                     angle: Math.random() * Math.PI * 2,
                     radius: orbitRadius,
                     baseRadius: orbitRadius,
-                    size: Math.random() < 0.35 ? 1.5 : 1,
+                    size: Math.random() < 0.35 ? 1.6 : 1.05,
                     alpha: 0.25 + Math.random() * 0.65,
                     speed: (0.045 + Math.random() * 0.025) * (24 / orbitRadius)
                 });
@@ -1192,19 +1234,20 @@
         }
 
         /**
-         * Spawns an expanding white gravitational shockwave/ripple ring
+         * Spawns an expanding gravitational shockwave/ripple ring
          */
-        function spawnRipple(startRadius = EVENT_HORIZON_RADIUS, maxRadius = 95, lineWidth = 1.8) {
+        function spawnRipple(startRadius = blackHole.eventHorizonRadius, maxRadius = 95, lineWidth = 1.8, color = '255, 255, 255') {
             ripples.push({
                 radius: startRadius,
                 maxRadius: maxRadius,
                 alpha: 0.9,
-                lineWidth: lineWidth
+                lineWidth: lineWidth,
+                color: color
             });
         }
 
         /**
-         * Spawns a giant flaming meteor aimed toward the center when 80 gravity balls are present
+         * Spawns a giant flaming meteor aimed toward the black hole when 80 gravity balls are present
          */
         function spawnMeteor() {
             const w = canvas.width;
@@ -1222,7 +1265,7 @@
             const dx = targetX - start.x;
             const dy = targetY - start.y;
             const dist = Math.hypot(dx, dy) || 1;
-            const speed = 15.5;
+            const speed = 13.5;
 
             meteor = {
                 x: start.x,
@@ -1238,7 +1281,8 @@
                 targetDist: dist
             };
 
-            screenShake = 5;
+            spawnRipple(blackHole.eventHorizonRadius, 140, 2.5, '255, 190, 95');
+            screenShake = 6;
         }
 
         /**
@@ -1276,24 +1320,27 @@
         }
 
         /**
-         * Triggers the meteor's main impact detonation, blowing up all remaining gravity balls
+         * Transfers the meteor's full core power into the black hole upon impact, supercharging it
          */
         function detonateMeteorImpact() {
-            const impactX = meteor ? meteor.x : blackHole.x;
-            const impactY = meteor ? meteor.y : blackHole.y;
-            const blownCount = balls.length;
+            const impactX = blackHole.x;
+            const impactY = blackHole.y;
 
             for (const b of balls) {
                 detonateBall(b);
             }
             balls = [];
 
-            // Massive central meteor blast waves
+            // Grant the black hole sustained supercharge and increment its stacked power level
+            powerLevel += 1;
+            superchargeTimer = SUPERCHARGE_DURATION;
+
+            // Massive central meteor-to-black-hole energy absorption shockwaves
             blastWaves.push({
                 x: impactX,
                 y: impactY,
                 radius: 15,
-                maxRadius: Math.max(canvas.width, canvas.height) * 0.75,
+                maxRadius: Math.max(canvas.width, canvas.height) * 0.78,
                 alpha: 1.0,
                 color: 'rgba(255, 175, 65, 0.95)',
                 lineWidth: 4.5
@@ -1302,17 +1349,17 @@
                 x: impactX,
                 y: impactY,
                 radius: 10,
-                maxRadius: Math.max(canvas.width, canvas.height) * 0.52,
+                maxRadius: Math.max(canvas.width, canvas.height) * 0.54,
                 alpha: 0.95,
                 color: 'rgba(255, 240, 190, 0.95)',
                 lineWidth: 3
             });
 
-            // Central meteor core debris burst
+            // Central energy burst
             for (let i = 0; i < 65; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const spd = 3 + Math.random() * 11;
-                const palette = ['#ffffff', '#ffe066', '#ff922b', '#ff4d1a', '#e8590c'];
+                const palette = ['#ffffff', '#ffe066', '#ff922b', '#ff4d1a', '#ffd43b'];
                 explosionParticles.push({
                     x: impactX,
                     y: impactY,
@@ -1325,16 +1372,16 @@
                 });
             }
 
-            screenShake = 20;
-            screenFlash = 0.55;
+            screenShake = 22;
+            screenFlash = 0.58;
             meteor = null;
             inSuctionZone = false;
-            lastEventMessage = blownCount > 0 ? 'Meteor Blew Up All 80 Balls' : 'Meteor Detonated';
+            lastEventMessage = `Black Hole Supercharged (Lvl ${powerLevel})`;
             updateStatusDisplay();
         }
 
         /**
-         * Updates meteor flight, path collisions, explosion particles, blast waves, and screen shake
+         * Updates meteor flight, energy transfer stream to the black hole, explosions, and screen shake
          */
         function updateMeteorAndExplosions() {
             if (screenShake > 0) {
@@ -1346,7 +1393,7 @@
                 screenFlash = Math.max(0, screenFlash - 0.035);
             }
 
-            // Update active meteor
+            // Update active meteor & stream its energy directly into the black hole
             if (meteor) {
                 meteor.x += meteor.vx;
                 meteor.y += meteor.vy;
@@ -1369,6 +1416,22 @@
                     });
                 }
 
+                // Stream glowing power particles from the incoming meteor straight into the black hole
+                for (let i = 0; i < 3; i++) {
+                    const toHoleX = blackHole.x - meteor.x;
+                    const toHoleY = blackHole.y - meteor.y;
+                    const baseAngle = Math.atan2(toHoleY, toHoleX) + (Math.random() - 0.5) * 0.55;
+                    const streamSpeed = 16 + Math.random() * 6;
+                    powerStreamParticles.push({
+                        x: meteor.x + (Math.random() - 0.5) * 16,
+                        y: meteor.y + (Math.random() - 0.5) * 16,
+                        vx: Math.cos(baseAngle) * streamSpeed,
+                        vy: Math.sin(baseAngle) * streamSpeed,
+                        size: 2.2 + Math.random() * 2.5,
+                        color: i === 0 ? '#ffffff' : (i === 1 ? '#ffe066' : '#ff922b')
+                    });
+                }
+
                 // Blow up any gravity balls along the meteor's direct path
                 const hitRadius = meteor.radius + 45;
                 for (let i = balls.length - 1; i >= 0; i--) {
@@ -1381,9 +1444,30 @@
                     }
                 }
 
-                // Detonate across the entire arena upon reaching the center
+                // Merge into the black hole upon reaching the center, transferring full power
                 if (meteor.distTraveled >= meteor.targetDist) {
                     detonateMeteorImpact();
+                }
+            }
+
+            // Update power stream particles siphoned into the black hole
+            for (let i = powerStreamParticles.length - 1; i >= 0; i--) {
+                const p = powerStreamParticles[i];
+                const dx = blackHole.x - p.x;
+                const dy = blackHole.y - p.y;
+                const dist = Math.hypot(dx, dy) || 1;
+
+                // Steer strongly toward the black hole singularity
+                p.vx = p.vx * 0.72 + (dx / dist) * 6.5;
+                p.vy = p.vy * 0.72 + (dy / dist) * 6.5;
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (dist <= blackHole.eventHorizonRadius + 4) {
+                    if (Math.random() < 0.25) {
+                        spawnRipple(blackHole.eventHorizonRadius, blackHole.suctionRadius * 1.15, 1.5, '255, 200, 110');
+                    }
+                    powerStreamParticles.splice(i, 1);
                 }
             }
 
@@ -1424,7 +1508,62 @@
         }
 
         /**
-         * Renders the meteor, its fiery trail, shockwave rings, explosion debris, and impact flash
+         * Draws the crackling energy tether and siphoned plasma stream feeding the black hole
+         */
+        function drawPowerTransferBeam() {
+            if (!meteor) return;
+
+            const mx = meteor.x;
+            const my = meteor.y;
+            const bx = blackHole.x;
+            const by = blackHole.y;
+            const dx = bx - mx;
+            const dy = by - my;
+            const dist = Math.hypot(dx, dy) || 1;
+            const nx = -dy / dist;
+            const ny = dx / dist;
+
+            ctx.save();
+
+            // 1. Wide Outer Plasma Conduit
+            const conduitGrad = ctx.createLinearGradient(mx, my, bx, by);
+            conduitGrad.addColorStop(0, 'rgba(255, 155, 45, 0.35)');
+            conduitGrad.addColorStop(0.5, 'rgba(255, 210, 115, 0.45)');
+            conduitGrad.addColorStop(1, 'rgba(255, 250, 225, 0.7)');
+
+            ctx.beginPath();
+            ctx.moveTo(mx, my);
+            ctx.lineTo(bx, by);
+            ctx.strokeStyle = conduitGrad;
+            ctx.lineWidth = 10 + 6 * incomingPowerRatio;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // 2. Two Crackling Sinusoidal Energy Tendrils
+            const segments = 24;
+            for (let strand = 0; strand < 2; strand++) {
+                const phaseOffset = strand * Math.PI;
+                const amp = (10 + 8 * incomingPowerRatio) * (strand === 0 ? 1 : -0.85);
+                ctx.beginPath();
+                for (let s = 0; s <= segments; s++) {
+                    const t = s / segments;
+                    const envelope = Math.sin(t * Math.PI);
+                    const wave = Math.sin(t * 14 - galaxyTime * 28 + phaseOffset) * amp * envelope;
+                    const px = mx + dx * t + nx * wave;
+                    const py = my + dy * t + ny * wave;
+                    if (s === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.strokeStyle = strand === 0 ? 'rgba(255, 245, 200, 0.92)' : 'rgba(255, 146, 43, 0.85)';
+                ctx.lineWidth = strand === 0 ? 2.4 : 1.8;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        /**
+         * Renders the meteor, its fiery trail, siphoned power particles, shockwave rings, explosion debris, and impact flash
          */
         function drawMeteorAndExplosions() {
             // 1. Expanding Blast Waves
@@ -1450,12 +1589,23 @@
                 ctx.restore();
             }
 
-            // 3. Flaming Meteor Body
+            // 3. Siphoned Power Orbs Streaming into Black Hole
+            for (const p of powerStreamParticles) {
+                ctx.save();
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = '#ff922b';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 4. Flaming Meteor Body
             if (meteor) {
                 ctx.save();
                 ctx.translate(meteor.x, meteor.y);
 
-                // Intense outer fiery plasma halo
                 const haloGrad = ctx.createRadialGradient(0, 0, meteor.radius * 0.4, 0, 0, meteor.radius * 2.8);
                 haloGrad.addColorStop(0, 'rgba(255, 245, 200, 0.95)');
                 haloGrad.addColorStop(0.35, 'rgba(255, 135, 30, 0.65)');
@@ -1466,7 +1616,6 @@
                 ctx.arc(0, 0, meteor.radius * 2.8, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Directional bow-shock flame cone
                 ctx.save();
                 ctx.rotate(meteor.angle);
                 const coneGrad = ctx.createLinearGradient(meteor.radius * 1.3, 0, -meteor.radius * 4.5, 0);
@@ -1482,7 +1631,6 @@
                 ctx.fill();
                 ctx.restore();
 
-                // Jagged rotating asteroid rock core
                 ctx.rotate(meteor.rotation);
                 const rockOffsets = [1.0, 0.86, 1.05, 0.82, 0.98, 0.88, 1.04, 0.84, 0.96, 0.9];
                 ctx.beginPath();
@@ -1507,7 +1655,6 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // Glowing magma cracks across the meteor
                 ctx.strokeStyle = '#fff3bf';
                 ctx.lineWidth = 1.6;
                 ctx.beginPath();
@@ -1521,7 +1668,7 @@
                 ctx.restore();
             }
 
-            // 4. Planetary & Meteor Explosion Particles
+            // 5. Planetary & Meteor Explosion Particles
             for (const p of explosionParticles) {
                 ctx.save();
                 ctx.globalAlpha = Math.max(0, p.life);
@@ -1532,7 +1679,7 @@
                 ctx.restore();
             }
 
-            // 5. Brief Radial Impact Flash
+            // 6. Brief Radial Impact Flash
             if (screenFlash > 0) {
                 ctx.save();
                 ctx.fillStyle = `rgba(255, 225, 165, ${screenFlash.toFixed(3)})`;
@@ -1617,6 +1764,12 @@
             meteorTrailParticles = [];
             explosionParticles = [];
             blastWaves = [];
+            powerStreamParticles = [];
+            powerLevel = 0;
+            superchargeTimer = 0;
+            incomingPowerRatio = 0;
+            blackHole.eventHorizonRadius = EVENT_HORIZON_RADIUS;
+            blackHole.suctionRadius = SUCTION_RADIUS;
             screenShake = 0;
             screenFlash = 0;
             inSuctionZone = false;
@@ -1626,19 +1779,22 @@
         }
 
         /**
-         * Updates the header status text based on all active planets and meteor events
+         * Updates the header status text based on active planets, meteor power transfer, and black hole state
          */
         function updateStatusDisplay() {
             const nextPlanet = getNextPlanetDef();
+            const powerState = getBlackHolePowerState();
 
             if (meteor) {
-                setStatus(`METEOR INCOMING! (${balls.length} Balls)`, 'danger');
+                setStatus(`METEOR POWERING BLACK HOLE (${powerState.gravityMultiplier.toFixed(1)}x G)`, 'danger');
                 return;
             }
 
             if (balls.length === 0) {
-                if (lastEventMessage) {
-                    const isDanger = lastEventMessage.includes('Consumed') || lastEventMessage.includes('Meteor');
+                if (powerState.isSupercharged) {
+                    setStatus(`BLACK HOLE SUPERCHARGED (${powerState.gravityMultiplier.toFixed(1)}x G) · Next: ${nextPlanet.name}`, 'danger');
+                } else if (lastEventMessage) {
+                    const isDanger = lastEventMessage.includes('Consumed') || lastEventMessage.includes('Supercharged');
                     setStatus(`${lastEventMessage} · Next: ${nextPlanet.name}`, isDanger ? 'danger' : '');
                 } else {
                     setStatus(`Ready · Next: ${nextPlanet.name}`, '');
@@ -1649,6 +1805,11 @@
             const capturedBall = balls.find(b => b.captured);
             if (capturedBall) {
                 setStatus(`${capturedBall.planet.name} Sucked In (${balls.length}/${METEOR_TRIGGER_COUNT})`, 'danger');
+                return;
+            }
+
+            if (powerState.isSupercharged) {
+                setStatus(`SUPERCHARGED (${powerState.gravityMultiplier.toFixed(1)}x G) · ${balls.length}/${METEOR_TRIGGER_COUNT} · Next: ${nextPlanet.name}`, 'danger');
                 return;
             }
 
@@ -1665,16 +1826,30 @@
         }
 
         /**
-         * Updates ambient black hole rotation, accretion particles, and gravitational ripples
+         * Updates black hole power level, dynamic event horizon/suction radii, accretion particles, and ripples
          */
         function updateBlackHoleEffects() {
-            diskRotation += inSuctionZone ? 0.032 : 0.016;
+            if (superchargeTimer > 0) {
+                superchargeTimer--;
+            }
+
+            const powerState = getBlackHolePowerState();
+
+            // Smoothly animate black hole singularity & suction zone radii as it absorbs meteor power
+            blackHole.eventHorizonRadius += (powerState.targetHorizonRadius - blackHole.eventHorizonRadius) * 0.1;
+            blackHole.suctionRadius += (powerState.targetSuctionRadius - blackHole.suctionRadius) * 0.1;
+
+            const spinBoost = powerState.isReceiving
+                ? 2.8
+                : (powerState.isSupercharged ? 2.1 : (1 + powerLevel * 0.2));
+
+            diskRotation += (inSuctionZone ? 0.032 : 0.016) * spinBoost;
 
             for (const p of accretionParticles) {
-                p.angle += p.speed * (inSuctionZone ? 1.45 : 1);
-                p.radius -= 0.04;
-                if (p.radius <= EVENT_HORIZON_RADIUS + 1.5) {
-                    p.radius = SUCTION_RADIUS - 3;
+                p.angle += p.speed * (inSuctionZone ? 1.45 : 1) * spinBoost;
+                p.radius -= 0.04 * spinBoost;
+                if (p.radius <= blackHole.eventHorizonRadius + 1.5) {
+                    p.radius = blackHole.suctionRadius - 3;
                     p.angle = Math.random() * Math.PI * 2;
                 }
             }
@@ -1682,7 +1857,7 @@
             for (let i = ripples.length - 1; i >= 0; i--) {
                 const r = ripples[i];
                 r.radius += 2.2;
-                const progress = (r.radius - EVENT_HORIZON_RADIUS) / (r.maxRadius - EVENT_HORIZON_RADIUS);
+                const progress = (r.radius - blackHole.eventHorizonRadius) / Math.max(1, r.maxRadius - blackHole.eventHorizonRadius);
                 r.alpha = Math.max(0, 0.85 * (1 - progress));
                 if (r.radius >= r.maxRadius) {
                     ripples.splice(i, 1);
@@ -1691,7 +1866,7 @@
         }
 
         /**
-         * Updates all active planets' trajectories, axial spin, suction zone pull, and capture spirals
+         * Updates all active planets' trajectories using the black hole's current (potentially meteor-empowered) gravity
          */
         function updatePhysics() {
             inSuctionZone = false;
@@ -1699,6 +1874,9 @@
             if (balls.length >= METEOR_TRIGGER_COUNT && !meteor) {
                 spawnMeteor();
             }
+
+            const powerState = getBlackHolePowerState();
+            const effectiveGravity = GRAVITY_CONSTANT * powerState.gravityMultiplier;
 
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
@@ -1723,7 +1901,12 @@
                     }
 
                     if (b.captureFrame >= CAPTURE_DURATION) {
-                        spawnRipple(EVENT_HORIZON_RADIUS, 72, 1.2);
+                        spawnRipple(
+                            blackHole.eventHorizonRadius,
+                            72 + (powerState.isPowered ? 24 : 0),
+                            1.2,
+                            powerState.isPowered ? '255, 205, 120' : '255, 255, 255'
+                        );
                         lastEventMessage = `${b.planet.name} Consumed`;
                         balls.splice(i, 1);
                     }
@@ -1746,30 +1929,36 @@
                     const cross = (-dx) * b.vy - (-dy) * b.vx;
                     b.spinDirection = cross >= 0 ? 1 : -1;
 
-                    spawnRipple(EVENT_HORIZON_RADIUS, 105, 2.2);
+                    spawnRipple(
+                        blackHole.eventHorizonRadius,
+                        105 + (powerState.isPowered ? 30 : 0),
+                        2.2,
+                        powerState.isPowered ? '255, 195, 100' : '255, 255, 255'
+                    );
                     continue;
                 }
 
                 const nx = dx / dist;
                 const ny = dy / dist;
 
-                let acceleration = GRAVITY_CONSTANT / (distSq + SOFTENING_FACTOR);
+                let acceleration = effectiveGravity / (distSq + SOFTENING_FACTOR);
 
-                // Inner Suction Zone Physics
+                // Inner Suction Zone Physics (amplified when black hole is powered by the meteor)
                 if (dist < blackHole.suctionRadius) {
                     inSuctionZone = true;
 
                     const suctionFactor = 1 - (dist / blackHole.suctionRadius);
+                    const powerSuctionScale = powerState.gravityMultiplier;
 
-                    b.rotation += b.planet.spinRate * (1 + 2.1 * suctionFactor);
+                    b.rotation += b.planet.spinRate * (1 + 2.1 * suctionFactor * Math.min(2, powerSuctionScale));
                     b.cloudRotation += 0.032 + 0.06 * suctionFactor;
 
-                    acceleration += 0.16 * suctionFactor + 0.48 * (suctionFactor * suctionFactor);
+                    acceleration += (0.16 * suctionFactor + 0.48 * (suctionFactor * suctionFactor)) * powerSuctionScale;
 
                     const tx = -ny;
                     const ty = nx;
                     const tangentialSpeed = b.vx * tx + b.vy * ty;
-                    const tangentialDrag = tangentialSpeed * (0.022 * suctionFactor);
+                    const tangentialDrag = tangentialSpeed * (0.022 * suctionFactor * Math.min(2.2, powerSuctionScale));
 
                     b.vx -= tx * tangentialDrag;
                     b.vy -= ty * tangentialDrag;
@@ -2145,7 +2334,7 @@
         }
 
         /**
-         * Renders the galaxy background, aliens, spaceships, accretion disk, suction zone, planet trails, black hole singularity, planets, and meteor
+         * Renders the galaxy background, aliens, spaceships, empowered black hole, planet trails, planets, and meteor
          */
         function draw() {
             ctx.save();
@@ -2160,25 +2349,47 @@
 
             const cx = blackHole.x;
             const cy = blackHole.y;
+            const horizonR = blackHole.eventHorizonRadius;
+            const suctionR = blackHole.suctionRadius;
+            const powerState = getBlackHolePowerState();
 
-            // 1. Draw Faint Outer Dashed Suction-Zone Danger Ring
+            // 1. Draw Faint Outer Dashed Suction-Zone Danger Ring (expands & glows golden when powered)
             ctx.save();
             ctx.beginPath();
             ctx.setLineDash([4, 6]);
             ctx.lineDashOffset = -diskRotation * 24;
-            ctx.arc(cx, cy, blackHole.suctionRadius, 0, Math.PI * 2);
-            ctx.strokeStyle = inSuctionZone
-                ? 'rgba(255, 255, 255, 0.65)'
-                : 'rgba(255, 255, 255, 0.24)';
-            ctx.lineWidth = 1;
+            ctx.arc(cx, cy, suctionR, 0, Math.PI * 2);
+            if (powerState.isReceiving || powerState.isSupercharged) {
+                ctx.strokeStyle = 'rgba(255, 200, 115, 0.78)';
+                ctx.lineWidth = 1.6;
+            } else if (powerLevel > 0) {
+                ctx.strokeStyle = 'rgba(255, 225, 165, 0.45)';
+                ctx.lineWidth = 1.2;
+            } else {
+                ctx.strokeStyle = inSuctionZone
+                    ? 'rgba(255, 255, 255, 0.65)'
+                    : 'rgba(255, 255, 255, 0.24)';
+                ctx.lineWidth = 1;
+            }
             ctx.stroke();
             ctx.restore();
+
+            // 1b. Draw Supercharge Duration Progress Arc when empowered
+            if (powerState.isSupercharged && !powerState.isReceiving) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, suctionR + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * powerState.chargeProgress);
+                ctx.strokeStyle = 'rgba(255, 185, 75, 0.85)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
 
             // 2. Draw Expanding Gravitational Shockwave Ripples
             for (const r of ripples) {
                 ctx.beginPath();
                 ctx.arc(cx, cy, r.radius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${r.alpha.toFixed(3)})`;
+                ctx.strokeStyle = `rgba(${r.color || '255, 255, 255'}, ${r.alpha.toFixed(3)})`;
                 ctx.lineWidth = r.lineWidth;
                 ctx.stroke();
             }
@@ -2187,33 +2398,42 @@
             ctx.save();
             ctx.translate(cx, cy);
 
+            const ringColorMain = (powerState.isReceiving || powerState.isSupercharged)
+                ? 'rgba(255, 215, 145, 0.82)'
+                : 'rgba(255, 255, 255, 0.55)';
+            const ringColorSecondary = (powerState.isReceiving || powerState.isSupercharged)
+                ? 'rgba(255, 155, 55, 0.62)'
+                : 'rgba(255, 255, 255, 0.32)';
+
             ctx.save();
             ctx.rotate(diskRotation * 1.8);
             ctx.beginPath();
-            ctx.arc(0, 0, EVENT_HORIZON_RADIUS + 6, 0, Math.PI * 1.45);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-            ctx.lineWidth = 1.2;
+            ctx.arc(0, 0, horizonR + 6, 0, Math.PI * 1.45);
+            ctx.strokeStyle = ringColorMain;
+            ctx.lineWidth = powerState.isPowered ? 1.8 : 1.2;
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.arc(0, 0, EVENT_HORIZON_RADIUS + 6, Math.PI * 1.6, Math.PI * 1.9);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 1;
+            ctx.arc(0, 0, horizonR + 6, Math.PI * 1.6, Math.PI * 1.9);
+            ctx.strokeStyle = ringColorSecondary;
+            ctx.lineWidth = 1.2;
             ctx.stroke();
             ctx.restore();
 
             ctx.save();
             ctx.rotate(-diskRotation * 1.15);
             ctx.beginPath();
-            ctx.arc(0, 0, EVENT_HORIZON_RADIUS + 14, 0.2, Math.PI * 1.15);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
-            ctx.lineWidth = 1;
+            ctx.arc(0, 0, horizonR + 14, 0.2, Math.PI * 1.15);
+            ctx.strokeStyle = ringColorSecondary;
+            ctx.lineWidth = powerState.isPowered ? 1.5 : 1;
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.arc(0, 0, EVENT_HORIZON_RADIUS + 22, Math.PI * 0.7, Math.PI * 1.75);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-            ctx.lineWidth = 0.9;
+            ctx.arc(0, 0, horizonR + 22, Math.PI * 0.7, Math.PI * 1.75);
+            ctx.strokeStyle = (powerState.isReceiving || powerState.isSupercharged)
+                ? 'rgba(255, 185, 95, 0.42)'
+                : 'rgba(255, 255, 255, 0.18)';
+            ctx.lineWidth = 1.1;
             ctx.stroke();
             ctx.restore();
 
@@ -2226,7 +2446,9 @@
 
                 ctx.beginPath();
                 ctx.arc(px, py, p.size, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha.toFixed(2)})`;
+                ctx.fillStyle = (powerState.isReceiving || powerState.isSupercharged)
+                    ? `rgba(255, 210, 125, ${Math.min(1, p.alpha + 0.25).toFixed(2)})`
+                    : `rgba(255, 255, 255, ${p.alpha.toFixed(2)})`;
                 ctx.fill();
             }
 
@@ -2248,39 +2470,67 @@
                 }
             }
 
-            // 6. Draw Pitch-Black Singularity Core & Bright Glowing Photon Ring
+            // 6. Draw Energy Transfer Beam from Incoming Meteor to Black Hole
+            drawPowerTransferBeam();
+
+            // 7. Draw Pitch-Black Singularity Core & Glowing Photon Ring
             ctx.save();
+            const coronaOuterR = horizonR + (powerState.isPowered ? 28 : 14);
             const coronaGrad = ctx.createRadialGradient(
-                cx, cy, EVENT_HORIZON_RADIUS - 1,
-                cx, cy, EVENT_HORIZON_RADIUS + 14
+                cx, cy, horizonR - 1,
+                cx, cy, coronaOuterR
             );
-            coronaGrad.addColorStop(0, 'rgba(255, 255, 255, 0.75)');
-            coronaGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.22)');
-            coronaGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            if (powerState.isReceiving || powerState.isSupercharged) {
+                coronaGrad.addColorStop(0, 'rgba(255, 250, 225, 0.95)');
+                coronaGrad.addColorStop(0.3, 'rgba(255, 165, 55, 0.55)');
+                coronaGrad.addColorStop(0.65, 'rgba(235, 85, 20, 0.22)');
+                coronaGrad.addColorStop(1, 'rgba(235, 85, 20, 0)');
+            } else {
+                coronaGrad.addColorStop(0, 'rgba(255, 255, 255, 0.75)');
+                coronaGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.22)');
+                coronaGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            }
 
             ctx.beginPath();
-            ctx.arc(cx, cy, EVENT_HORIZON_RADIUS + 14, 0, Math.PI * 2);
+            ctx.arc(cx, cy, coronaOuterR, 0, Math.PI * 2);
             ctx.fillStyle = coronaGrad;
             ctx.fill();
 
             ctx.beginPath();
-            ctx.arc(cx, cy, EVENT_HORIZON_RADIUS, 0, Math.PI * 2);
+            ctx.arc(cx, cy, horizonR, 0, Math.PI * 2);
             ctx.fillStyle = '#000000';
             ctx.fill();
 
-            ctx.shadowColor = '#ffffff';
-            ctx.shadowBlur = 14;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
+            ctx.shadowColor = (powerState.isReceiving || powerState.isSupercharged) ? '#ffb84d' : '#ffffff';
+            ctx.shadowBlur = (powerState.isReceiving || powerState.isSupercharged) ? 22 : 14;
+            ctx.strokeStyle = (powerState.isReceiving || powerState.isSupercharged) ? '#fff3bf' : '#ffffff';
+            ctx.lineWidth = (powerState.isReceiving || powerState.isSupercharged) ? 2.8 : 2;
             ctx.stroke();
             ctx.restore();
 
-            // 7. Draw All Active Planets
+            // 7b. Subtle On-Canvas Power Indicator below the Black Hole when Empowered
+            if (powerState.isPowered) {
+                ctx.save();
+                ctx.font = "bold 10px 'Courier New', monospace";
+                ctx.textAlign = 'center';
+                ctx.fillStyle = (powerState.isReceiving || powerState.isSupercharged)
+                    ? 'rgba(255, 225, 155, 0.92)'
+                    : 'rgba(255, 255, 255, 0.72)';
+                const badgeText = powerState.isReceiving
+                    ? `ABSORBING METEOR POWER · ${powerState.gravityMultiplier.toFixed(1)}x G`
+                    : (powerState.isSupercharged
+                        ? `EMPOWERED LVL ${powerLevel} · ${powerState.gravityMultiplier.toFixed(1)}x G`
+                        : `POWER LVL ${powerLevel} · ${powerState.gravityMultiplier.toFixed(1)}x G`);
+                ctx.fillText(badgeText, cx, cy + suctionR + 18);
+                ctx.restore();
+            }
+
+            // 8. Draw All Active Planets
             for (const b of balls) {
                 drawPlanet(b);
             }
 
-            // 8. Draw Meteor & Planet Explosions
+            // 9. Draw Meteor & Planet Explosions
             drawMeteorAndExplosions();
 
             ctx.restore();
