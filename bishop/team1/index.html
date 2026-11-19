@@ -136,6 +136,22 @@
             { main: '#ffd166', hat: '#1b9aaa', tunic: '#2d6a4f', trim: '#ffd166', boots: '#e63946', trail: 'rgba(255, 209, 102, 0.75)' } // North Pole Frosted Elf
         ];
         const FAIRY_LIGHT_COLORS = ['#ff3b30', '#ffd166', '#34c759', '#5ac8fa', '#ffffff'];
+        const TREE_LIGHT_COLORS = ['#ff3b30', '#ffd166', '#34c759', '#5ac8fa', '#ff9f1c'];
+
+        // Christmas trees arranged across the snowy ground
+        const GROUND_TREES = [
+            { rx: 0.05, height: 48, seed: 0 },
+            { rx: 0.11, height: 36, seed: 1 },
+            { rx: 0.19, height: 54, seed: 2 },
+            { rx: 0.28, height: 42, seed: 3 },
+            { rx: 0.38, height: 36, seed: 4 },
+            { rx: 0.49, height: 44, seed: 5 },
+            { rx: 0.59, height: 38, seed: 6 },
+            { rx: 0.70, height: 52, seed: 7 },
+            { rx: 0.79, height: 40, seed: 8 },
+            { rx: 0.88, height: 56, seed: 9 },
+            { rx: 0.95, height: 42, seed: 10 }
+        ];
 
         // STATE VARIABLES
         let elves = [];
@@ -472,35 +488,203 @@
             }
         }
 
+        function getGroundY(rx, h) {
+            return h - 18 - Math.sin(rx * Math.PI * 2.4 + 0.3) * 6 - Math.cos(rx * Math.PI * 1.1) * 4;
+        }
+
+        function drawChristmasTreeWithLights(tx, groundY, treeHeight, seed) {
+            ctx.save();
+
+            const trunkW = Math.max(4, treeHeight * 0.14);
+            const trunkH = Math.max(5, treeHeight * 0.16);
+            const boughBaseY = groundY - trunkH + 3;
+            const foliageH = treeHeight - trunkH;
+
+            // Wooden tree trunk
+            ctx.fillStyle = '#5c3a21';
+            ctx.fillRect(tx - trunkW / 2, groundY - trunkH, trunkW, trunkH + 2);
+            ctx.strokeStyle = '#3d2514';
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(tx - trunkW / 2, groundY - trunkH, trunkW, trunkH + 2);
+
+            // Three overlapping evergreen bough tiers (bottom, middle, top)
+            const tiers = [
+                {
+                    topY: boughBaseY - foliageH * 0.52,
+                    botY: boughBaseY,
+                    halfW: treeHeight * 0.38
+                },
+                {
+                    topY: boughBaseY - foliageH * 0.80,
+                    botY: boughBaseY - foliageH * 0.34,
+                    halfW: treeHeight * 0.30
+                },
+                {
+                    topY: boughBaseY - foliageH,
+                    botY: boughBaseY - foliageH * 0.62,
+                    halfW: treeHeight * 0.21
+                }
+            ];
+
+            for (let t = 0; t < tiers.length; t++) {
+                const tier = tiers[t];
+                const grad = ctx.createLinearGradient(tx, tier.topY, tx, tier.botY);
+                grad.addColorStop(0, '#2d6a4f');
+                grad.addColorStop(1, '#1b4332');
+
+                ctx.beginPath();
+                ctx.moveTo(tx, tier.topY);
+                ctx.lineTo(tx - tier.halfW, tier.botY);
+                ctx.lineTo(tx + tier.halfW, tier.botY);
+                ctx.closePath();
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(82, 183, 136, 0.35)';
+                ctx.lineWidth = 0.9;
+                ctx.stroke();
+            }
+
+            // Small snow mound around the base of the trunk
+            ctx.beginPath();
+            ctx.ellipse(tx, groundY + 1, trunkW * 1.35, 2.4, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(226, 241, 248, 0.45)';
+            ctx.fill();
+
+            // Glowing golden star topper
+            const starY = boughBaseY - foliageH - 1.5;
+            const starPulse = 0.8 + Math.sin(frameCount * 0.08 + seed) * 0.2;
+            const starGlow = ctx.createRadialGradient(tx, starY, 0.5, tx, starY, 7 * starPulse);
+            starGlow.addColorStop(0, 'rgba(255, 243, 176, 0.8)');
+            starGlow.addColorStop(1, 'rgba(255, 209, 102, 0)');
+            ctx.fillStyle = starGlow;
+            ctx.beginPath();
+            ctx.arc(tx, starY, 7 * starPulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffd166';
+            ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                const r = i % 2 === 0 ? 4.2 : 1.5;
+                const ang = (i * Math.PI) / 4;
+                const sx = tx + Math.cos(ang) * r;
+                const sy = starY + Math.sin(ang) * r;
+                if (i === 0) ctx.moveTo(sx, sy);
+                else ctx.lineTo(sx, sy);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            // Draped light strings and twinkling Christmas bulbs across each tier
+            const lightRows = [
+                { tierIndex: 0, count: 4, yStartRatio: 0.42, yEndRatio: 0.82 },
+                { tierIndex: 1, count: 3, yStartRatio: 0.40, yEndRatio: 0.80 },
+                { tierIndex: 2, count: 2, yStartRatio: 0.45, yEndRatio: 0.78 }
+            ];
+
+            let bulbCounter = 0;
+            for (const row of lightRows) {
+                const tier = tiers[row.tierIndex];
+                const points = [];
+
+                for (let b = 0; b < row.count; b++) {
+                    const frac = row.count === 1 ? 0.5 : b / (row.count - 1);
+                    const yRatio = row.yStartRatio + (row.yEndRatio - row.yStartRatio) * frac;
+                    const by = tier.topY + (tier.botY - tier.topY) * yRatio;
+                    const maxSpan = tier.halfW * yRatio * 0.78;
+                    const dir = row.tierIndex % 2 === 0 ? 1 : -1;
+                    const bx = tx + dir * (-maxSpan + frac * (maxSpan * 2));
+                    points.push({ x: bx, y: by });
+                }
+
+                // Subtle garland cord connecting the lights
+                if (points.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let p = 1; p < points.length; p++) {
+                        ctx.lineTo(points[p].x, points[p].y);
+                    }
+                    ctx.strokeStyle = 'rgba(255, 209, 102, 0.22)';
+                    ctx.lineWidth = 0.7;
+                    ctx.stroke();
+                }
+
+                // Glowing colorful bulbs
+                for (const pt of points) {
+                    const color = TREE_LIGHT_COLORS[(seed + bulbCounter) % TREE_LIGHT_COLORS.length];
+                    const twinkle = 0.6 + 0.4 * Math.sin(frameCount * 0.08 + seed * 1.7 + bulbCounter * 1.4);
+
+                    // Soft colored light halo
+                    ctx.save();
+                    ctx.globalAlpha = 0.35 * twinkle;
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 4.2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Bright bulb core
+                    ctx.globalAlpha = 0.7 + 0.3 * twinkle;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 1.7, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Crisp white sparkle center
+                    ctx.globalAlpha = 0.85 * twinkle;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 0.65, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    bulbCounter++;
+                }
+            }
+
+            ctx.restore();
+        }
+
         function drawWinterHorizon() {
-            // Subtle snowy pine horizon silhouette at the bottom edge
             const w = canvas.width;
             const h = canvas.height;
             ctx.save();
+
+            // Rolling snowy ground along the bottom edge
+            const groundGrad = ctx.createLinearGradient(0, h - 30, 0, h);
+            groundGrad.addColorStop(0, 'rgba(226, 241, 248, 0.26)');
+            groundGrad.addColorStop(1, 'rgba(186, 218, 235, 0.14)');
+
             ctx.beginPath();
             ctx.moveTo(0, h);
-            ctx.lineTo(0, h - 18);
-            ctx.quadraticCurveTo(w * 0.25, h - 34, w * 0.5, h - 16);
-            ctx.quadraticCurveTo(w * 0.78, h - 2, w, h - 22);
+            const steps = 40;
+            for (let i = 0; i <= steps; i++) {
+                const rx = i / steps;
+                ctx.lineTo(rx * w, getGroundY(rx, h));
+            }
             ctx.lineTo(w, h);
             ctx.closePath();
-            ctx.fillStyle = 'rgba(226, 241, 248, 0.12)';
+            ctx.fillStyle = groundGrad;
             ctx.fill();
 
-            // Tiny evergreen pine tree silhouettes along the snowbank
-            const treePositions = [0.06, 0.11, 0.22, 0.76, 0.88, 0.94];
-            for (let i = 0; i < treePositions.length; i++) {
-                const tx = treePositions[i] * w;
-                const ty = h - 14;
-                const th = 16 + (i % 3) * 5;
-                ctx.beginPath();
-                ctx.moveTo(tx, ty - th);
-                ctx.lineTo(tx - th * 0.42, ty);
-                ctx.lineTo(tx + th * 0.42, ty);
-                ctx.closePath();
-                ctx.fillStyle = 'rgba(20, 65, 50, 0.45)';
-                ctx.fill();
+            // Subtle frosty snow ridge highlight
+            ctx.beginPath();
+            for (let i = 0; i <= steps; i++) {
+                const rx = i / steps;
+                const gx = rx * w;
+                const gy = getGroundY(rx, h);
+                if (i === 0) ctx.moveTo(gx, gy);
+                else ctx.lineTo(gx, gy);
             }
+            ctx.strokeStyle = 'rgba(240, 249, 255, 0.32)';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // Draw Christmas trees with twinkling lights standing on the snow ground
+            for (const tree of GROUND_TREES) {
+                const tx = tree.rx * w;
+                const groundY = getGroundY(tree.rx, h);
+                drawChristmasTreeWithLights(tx, groundY, tree.height, tree.seed);
+            }
+
             ctx.restore();
         }
 
@@ -999,7 +1183,7 @@
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 0. Draw Festive Background Layer (Stars, Snow, Horizon, Landmarks, Flyers)
+            // 0. Draw Festive Background Layer (Stars, Snow, Horizon & Lit Trees, Landmarks, Flyers)
             drawStarsAndSnow();
             drawWinterHorizon();
             drawFestiveObjects();
