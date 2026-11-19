@@ -104,7 +104,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch Earth.
+        Click anywhere on the canvas to launch Earth. Double-click to add more Earths.
     </div>
 
     <script>
@@ -124,12 +124,15 @@
         const EARTH_RADIUS = 9;           // Visual and collision radius of planet Earth
         const ASTRONAUT_HEIGHT_CM = 8;    // Physical target height of background astronaut (8 cm)
         const SUN_SLOW_MOTION_SPEED = 0.005; // Slow-motion phase increment for solar corona & surface rotation
+        const DOUBLE_TAP_DELAY = 250;     // Max milliseconds between taps for double-tap detection
 
         // STATE VARIABLES
         let bodies = [];
         let twinklingStars = [];
         let shootingStar = null;
         let shootingStarCooldown = 180;
+        let clickTimer = null;
+        let lastTouchTime = 0;
 
         // Central Sun Definition
         const centralNode = {
@@ -453,26 +456,68 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Canvas Click Handler: Directly launch Earth at click position
+        // Single-click handler: launch/replace Earth (delayed slightly so double-taps don't clear existing Earths)
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            launchEarth(clickX, clickY);
+            if (e.detail === 1) {
+                clearTimeout(clickTimer);
+                clickTimer = setTimeout(() => {
+                    launchEarth(clickX, clickY);
+                    clickTimer = null;
+                }, DOUBLE_TAP_DELAY);
+            } else if (e.detail >= 2) {
+                clearTimeout(clickTimer);
+                clickTimer = null;
+            }
         });
 
+        // Double-click handler: add another Earth without removing existing ones
+        canvas.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            clearTimeout(clickTimer);
+            clickTimer = null;
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            addEarth(clickX, clickY);
+        });
+
+        // Touch double-tap support for touchscreens
+        canvas.addEventListener('touchend', (e) => {
+            if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+            const now = Date.now();
+            const touch = e.changedTouches[0];
+            const rect = canvas.getBoundingClientRect();
+            const tapX = touch.clientX - rect.left;
+            const tapY = touch.clientY - rect.top;
+
+            if (now - lastTouchTime <= DOUBLE_TAP_DELAY) {
+                e.preventDefault();
+                clearTimeout(clickTimer);
+                clickTimer = null;
+                lastTouchTime = 0;
+                addEarth(tapX, tapY);
+            } else {
+                lastTouchTime = now;
+            }
+        }, { passive: false });
+
         /**
-         * Launches a single planet Earth body from the specified canvas coordinates.
+         * Creates a new Earth body object at the specified coordinates.
          */
-        function launchEarth(x, y) {
+        function createEarthBody(x, y) {
             // Fixed launch direction: 90° (0° = UP, 90° = RIGHT, 180° = DOWN, 270° = LEFT)
             const rad = (FIXED_LAUNCH_ANGLE * Math.PI) / 180;
             const vx = LAUNCH_VELOCITY * Math.sin(rad);  // sin(90°) = 1  -> vx = 5
             const vy = -LAUNCH_VELOCITY * Math.cos(rad); // cos(90°) = 0  -> vy = 0
 
-            // Overwrite existing array to strictly maintain a single Earth on screen
-            bodies = [{
+            return {
                 x: x,
                 y: y,
                 vx: vx,
@@ -480,13 +525,39 @@
                 radius: EARTH_RADIUS,
                 rotation: 0, // Horizontal rotation phase for spinning continents/clouds
                 trail: []    // Stores history of past {x, y} coordinates
-            }];
+            };
         }
 
         /**
-         * Clears the active Earth body from the simulation.
+         * Launches a single planet Earth body from the specified canvas coordinates,
+         * replacing any existing Earths.
+         */
+        function launchEarth(x, y) {
+            bodies = [createEarthBody(x, y)];
+        }
+
+        /**
+         * Adds a new planet Earth body at the specified coordinates while keeping
+         * all existing Earths in orbit.
+         */
+        function addEarth(x, y) {
+            let spawnX = x;
+            let spawnY = y;
+
+            // Offset slightly if spawning directly on top of an existing Earth
+            while (bodies.some(b => Math.hypot(b.x - spawnX, b.y - spawnY) < EARTH_RADIUS * 2)) {
+                spawnY += EARTH_RADIUS * 2.2;
+            }
+
+            bodies.push(createEarthBody(spawnX, spawnY));
+        }
+
+        /**
+         * Clears all active Earth bodies from the simulation.
          */
         function resetSimulation() {
+            clearTimeout(clickTimer);
+            clickTimer = null;
             bodies = [];
         }
 
