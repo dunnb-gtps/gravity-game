@@ -1134,6 +1134,82 @@
         }
 
         /**
+         * Draws a rounded kawaii speech bubble with a directional pointer tail.
+         */
+        function drawSpeechBubble({
+            x,
+            y,
+            width,
+            height,
+            text,
+            tailBaseLeft,
+            tailBaseRight,
+            tailTip,
+            fillTop = '#ffffff',
+            fillBottom = '#fff3f8',
+            strokeColor = '#ff85b2',
+            textColor = '#c92a67',
+            shadowColor = 'rgba(255, 118, 168, 0.24)'
+        }) {
+            const left = x - width / 2;
+            const top = y - height / 2;
+            const radius = height / 2;
+
+            ctx.save();
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+
+            // Soft pastel drop shadow
+            ctx.shadowColor = shadowColor;
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 4;
+
+            const bubbleGrad = ctx.createLinearGradient(0, top, 0, top + height);
+            bubbleGrad.addColorStop(0, fillTop);
+            bubbleGrad.addColorStop(1, fillBottom);
+
+            // Pointer tail path
+            ctx.beginPath();
+            ctx.moveTo(tailBaseLeft.x, tailBaseLeft.y);
+            ctx.lineTo(tailTip.x, tailTip.y);
+            ctx.lineTo(tailBaseRight.x, tailBaseRight.y);
+            ctx.closePath();
+            ctx.fillStyle = fillBottom;
+            ctx.fill();
+            ctx.lineWidth = 2.4;
+            ctx.strokeStyle = strokeColor;
+            ctx.stroke();
+
+            // Rounded pill bubble body
+            ctx.beginPath();
+            ctx.roundRect(left, top, width, height, radius);
+            ctx.fillStyle = bubbleGrad;
+            ctx.fill();
+            ctx.lineWidth = 2.4;
+            ctx.strokeStyle = strokeColor;
+            ctx.stroke();
+
+            // Seam patch so pointer tail merges cleanly into bubble interior
+            ctx.shadowColor = 'transparent';
+            ctx.beginPath();
+            ctx.moveTo(tailBaseLeft.x + 1.5, tailBaseLeft.y - 1.5);
+            ctx.lineTo(tailBaseRight.x - 1.5, tailBaseRight.y - 1.5);
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = fillBottom;
+            ctx.stroke();
+
+            // Crisp kawaii speech text
+            ctx.font = "700 15px 'Fredoka', 'Nunito', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = textColor;
+            ctx.fillText(text, x, y + 0.5);
+
+            ctx.restore();
+        }
+
+        /**
          * Draws twinkling stars, tiny pastel hearts, and 4-point sparkles.
          */
         function drawSparkleItem(item, time) {
@@ -1178,14 +1254,15 @@
         }
 
         /**
-         * Draws Hello Kitty in the lower-left corner with soft pastel harmony
-         * so trajectory lines remain super crisp and legible over her.
+         * Draws Hello Kitty in the lower-left corner saying "Hi guys!"
+         * with soft pastel harmony so trajectory lines remain crisp and legible.
          */
-        function drawHelloKitty() {
+        function drawHelloKitty(time) {
             const scale = Math.max(0.58, Math.min(0.95, canvas.width / 980));
             const baseX = 108 * scale;
             const baseY = canvas.height - 76 * scale;
             const outlineColor = '#5e374b';
+            const bubbleBob = Math.sin(time * 0.003) * 2.5;
 
             ctx.save();
             ctx.translate(baseX, baseY);
@@ -1337,17 +1414,38 @@
             ctx.stroke();
             ctx.restore();
 
+            // 5. Hello Kitty Speech Bubble: "Hi guys!"
+            ctx.globalAlpha = 0.96;
+            const hkBubbleX = 80;
+            const hkBubbleY = -74 + bubbleBob;
+            drawSpeechBubble({
+                x: hkBubbleX,
+                y: hkBubbleY,
+                width: 98,
+                height: 34,
+                text: 'Hi guys!',
+                tailBaseLeft: { x: hkBubbleX - 24, y: hkBubbleY + 14 },
+                tailBaseRight: { x: hkBubbleX - 10, y: hkBubbleY + 15 },
+                tailTip: { x: 46, y: -26 },
+                fillTop: '#ffffff',
+                fillBottom: '#ffeaf3',
+                strokeColor: '#ff70a6',
+                textColor: '#d93870',
+                shadowColor: 'rgba(255, 112, 166, 0.28)'
+            });
+
             ctx.restore();
         }
 
         /**
          * Draws Cinnamoroll floating gently in the upper-right sky among clouds,
-         * complete with long floppy ears, sky-blue eyes, rosy cheeks, and curled tail.
+         * saying "I'm sleepy..." with cozy sleepy eyes and floating zZ sparkles.
          */
         function drawCinnamoroll(time) {
             const scale = Math.max(0.58, Math.min(0.95, canvas.width / 980));
             const bobOffset = Math.sin(time * 0.0025) * 6;
             const earWave = Math.sin(time * 0.0032) * 0.08;
+            const bubbleBob = Math.sin(time * 0.0028 + 1.2) * 2.5;
             const baseX = canvas.width - 132 * scale;
             const baseY = (96 + bobOffset) * scale;
             const cinnaOutline = '#62a4d6';
@@ -1436,26 +1534,29 @@
             ctx.fill();
             ctx.stroke();
 
-            // 5. Facial Features: Big Sky-Blue Eyes, Rosy Cheeks, Puppy Mouth
+            // 5. Facial Features: Sleepy Half-Lidded Sky-Blue Eyes, Rosy Cheeks, Puppy Mouth
             ctx.fillStyle = 'rgba(255, 148, 184, 0.72)';
             ctx.beginPath();
             ctx.ellipse(-22, 4, 7.5, 4.5, 0, 0, Math.PI * 2);
             ctx.ellipse(22, 4, 7.5, 4.5, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Big sky-blue oval eyes
+            // Cozy half-lidded sleepy sky-blue eyes
             ctx.fillStyle = '#489ee0';
             ctx.beginPath();
-            ctx.ellipse(-15, -3, 4.2, 5.8, 0, 0, Math.PI * 2);
-            ctx.ellipse(15, -3, 4.2, 5.8, 0, 0, Math.PI * 2);
+            ctx.ellipse(-15, -2.2, 4.2, 4.4, 0, 0, Math.PI);
+            ctx.ellipse(15, -2.2, 4.2, 4.4, 0, 0, Math.PI);
             ctx.fill();
 
-            // Bright white eye catchlights
-            ctx.fillStyle = '#ffffff';
+            // Soft sleepy upper eyelid lines
+            ctx.strokeStyle = '#3b7db3';
+            ctx.lineWidth = 2.1;
             ctx.beginPath();
-            ctx.arc(-16.2, -5, 1.6, 0, Math.PI * 2);
-            ctx.arc(13.8, -5, 1.6, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.moveTo(-19.5, -2.4);
+            ctx.quadraticCurveTo(-15, -0.8, -10.5, -2.4);
+            ctx.moveTo(10.5, -2.4);
+            ctx.quadraticCurveTo(15, -0.8, 19.5, -2.4);
+            ctx.stroke();
 
             // Cute curved puppy "w" mouth
             ctx.strokeStyle = '#538db8';
@@ -1466,6 +1567,35 @@
             ctx.beginPath();
             ctx.arc(3.5, 3.5, 3.5, 0.05 * Math.PI, 0.85 * Math.PI);
             ctx.stroke();
+
+            // 6. Cinnamoroll Speech Bubble: "I'm sleepy..."
+            ctx.globalAlpha = 0.96;
+            const cinnaBubbleX = -102;
+            const cinnaBubbleY = -36 + bubbleBob;
+            drawSpeechBubble({
+                x: cinnaBubbleX,
+                y: cinnaBubbleY,
+                width: 118,
+                height: 34,
+                text: "I'm sleepy...",
+                tailBaseLeft: { x: cinnaBubbleX + 26, y: cinnaBubbleY + 14 },
+                tailBaseRight: { x: cinnaBubbleX + 42, y: cinnaBubbleY + 11 },
+                tailTip: { x: -40, y: -6 },
+                fillTop: '#ffffff',
+                fillBottom: '#e8f5ff',
+                strokeColor: '#62a4d6',
+                textColor: '#2b6cb0',
+                shadowColor: 'rgba(98, 164, 214, 0.28)'
+            });
+
+            // Cute gently drifting "z Z" sleep marks above the speech bubble
+            const zFloat = Math.sin(time * 0.0035) * 3;
+            ctx.font = "700 12px 'Fredoka', sans-serif";
+            ctx.fillStyle = 'rgba(72, 158, 224, 0.85)';
+            ctx.textAlign = 'center';
+            ctx.fillText('z', cinnaBubbleX + 34, cinnaBubbleY - 23 + zFloat);
+            ctx.font = "700 15px 'Fredoka', sans-serif";
+            ctx.fillText('Z', cinnaBubbleX + 46, cinnaBubbleY - 31 - zFloat * 0.8);
 
             ctx.restore();
         }
@@ -2140,7 +2270,7 @@
             }
 
             // 4. Theme Characters: Hello Kitty (Lower-Left) & Cinnamoroll (Upper-Right)
-            drawHelloKitty();
+            drawHelloKitty(animTime);
             drawCinnamoroll(animTime);
 
             // 5. Collectible Floating Flowers
