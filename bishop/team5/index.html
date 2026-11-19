@@ -152,7 +152,7 @@
     </div>
 
     <div class="instructions">
-        Click anywhere on the canvas to launch different planets. Avoid the black hole's event horizon!
+        Click anywhere on the canvas to launch gravity balls. Spawn 80 to trigger a meteor strike!
     </div>
 
     <script>
@@ -170,6 +170,7 @@
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
         const TRAIL_LENGTH = 280;          // Number of historic trail points stored
         const SOFTENING_FACTOR = 180;      // Lowered softening for steeper pull near singularity
+        const METEOR_TRIGGER_COUNT = 80;   // Spawn meteor when 80 gravity balls are active
 
         // EARTH CONTINENTS & CLOUDS (lon, lat in radians)
         const EARTH_CONTINENTS = [
@@ -386,6 +387,14 @@
         let planetCycleIndex = 0;
         let lastEventMessage = '';
 
+        // METEOR & EXPLOSION STATE
+        let meteor = null;
+        let meteorTrailParticles = [];
+        let explosionParticles = [];
+        let blastWaves = [];
+        let screenShake = 0;
+        let screenFlash = 0;
+
         // GALAXY, ALIENS & SPACESHIPS STATE
         let galaxyTime = 0;
         let twinklingStars = [];
@@ -584,7 +593,7 @@
                     bobPhase: 0.4,
                     bobSpeed: 0.035,
                     scale: 0.95,
-                    alienColor: '#6ee777', // Classic lime-green alien
+                    alienColor: '#6ee777',
                     lightHue: '#34d399',
                     beamTimer: 40
                 },
@@ -595,7 +604,7 @@
                     bobPhase: 2.3,
                     bobSpeed: 0.03,
                     scale: 0.85,
-                    alienColor: '#c084fc', // Cosmic lavender alien
+                    alienColor: '#c084fc',
                     lightHue: '#e879f9',
                     beamTimer: 160
                 },
@@ -606,7 +615,7 @@
                     bobPhase: 4.1,
                     bobSpeed: 0.038,
                     scale: 0.9,
-                    alienColor: '#38bdf8', // Aquamarine alien
+                    alienColor: '#38bdf8',
                     lightHue: '#22d3ee',
                     beamTimer: 270
                 }
@@ -697,7 +706,6 @@
                     ship.trail.shift();
                 }
 
-                // Wrap smoothly across screen borders
                 let wrapped = false;
                 if (ship.x > w + pad) { ship.x = -pad; wrapped = true; }
                 else if (ship.x < -pad) { ship.x = w + pad; wrapped = true; }
@@ -746,7 +754,6 @@
         function drawSpaceship(ship) {
             const angle = Math.atan2(ship.vy, ship.vx);
 
-            // Engine exhaust contrail
             if (ship.trail.length > 2) {
                 for (let i = 1; i < ship.trail.length; i++) {
                     const ratio = i / ship.trail.length;
@@ -769,7 +776,6 @@
             const flicker = 0.8 + Math.sin(ship.pulsePhase * 2.5) * 0.25;
 
             if (ship.type === 'interceptor') {
-                // Twin cyan ion thruster flames
                 ctx.fillStyle = 'rgba(56, 189, 248, 0.85)';
                 ctx.beginPath();
                 ctx.moveTo(-13, -4);
@@ -783,7 +789,6 @@
                 ctx.lineTo(-13, 4);
                 ctx.fill();
 
-                // Swept delta wings
                 ctx.fillStyle = '#64748b';
                 ctx.beginPath();
                 ctx.moveTo(8, 0);
@@ -793,7 +798,6 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Sleek metallic fuselage
                 const hullGrad = ctx.createLinearGradient(-14, 0, 18, 0);
                 hullGrad.addColorStop(0, '#94a3b8');
                 hullGrad.addColorStop(0.6, '#e2e8f0');
@@ -808,13 +812,11 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Glowing cockpit canopy
                 ctx.fillStyle = '#22d3ee';
                 ctx.beginPath();
                 ctx.ellipse(3, 0, 5.5, 2.3, 0, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Wingtip strobe lights
                 ctx.fillStyle = Math.sin(ship.pulsePhase) > 0 ? '#f43f5e' : '#38bdf8';
                 ctx.beginPath();
                 ctx.arc(-11, -12, 1.3, 0, Math.PI * 2);
@@ -822,7 +824,6 @@
                 ctx.fill();
 
             } else if (ship.type === 'cruiser') {
-                // Warm amber plasma engine glow
                 const thrustGrad = ctx.createRadialGradient(-18, 0, 1, -22, 0, 13 * flicker);
                 thrustGrad.addColorStop(0, 'rgba(255, 240, 180, 0.95)');
                 thrustGrad.addColorStop(0.5, 'rgba(251, 146, 60, 0.65)');
@@ -832,12 +833,10 @@
                 ctx.arc(-21, 0, 13 * flicker, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Engine nacelles
                 ctx.fillStyle = '#475569';
                 ctx.fillRect(-17, -9, 12, 3.5);
                 ctx.fillRect(-17, 5.5, 12, 3.5);
 
-                // Heavy starship hull
                 ctx.fillStyle = '#cbd5e1';
                 ctx.beginPath();
                 ctx.moveTo(22, 0);
@@ -849,7 +848,6 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Hull accent stripe & illuminated deck windows
                 ctx.fillStyle = '#6366f1';
                 ctx.fillRect(-10, -2, 22, 4);
 
@@ -859,7 +857,6 @@
                 }
 
             } else {
-                // Retro-futuristic rocket with porthole
                 ctx.fillStyle = 'rgba(251, 146, 60, 0.9)';
                 ctx.beginPath();
                 ctx.moveTo(-13, -3.5);
@@ -868,7 +865,6 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Red tail fins
                 ctx.fillStyle = '#ef4444';
                 ctx.beginPath();
                 ctx.moveTo(-7, -4);
@@ -884,13 +880,11 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Silver rocket body
                 ctx.fillStyle = '#f1f5f9';
                 ctx.beginPath();
                 ctx.ellipse(2, 0, 15, 5.5, 0, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Crimson nose cone
                 ctx.fillStyle = '#ef4444';
                 ctx.beginPath();
                 ctx.moveTo(18, 0);
@@ -899,7 +893,6 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Porthole window
                 ctx.fillStyle = '#38bdf8';
                 ctx.beginPath();
                 ctx.arc(2, 0, 2.7, 0, Math.PI * 2);
@@ -921,7 +914,6 @@
             ctx.scale(ufo.scale, ufo.scale);
             ctx.rotate(Math.sin(ufo.bobPhase) * 0.08);
 
-            // 1. Optional Pulsing Tractor Beam
             if (ufo.beamTimer < 110) {
                 const beamAlpha = Math.sin((ufo.beamTimer / 110) * Math.PI) * 0.22;
                 const beamGrad = ctx.createLinearGradient(0, 6, 0, 56);
@@ -938,20 +930,16 @@
                 ctx.fill();
             }
 
-            // 2. Alien Pilot Inside the Cockpit Dome
-            // Alien shoulders/torso
             ctx.fillStyle = '#334155';
             ctx.beginPath();
             ctx.ellipse(0, -3.5, 5.5, 3.2, 0, Math.PI, Math.PI * 2);
             ctx.fill();
 
-            // Alien head
             ctx.fillStyle = ufo.alienColor;
             ctx.beginPath();
             ctx.ellipse(0, -8.5, 4.3, 5.0, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Little antennae
             ctx.strokeStyle = ufo.alienColor;
             ctx.lineWidth = 1.1;
             ctx.beginPath();
@@ -967,7 +955,6 @@
             ctx.arc(3.5, -15.8, 1.1, 0, Math.PI * 2);
             ctx.fill();
 
-            // Big glossy alien eyes
             ctx.fillStyle = '#090d16';
             ctx.beginPath();
             ctx.ellipse(-1.7, -8.5, 1.3, 1.9, -0.25, 0, Math.PI * 2);
@@ -980,7 +967,6 @@
             ctx.arc(1.4, -9.1, 0.45, 0, Math.PI * 2);
             ctx.fill();
 
-            // 3. Translucent Glass Cockpit Dome
             const domeGrad = ctx.createRadialGradient(-3, -12, 1, 0, -6, 13);
             domeGrad.addColorStop(0, 'rgba(224, 242, 254, 0.52)');
             domeGrad.addColorStop(0.7, 'rgba(125, 211, 252, 0.24)');
@@ -994,7 +980,6 @@
             ctx.lineWidth = 0.9;
             ctx.stroke();
 
-            // 4. Metallic Saucer Hull
             const saucerGrad = ctx.createLinearGradient(-22, -4, 22, 6);
             saucerGrad.addColorStop(0, '#64748b');
             saucerGrad.addColorStop(0.5, '#e2e8f0');
@@ -1005,13 +990,11 @@
             ctx.ellipse(0, 0, 22, 6.2, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Lower emitter pod
             ctx.fillStyle = '#334155';
             ctx.beginPath();
             ctx.ellipse(0, 4.5, 9, 2.6, 0, 0, Math.PI);
             ctx.fill();
 
-            // 5. Animated Rotating Rim Lights
             const lightCount = 5;
             for (let i = 0; i < lightCount; i++) {
                 const lx = -14 + (i * 28) / (lightCount - 1);
@@ -1034,7 +1017,6 @@
             ctx.rotate(alien.tilt);
             ctx.scale(alien.scale, alien.scale);
 
-            // Jetpack puff
             const puffAlpha = 0.25 + Math.sin(alien.phase * 4) * 0.15;
             ctx.fillStyle = `rgba(186, 230, 253, ${puffAlpha.toFixed(2)})`;
             ctx.beginPath();
@@ -1042,17 +1024,14 @@
             ctx.arc(-11, 9, 2.2, 0, Math.PI * 2);
             ctx.fill();
 
-            // Mini jetpack
             ctx.fillStyle = '#94a3b8';
             ctx.fillRect(-7.5, -1, 4, 8);
 
-            // Space suit torso & waving arms
             ctx.fillStyle = alien.suitColor;
             ctx.beginPath();
             ctx.roundRect(-4.5, 0, 9, 9.5, 3);
             ctx.fill();
 
-            // Waving arm
             const waveAngle = Math.sin(alien.phase * 3.2) * 0.45 - 0.6;
             ctx.save();
             ctx.translate(4.5, 2);
@@ -1070,7 +1049,6 @@
             ctx.fill();
             ctx.restore();
 
-            // Little legs
             ctx.strokeStyle = alien.suitColor;
             ctx.lineWidth = 2.4;
             ctx.lineCap = 'round';
@@ -1081,13 +1059,11 @@
             ctx.lineTo(3, 14);
             ctx.stroke();
 
-            // Alien head
             ctx.fillStyle = alien.bodyColor;
             ctx.beginPath();
             ctx.ellipse(0, -5.5, 4.8, 5.2, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Antenna
             ctx.strokeStyle = alien.bodyColor;
             ctx.lineWidth = 1.2;
             ctx.beginPath();
@@ -1099,7 +1075,6 @@
             ctx.arc(0, -14, 1.3, 0, Math.PI * 2);
             ctx.fill();
 
-            // Big cute eyes
             ctx.fillStyle = '#090d16';
             ctx.beginPath();
             ctx.ellipse(-1.9, -5.5, 1.3, 1.8, -0.2, 0, Math.PI * 2);
@@ -1112,7 +1087,6 @@
             ctx.arc(1.6, -6.1, 0.45, 0, Math.PI * 2);
             ctx.fill();
 
-            // Transparent glass bubble space helmet
             const helmetGrad = ctx.createRadialGradient(-2.5, -8.5, 1, 0, -6, 9);
             helmetGrad.addColorStop(0, 'rgba(255, 255, 255, 0.42)');
             helmetGrad.addColorStop(0.75, 'rgba(186, 230, 253, 0.14)');
@@ -1132,9 +1106,10 @@
          * Renders the pre-baked galaxy canvas plus dynamic twinkling stars, shooting stars, spaceships, and aliens
          */
         function drawGalaxyBackground() {
+            ctx.fillStyle = '#04030a';
+            ctx.fillRect(-30, -30, canvas.width + 60, canvas.height + 60);
             ctx.drawImage(bgCanvas, 0, 0);
 
-            // Twinkling foreground stars
             for (const star of twinklingStars) {
                 const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(galaxyTime * 60 * star.speed + star.phase));
                 ctx.fillStyle = star.color;
@@ -1145,7 +1120,6 @@
             }
             ctx.globalAlpha = 1;
 
-            // Shooting stars
             for (const s of shootingStars) {
                 const grad = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * 6, s.y - s.vy * 6);
                 grad.addColorStop(0, `rgba(255, 255, 255, ${s.life.toFixed(2)})`);
@@ -1158,17 +1132,14 @@
                 ctx.stroke();
             }
 
-            // Cruising spaceships
             for (const ship of spaceships) {
                 drawSpaceship(ship);
             }
 
-            // Alien UFOs
             for (const ufo of ufos) {
                 drawUFO(ufo);
             }
 
-            // Floating space aliens
             for (const alien of spaceAliens) {
                 drawSpaceAlien(alien);
             }
@@ -1233,6 +1204,344 @@
         }
 
         /**
+         * Spawns a giant flaming meteor aimed toward the center when 80 gravity balls are present
+         */
+        function spawnMeteor() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const corners = [
+                { x: -90, y: -90 },
+                { x: w + 90, y: -90 },
+                { x: -90, y: h + 90 },
+                { x: w + 90, y: h + 90 }
+            ];
+            const start = corners[Math.floor(Math.random() * corners.length)];
+            const targetX = blackHole.x;
+            const targetY = blackHole.y;
+
+            const dx = targetX - start.x;
+            const dy = targetY - start.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const speed = 15.5;
+
+            meteor = {
+                x: start.x,
+                y: start.y,
+                vx: (dx / dist) * speed,
+                vy: (dy / dist) * speed,
+                speed: speed,
+                radius: 26,
+                angle: Math.atan2(dy, dx),
+                rotation: 0,
+                spin: 0.09,
+                distTraveled: 0,
+                targetDist: dist
+            };
+
+            screenShake = 5;
+        }
+
+        /**
+         * Blows up a single gravity ball into fiery sparks, fragments, and a blast wave
+         */
+        function detonateBall(b) {
+            blastWaves.push({
+                x: b.x,
+                y: b.y,
+                radius: b.radius * 0.5,
+                maxRadius: b.radius * 4.2 + 22,
+                alpha: 0.95,
+                color: b.planet.trailColor,
+                lineWidth: 2.2
+            });
+
+            const fragmentCount = 14;
+            for (let i = 0; i < fragmentCount; i++) {
+                const angle = (Math.PI * 2 * i) / fragmentCount + (Math.random() - 0.5) * 0.4;
+                const spd = 2.2 + Math.random() * 5.8;
+                const isFire = i % 2 === 0;
+                explosionParticles.push({
+                    x: b.x,
+                    y: b.y,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    size: 1.8 + Math.random() * 2.8,
+                    life: 1.0,
+                    decay: 0.022 + Math.random() * 0.018,
+                    color: isFire
+                        ? (Math.random() < 0.5 ? '#ff9e2c' : '#ff4d1a')
+                        : b.planet.rimColor
+                });
+            }
+        }
+
+        /**
+         * Triggers the meteor's main impact detonation, blowing up all remaining gravity balls
+         */
+        function detonateMeteorImpact() {
+            const impactX = meteor ? meteor.x : blackHole.x;
+            const impactY = meteor ? meteor.y : blackHole.y;
+            const blownCount = balls.length;
+
+            for (const b of balls) {
+                detonateBall(b);
+            }
+            balls = [];
+
+            // Massive central meteor blast waves
+            blastWaves.push({
+                x: impactX,
+                y: impactY,
+                radius: 15,
+                maxRadius: Math.max(canvas.width, canvas.height) * 0.75,
+                alpha: 1.0,
+                color: 'rgba(255, 175, 65, 0.95)',
+                lineWidth: 4.5
+            });
+            blastWaves.push({
+                x: impactX,
+                y: impactY,
+                radius: 10,
+                maxRadius: Math.max(canvas.width, canvas.height) * 0.52,
+                alpha: 0.95,
+                color: 'rgba(255, 240, 190, 0.95)',
+                lineWidth: 3
+            });
+
+            // Central meteor core debris burst
+            for (let i = 0; i < 65; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const spd = 3 + Math.random() * 11;
+                const palette = ['#ffffff', '#ffe066', '#ff922b', '#ff4d1a', '#e8590c'];
+                explosionParticles.push({
+                    x: impactX,
+                    y: impactY,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    size: 2.2 + Math.random() * 3.8,
+                    life: 1.0,
+                    decay: 0.015 + Math.random() * 0.015,
+                    color: palette[i % palette.length]
+                });
+            }
+
+            screenShake = 20;
+            screenFlash = 0.55;
+            meteor = null;
+            inSuctionZone = false;
+            lastEventMessage = blownCount > 0 ? 'Meteor Blew Up All 80 Balls' : 'Meteor Detonated';
+            updateStatusDisplay();
+        }
+
+        /**
+         * Updates meteor flight, path collisions, explosion particles, blast waves, and screen shake
+         */
+        function updateMeteorAndExplosions() {
+            if (screenShake > 0) {
+                screenShake *= 0.88;
+                if (screenShake < 0.1) screenShake = 0;
+            }
+
+            if (screenFlash > 0) {
+                screenFlash = Math.max(0, screenFlash - 0.035);
+            }
+
+            // Update active meteor
+            if (meteor) {
+                meteor.x += meteor.vx;
+                meteor.y += meteor.vy;
+                meteor.distTraveled += meteor.speed;
+                meteor.rotation += meteor.spin;
+
+                // Spawn blazing fire & ember trail behind the meteor
+                for (let i = 0; i < 4; i++) {
+                    const spreadAngle = meteor.angle + Math.PI + (Math.random() - 0.5) * 0.65;
+                    const trailSpd = 1.5 + Math.random() * 3.5;
+                    meteorTrailParticles.push({
+                        x: meteor.x + (Math.random() - 0.5) * 14,
+                        y: meteor.y + (Math.random() - 0.5) * 14,
+                        vx: Math.cos(spreadAngle) * trailSpd,
+                        vy: Math.sin(spreadAngle) * trailSpd,
+                        size: 4 + Math.random() * 9,
+                        life: 1.0,
+                        decay: 0.035 + Math.random() * 0.025,
+                        color: i === 0 ? '#fff3bf' : (i < 3 ? '#ff922b' : '#e8590c')
+                    });
+                }
+
+                // Blow up any gravity balls along the meteor's direct path
+                const hitRadius = meteor.radius + 45;
+                for (let i = balls.length - 1; i >= 0; i--) {
+                    const b = balls[i];
+                    const dist = Math.hypot(b.x - meteor.x, b.y - meteor.y);
+                    if (dist <= hitRadius + b.radius) {
+                        detonateBall(b);
+                        balls.splice(i, 1);
+                        screenShake = Math.max(screenShake, 7);
+                    }
+                }
+
+                // Detonate across the entire arena upon reaching the center
+                if (meteor.distTraveled >= meteor.targetDist) {
+                    detonateMeteorImpact();
+                }
+            }
+
+            // Update meteor trail particles
+            for (let i = meteorTrailParticles.length - 1; i >= 0; i--) {
+                const p = meteorTrailParticles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.size *= 0.96;
+                p.life -= p.decay;
+                if (p.life <= 0) {
+                    meteorTrailParticles.splice(i, 1);
+                }
+            }
+
+            // Update explosion fragments & sparks
+            for (let i = explosionParticles.length - 1; i >= 0; i--) {
+                const p = explosionParticles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.965;
+                p.vy *= 0.965;
+                p.life -= p.decay;
+                if (p.life <= 0) {
+                    explosionParticles.splice(i, 1);
+                }
+            }
+
+            // Update expanding shockwave rings
+            for (let i = blastWaves.length - 1; i >= 0; i--) {
+                const w = blastWaves[i];
+                w.radius += (w.maxRadius - w.radius) * 0.14 + 2.5;
+                w.alpha *= 0.91;
+                if (w.alpha <= 0.02 || w.radius >= w.maxRadius) {
+                    blastWaves.splice(i, 1);
+                }
+            }
+        }
+
+        /**
+         * Renders the meteor, its fiery trail, shockwave rings, explosion debris, and impact flash
+         */
+        function drawMeteorAndExplosions() {
+            // 1. Expanding Blast Waves
+            for (const w of blastWaves) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = w.color;
+                ctx.globalAlpha = Math.max(0, w.alpha);
+                ctx.lineWidth = w.lineWidth;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 2. Meteor Fire & Ember Trail
+            for (const p of meteorTrailParticles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.life * 0.85);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 3. Flaming Meteor Body
+            if (meteor) {
+                ctx.save();
+                ctx.translate(meteor.x, meteor.y);
+
+                // Intense outer fiery plasma halo
+                const haloGrad = ctx.createRadialGradient(0, 0, meteor.radius * 0.4, 0, 0, meteor.radius * 2.8);
+                haloGrad.addColorStop(0, 'rgba(255, 245, 200, 0.95)');
+                haloGrad.addColorStop(0.35, 'rgba(255, 135, 30, 0.65)');
+                haloGrad.addColorStop(0.7, 'rgba(235, 55, 15, 0.25)');
+                haloGrad.addColorStop(1, 'rgba(235, 55, 15, 0)');
+                ctx.fillStyle = haloGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, meteor.radius * 2.8, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Directional bow-shock flame cone
+                ctx.save();
+                ctx.rotate(meteor.angle);
+                const coneGrad = ctx.createLinearGradient(meteor.radius * 1.3, 0, -meteor.radius * 4.5, 0);
+                coneGrad.addColorStop(0, 'rgba(255, 250, 220, 0.9)');
+                coneGrad.addColorStop(0.35, 'rgba(255, 145, 35, 0.65)');
+                coneGrad.addColorStop(1, 'rgba(255, 65, 10, 0)');
+                ctx.fillStyle = coneGrad;
+                ctx.beginPath();
+                ctx.moveTo(meteor.radius * 1.35, 0);
+                ctx.quadraticCurveTo(0, -meteor.radius * 1.45, -meteor.radius * 4.5, -meteor.radius * 0.5);
+                ctx.lineTo(-meteor.radius * 4.5, meteor.radius * 0.5);
+                ctx.quadraticCurveTo(0, meteor.radius * 1.45, meteor.radius * 1.35, 0);
+                ctx.fill();
+                ctx.restore();
+
+                // Jagged rotating asteroid rock core
+                ctx.rotate(meteor.rotation);
+                const rockOffsets = [1.0, 0.86, 1.05, 0.82, 0.98, 0.88, 1.04, 0.84, 0.96, 0.9];
+                ctx.beginPath();
+                for (let i = 0; i < rockOffsets.length; i++) {
+                    const a = (Math.PI * 2 * i) / rockOffsets.length;
+                    const r = meteor.radius * rockOffsets[i];
+                    const px = Math.cos(a) * r;
+                    const py = Math.sin(a) * r;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+
+                const rockGrad = ctx.createRadialGradient(-6, -6, 2, 0, 0, meteor.radius);
+                rockGrad.addColorStop(0, '#ffd43b');
+                rockGrad.addColorStop(0.45, '#d9480f');
+                rockGrad.addColorStop(1, '#2b160e');
+                ctx.fillStyle = rockGrad;
+                ctx.fill();
+
+                ctx.strokeStyle = '#ff922b';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Glowing magma cracks across the meteor
+                ctx.strokeStyle = '#fff3bf';
+                ctx.lineWidth = 1.6;
+                ctx.beginPath();
+                ctx.moveTo(-10, -6);
+                ctx.lineTo(2, 1);
+                ctx.lineTo(11, -8);
+                ctx.moveTo(2, 1);
+                ctx.lineTo(5, 12);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // 4. Planetary & Meteor Explosion Particles
+            for (const p of explosionParticles) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 5. Brief Radial Impact Flash
+            if (screenFlash > 0) {
+                ctx.save();
+                ctx.fillStyle = `rgba(255, 225, 165, ${screenFlash.toFixed(3)})`;
+                ctx.fillRect(-30, -30, canvas.width + 60, canvas.height + 60);
+                ctx.restore();
+            }
+        }
+
+        /**
          * Dynamically resizes the canvas to fit its fluid container, rebuilds the galaxy backdrop, and centers the black hole
          */
         function resizeCanvas() {
@@ -1290,6 +1599,11 @@
                 spinDirection: 1
             });
 
+            // Trigger meteor strike once 80 gravity balls are spawned
+            if (balls.length >= METEOR_TRIGGER_COUNT && !meteor) {
+                spawnMeteor();
+            }
+
             updateStatusDisplay();
         }
 
@@ -1299,6 +1613,12 @@
         function resetSimulation() {
             balls = [];
             ripples = [];
+            meteor = null;
+            meteorTrailParticles = [];
+            explosionParticles = [];
+            blastWaves = [];
+            screenShake = 0;
+            screenFlash = 0;
             inSuctionZone = false;
             planetCycleIndex = 0;
             lastEventMessage = '';
@@ -1306,14 +1626,20 @@
         }
 
         /**
-         * Updates the header status text based on all active planets
+         * Updates the header status text based on all active planets and meteor events
          */
         function updateStatusDisplay() {
             const nextPlanet = getNextPlanetDef();
 
+            if (meteor) {
+                setStatus(`METEOR INCOMING! (${balls.length} Balls)`, 'danger');
+                return;
+            }
+
             if (balls.length === 0) {
                 if (lastEventMessage) {
-                    setStatus(`${lastEventMessage} · Next: ${nextPlanet.name}`, lastEventMessage.includes('Consumed') ? 'danger' : '');
+                    const isDanger = lastEventMessage.includes('Consumed') || lastEventMessage.includes('Meteor');
+                    setStatus(`${lastEventMessage} · Next: ${nextPlanet.name}`, isDanger ? 'danger' : '');
                 } else {
                     setStatus(`Ready · Next: ${nextPlanet.name}`, '');
                 }
@@ -1322,19 +1648,19 @@
 
             const capturedBall = balls.find(b => b.captured);
             if (capturedBall) {
-                setStatus(`${capturedBall.planet.name} Sucked In (${balls.length} Active)`, 'danger');
+                setStatus(`${capturedBall.planet.name} Sucked In (${balls.length}/${METEOR_TRIGGER_COUNT})`, 'danger');
                 return;
             }
 
             if (inSuctionZone) {
-                setStatus(`Suction Zone · ${balls.length} Active · Next: ${nextPlanet.name}`, 'danger');
+                setStatus(`Suction Zone · ${balls.length}/${METEOR_TRIGGER_COUNT} · Next: ${nextPlanet.name}`, 'danger');
                 return;
             }
 
             if (balls.length === 1) {
-                setStatus(`Orbiting: ${balls[0].planet.name} · Next: ${nextPlanet.name}`, 'active');
+                setStatus(`Orbiting: ${balls[0].planet.name} (1/${METEOR_TRIGGER_COUNT}) · Next: ${nextPlanet.name}`, 'active');
             } else {
-                setStatus(`${balls.length} Planets Orbiting · Next: ${nextPlanet.name}`, 'active');
+                setStatus(`${balls.length}/${METEOR_TRIGGER_COUNT} Orbiting · Next: ${nextPlanet.name}`, 'active');
             }
         }
 
@@ -1369,6 +1695,10 @@
          */
         function updatePhysics() {
             inSuctionZone = false;
+
+            if (balls.length >= METEOR_TRIGGER_COUNT && !meteor) {
+                spawnMeteor();
+            }
 
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
@@ -1553,28 +1883,24 @@
             const endAngle = isFront ? Math.PI : Math.PI * 2;
 
             if (planetId === 'saturn') {
-                // Outer A-ring
                 ctx.beginPath();
                 ctx.ellipse(0, 0, r * 2.25, r * 0.62, 0, startAngle, endAngle);
                 ctx.strokeStyle = 'rgba(218, 192, 138, 0.62)';
                 ctx.lineWidth = Math.max(1, r * 0.22);
                 ctx.stroke();
 
-                // Bright inner B-ring (separated by Cassini division gap)
                 ctx.beginPath();
                 ctx.ellipse(0, 0, r * 1.72, r * 0.47, 0, startAngle, endAngle);
                 ctx.strokeStyle = 'rgba(245, 224, 172, 0.85)';
                 ctx.lineWidth = Math.max(1.2, r * 0.28);
                 ctx.stroke();
 
-                // Faint inner C-ring
                 ctx.beginPath();
                 ctx.ellipse(0, 0, r * 1.38, r * 0.38, 0, startAngle, endAngle);
                 ctx.strokeStyle = 'rgba(185, 162, 118, 0.35)';
                 ctx.lineWidth = Math.max(0.7, r * 0.14);
                 ctx.stroke();
             } else if (planetId === 'uranus') {
-                // Delicate translucent ring system
                 ctx.beginPath();
                 ctx.ellipse(0, 0, r * 1.85, r * 0.48, 0, startAngle, endAngle);
                 ctx.strokeStyle = 'rgba(180, 245, 250, 0.42)';
@@ -1640,7 +1966,6 @@
                     drawSphericalPolygon(continent.points, continent.centerLon, b.rotation, r, continent.color);
                 }
 
-                // Polar Ice Caps
                 ctx.fillStyle = 'rgba(240, 248, 255, 0.9)';
                 ctx.beginPath();
                 ctx.ellipse(0, -r * 0.92, r * 0.45, r * 0.16, 0, 0, Math.PI * 2);
@@ -1649,7 +1974,6 @@
                 ctx.ellipse(0, r * 0.93, r * 0.42, r * 0.15, 0, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Drifting Clouds
                 for (const cloud of EARTH_CLOUDS) {
                     drawSphericalPolygon(cloud.points, cloud.centerLon, b.cloudRotation, r, 'rgba(255, 255, 255, 0.42)');
                 }
@@ -1666,7 +1990,6 @@
                     drawSphericalPolygon(region.points, region.centerLon, b.rotation, r, region.color);
                 }
 
-                // Northern Polar Ice Cap
                 ctx.fillStyle = 'rgba(255, 246, 240, 0.92)';
                 ctx.beginPath();
                 ctx.ellipse(0, -r * 0.92, r * 0.42, r * 0.16, 0, 0, Math.PI * 2);
@@ -1686,7 +2009,6 @@
                     { y: 0.80,  h: 0.22, color: '#8f6d4c' }
                 ]);
 
-                // Iconic Rotating Great Red Spot
                 drawSphericalSpot(
                     0.5, 0.32, b.rotation, r,
                     r * 0.32, r * 0.18,
@@ -1719,7 +2041,6 @@
                     { y: 0.25,  h: 0.22, color: 'rgba(15, 38, 130, 0.45)' }
                 ]);
 
-                // Great Dark Spot & High-Altitude White Methane Streak
                 drawSphericalSpot(0.2, 0.22, b.rotation, r, r * 0.28, r * 0.16, '#0c2175');
                 drawSphericalSpot(0.35, -0.28, b.rotation * 1.15, r, r * 0.36, r * 0.06, 'rgba(225, 242, 255, 0.72)');
 
@@ -1756,7 +2077,6 @@
                 ctx.fillStyle = merGrad;
                 ctx.fillRect(-r, -r, r * 2, r * 2);
 
-                // Impact Craters (including Caloris Basin)
                 drawSphericalSpot(-0.6, -0.25, b.rotation, r, r * 0.28, r * 0.25, '#73737a', 'rgba(220, 220, 228, 0.45)');
                 drawSphericalSpot(0.5, 0.32, b.rotation, r, r * 0.20, r * 0.18, '#66666e', 'rgba(210, 210, 218, 0.35)');
                 drawSphericalSpot(1.8, -0.40, b.rotation, r, r * 0.22, r * 0.20, '#6e6e75', 'rgba(215, 215, 222, 0.4)');
@@ -1775,7 +2095,6 @@
                 }
             }
 
-            // Unrotate tilt before applying camera-relative 3D shadow terminator
             ctx.rotate(-p.axialTilt);
 
             // 5. 3D Spherical Shadow Terminator & Limb Highlight
@@ -1787,7 +2106,7 @@
             ctx.fillStyle = shadowGrad;
             ctx.fillRect(-r, -r, r * 2, r * 2);
 
-            ctx.restore(); // End sphere clip
+            ctx.restore();
 
             // 6. Crisp Planetary Rim Border
             ctx.beginPath();
@@ -1815,9 +2134,16 @@
         }
 
         /**
-         * Renders the galaxy background, aliens, spaceships, accretion disk, suction zone, planet trails, black hole singularity, and planets
+         * Renders the galaxy background, aliens, spaceships, accretion disk, suction zone, planet trails, black hole singularity, planets, and meteor
          */
         function draw() {
+            ctx.save();
+            if (screenShake > 0.1) {
+                const sx = (Math.random() - 0.5) * screenShake;
+                const sy = (Math.random() - 0.5) * screenShake;
+                ctx.translate(sx, sy);
+            }
+
             // 0. Draw Galaxy, Nebulae, Starfield, Spaceships, and Aliens
             drawGalaxyBackground();
 
@@ -1938,10 +2264,16 @@
             for (const b of balls) {
                 drawPlanet(b);
             }
+
+            // 8. Draw Meteor & Planet Explosions
+            drawMeteorAndExplosions();
+
+            ctx.restore();
         }
 
         function animate() {
             updatePhysics();
+            updateMeteorAndExplosions();
             updateBlackHoleEffects();
             updateCosmicEntities();
             draw();
