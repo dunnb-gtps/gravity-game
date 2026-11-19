@@ -142,8 +142,8 @@
         const GRAVITY_CONSTANT = 1800;    // Strength of gravitational pull (G)
         const LAUNCH_VELOCITY = 5;         // Fixed velocity on click
         const FIXED_LAUNCH_ANGLE = 90;     // Fixed direction in degrees (90° = straight right)
-        const TRAIL_LENGTH = 300;         // Number of historic trail points stored
         const SOFTENING_FACTOR = 400;     // Prevents infinite velocity near center
+        const MAX_MINI_STARFISHES = 260;   // Cap active bursting mini starfishes
 
         // FISH GAMEPLAY CONSTANTS
         const MAX_FISH = 5;                // Max concurrent fish in the background
@@ -159,8 +159,15 @@
             { body: '#c77dff', belly: '#edd2ff', fin: '#9d4edd', glow: 'rgba(199, 125, 255, 0.35)' }
         ];
 
+        const MINI_STARFISH_PALETTES = [
+            ['#ffd166', '#ff7b54', '#e84855'],
+            ['#ffe08a', '#ff965a', '#f25c54'],
+            ['#fff0a8', '#ffad5a', '#ff7043']
+        ];
+
         // STATE VARIABLES
         let balls = [];
+        let miniStarfishes = [];
         let stars = [];
         let fishes = [];
         let catchEffects = [];
@@ -348,6 +355,57 @@
             });
         }
 
+        function spawnTrailMiniStarfish(x, y, ballVx, ballVy) {
+            const speed = Math.hypot(ballVx, ballVy);
+            const moveAngle = speed > 0.001 ? Math.atan2(ballVy, ballVx) : Math.random() * Math.PI * 2;
+            const backAngle = moveAngle + Math.PI;
+
+            // Fan outward behind and perpendicular to the starfish's path so they burst out of the wake
+            const burstAngle = backAngle + (Math.random() - 0.5) * Math.PI * 1.45;
+            const burstSpeed = 30 + Math.random() * 85;
+            const colors = MINI_STARFISH_PALETTES[Math.floor(Math.random() * MINI_STARFISH_PALETTES.length)];
+
+            // Offset slightly behind the center of the main starfish
+            const offsetDist = 4 + Math.random() * 3;
+            const spawnX = x + Math.cos(backAngle) * offsetDist;
+            const spawnY = y + Math.sin(backAngle) * offsetDist;
+
+            miniStarfishes.push({
+                x: spawnX,
+                y: spawnY,
+                vx: Math.cos(burstAngle) * burstSpeed,
+                vy: Math.sin(burstAngle) * burstSpeed,
+                outerRadius: 3.3 + Math.random() * 2.6,
+                angle: Math.random() * Math.PI * 2,
+                spinSpeed: (Math.random() - 0.5) * 8.0,
+                age: 0,
+                maxLife: 0.65 + Math.random() * 0.45,
+                colors: colors
+            });
+
+            if (miniStarfishes.length > MAX_MINI_STARFISHES) {
+                miniStarfishes.shift();
+            }
+        }
+
+        function updateMiniStarfishes(dt) {
+            const drag = Math.pow(0.16, dt);
+            for (let i = miniStarfishes.length - 1; i >= 0; i--) {
+                const ms = miniStarfishes[i];
+                ms.age += dt;
+                if (ms.age >= ms.maxLife) {
+                    miniStarfishes.splice(i, 1);
+                    continue;
+                }
+
+                ms.x += ms.vx * dt;
+                ms.y += ms.vy * dt;
+                ms.vx *= drag;
+                ms.vy *= drag;
+                ms.angle += ms.spinSpeed * dt;
+            }
+        }
+
         function resizeCanvas() {
             const wrapper = document.getElementById('canvas-wrapper');
             canvas.width = wrapper.clientWidth;
@@ -395,12 +453,13 @@
                 outerRadius: 12,
                 angle: Math.random() * Math.PI * 2,
                 spinSpeed: 0.055,
-                trail: [] // Stores history of past {x, y} coordinates
+                trailSpawnAcc: 0
             }];
         }
 
         function resetSimulation() {
             balls = [];
+            miniStarfishes = [];
             catchEffects = [];
             score = 0;
             fishSpawnTimer = 0;
@@ -501,6 +560,7 @@
         function updatePhysics(dt) {
             auroraTime += 0.014;
             updateFishes(dt);
+            updateMiniStarfishes(dt);
 
             for (let i = balls.length - 1; i >= 0; i--) {
                 const b = balls[i];
@@ -532,6 +592,9 @@
                 const ax = acceleration * (dx / dist);
                 const ay = acceleration * (dy / dist);
 
+                const prevX = b.x;
+                const prevY = b.y;
+
                 // Update velocity, position, and rotation angle
                 b.vx += ax;
                 b.vy += ay;
@@ -539,10 +602,21 @@
                 b.y += b.vy;
                 b.angle += b.spinSpeed;
 
-                // Record position history for line trail
-                b.trail.push({ x: b.x, y: b.y });
-                if (b.trail.length > TRAIL_LENGTH) {
-                    b.trail.shift();
+                // Spawn bursting mini starfishes behind the moving ball
+                const stepDx = b.x - prevX;
+                const stepDy = b.y - prevY;
+                const stepDist = Math.hypot(stepDx, stepDy);
+                b.trailSpawnAcc += Math.max(stepDist, 2.4);
+
+                const spawnInterval = 4.4;
+                let spawnedThisStep = 0;
+                while (b.trailSpawnAcc >= spawnInterval && spawnedThisStep < 5) {
+                    b.trailSpawnAcc -= spawnInterval;
+                    spawnedThisStep++;
+                    const t = Math.random();
+                    const sx = prevX + stepDx * t;
+                    const sy = prevY + stepDy * t;
+                    spawnTrailMiniStarfish(sx, sy, b.vx, b.vy);
                 }
 
                 // Check collision with visible background fish
@@ -904,9 +978,99 @@
             ctx.restore();
         }
 
+        function buildStarfishPath(outerR) {
+            const innerR = outerR * 0.44;
+            const arms = 5;
+
+            ctx.beginPath();
+            for (let i = 0; i < arms; i++) {
+                const tipAngle = (i * Math.PI * 2) / arms - Math.PI / 2;
+                const prevValleyAngle = ((i - 0.5) * Math.PI * 2) / arms - Math.PI / 2;
+                const nextValleyAngle = ((i + 0.5) * Math.PI * 2) / arms - Math.PI / 2;
+
+                const vx1 = Math.cos(prevValleyAngle) * innerR;
+                const vy1 = Math.sin(prevValleyAngle) * innerR;
+                const tx = Math.cos(tipAngle) * outerR;
+                const ty = Math.sin(tipAngle) * outerR;
+                const vx2 = Math.cos(nextValleyAngle) * innerR;
+                const vy2 = Math.sin(nextValleyAngle) * innerR;
+
+                const leftFlankAngle = tipAngle - 0.24;
+                const rightFlankAngle = tipAngle + 0.24;
+                const c1x = Math.cos(leftFlankAngle) * (outerR * 0.72);
+                const c1y = Math.sin(leftFlankAngle) * (outerR * 0.72);
+                const c2x = Math.cos(rightFlankAngle) * (outerR * 0.72);
+                const c2y = Math.sin(rightFlankAngle) * (outerR * 0.72);
+
+                if (i === 0) {
+                    ctx.moveTo(vx1, vy1);
+                }
+                ctx.quadraticCurveTo(c1x, c1y, tx, ty);
+                ctx.quadraticCurveTo(c2x, c2y, vx2, vy2);
+            }
+            ctx.closePath();
+        }
+
+        function drawMiniStarfishes() {
+            for (let idx = 0; idx < miniStarfishes.length; idx++) {
+                const ms = miniStarfishes[idx];
+                const lifeRatio = ms.age / ms.maxLife;
+                const popIn = Math.min(1, ms.age / 0.08);
+                const fadeOut = 1 - Math.pow(lifeRatio, 1.6);
+                const scale = (0.35 + 0.85 * popIn) * (1 - lifeRatio * 0.35);
+                const alpha = Math.max(0, Math.min(1, fadeOut * 0.95));
+                const outerR = ms.outerRadius;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(ms.x, ms.y);
+                ctx.rotate(ms.angle);
+                ctx.scale(scale, scale);
+
+                // Subtle warm glow
+                ctx.fillStyle = 'rgba(255, 165, 95, 0.25)';
+                ctx.beginPath();
+                ctx.arc(0, 0, outerR * 1.45, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Mini 5-armed starfish body
+                buildStarfishPath(outerR);
+                const bodyGrad = ctx.createRadialGradient(0, 0, 0.5, 0, 0, outerR);
+                bodyGrad.addColorStop(0, ms.colors[0]);
+                bodyGrad.addColorStop(0.5, ms.colors[1]);
+                bodyGrad.addColorStop(1, ms.colors[2]);
+
+                ctx.fillStyle = bodyGrad;
+                ctx.fill();
+
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = 0.75;
+                ctx.strokeStyle = '#ffd180';
+                ctx.stroke();
+
+                // Tiny cream center & arm dots
+                ctx.fillStyle = 'rgba(255, 250, 236, 0.88)';
+                ctx.beginPath();
+                ctx.arc(0, 0, 0.65, 0, Math.PI * 2);
+                for (let a = 0; a < 5; a++) {
+                    const armAngle = (a * Math.PI * 2) / 5 - Math.PI / 2;
+                    ctx.moveTo(Math.cos(armAngle) * (outerR * 0.48), Math.sin(armAngle) * (outerR * 0.48));
+                    ctx.arc(
+                        Math.cos(armAngle) * (outerR * 0.48),
+                        Math.sin(armAngle) * (outerR * 0.48),
+                        0.45,
+                        0,
+                        Math.PI * 2
+                    );
+                }
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
         function drawStarfish(b) {
             const outerR = b.outerRadius;
-            const innerR = outerR * 0.44;
             const arms = 5;
 
             ctx.save();
@@ -923,34 +1087,7 @@
             ctx.fill();
 
             // Build organic 5-armed starfish silhouette
-            ctx.beginPath();
-            for (let i = 0; i < arms; i++) {
-                const tipAngle = (i * Math.PI * 2) / arms - Math.PI / 2;
-                const prevValleyAngle = ((i - 0.5) * Math.PI * 2) / arms - Math.PI / 2;
-                const nextValleyAngle = ((i + 0.5) * Math.PI * 2) / arms - Math.PI / 2;
-
-                const vx1 = Math.cos(prevValleyAngle) * innerR;
-                const vy1 = Math.sin(prevValleyAngle) * innerR;
-                const tx = Math.cos(tipAngle) * outerR;
-                const ty = Math.sin(tipAngle) * outerR;
-                const vx2 = Math.cos(nextValleyAngle) * innerR;
-                const vy2 = Math.sin(nextValleyAngle) * innerR;
-
-                // Control points slightly widened to give plump, rounded starfish arms
-                const leftFlankAngle = tipAngle - 0.24;
-                const rightFlankAngle = tipAngle + 0.24;
-                const c1x = Math.cos(leftFlankAngle) * (outerR * 0.72);
-                const c1y = Math.sin(leftFlankAngle) * (outerR * 0.72);
-                const c2x = Math.cos(rightFlankAngle) * (outerR * 0.72);
-                const c2y = Math.sin(rightFlankAngle) * (outerR * 0.72);
-
-                if (i === 0) {
-                    ctx.moveTo(vx1, vy1);
-                }
-                ctx.quadraticCurveTo(c1x, c1y, tx, ty);
-                ctx.quadraticCurveTo(c2x, c2y, vx2, vy2);
-            }
-            ctx.closePath();
+            buildStarfishPath(outerR);
 
             // Rich coral-to-gold radial gradient fill
             const bodyGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, outerR);
@@ -1007,24 +1144,14 @@
             // 2. Draw Catch Effects
             drawCatchEffects();
 
-            // 3. Draw Central Sea Otter
+            // 3. Draw Bursting Mini Starfish Trail
+            drawMiniStarfishes();
+
+            // 4. Draw Central Sea Otter
             drawSeaOtter(centralNode.x, centralNode.y);
 
-            // 4. Draw Starfish & Trail
+            // 5. Draw Main Starfish
             for (const b of balls) {
-                // Draw path line
-                if (b.trail.length > 1) {
-                    ctx.beginPath();
-                    ctx.moveTo(b.trail[0].x, b.trail[0].y);
-                    for (let t = 1; t < b.trail.length; t++) {
-                        ctx.lineTo(b.trail[t].x, b.trail[t].y);
-                    }
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1.2;
-                    ctx.stroke();
-                }
-
-                // Draw starfish object
                 drawStarfish(b);
             }
         }
